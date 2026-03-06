@@ -18,5 +18,5 @@ CREATE TABLE IF NOT EXISTS `sys_user` (
 
 -- 默认管理员账号：admin / admin123（BCrypt加密）
 INSERT INTO `sys_user` (`username`, `password`, `email`, `role`, `status`)
-VALUES ('admin', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin@sanitary.com', 'ADMIN', 1)
+VALUES ('admin', '$2b$10$gVmswZWzA42HHQnh3CCE5.NFc7f7wpt8cLtBJNxX5fJ1P5ozNYAsK', 'admin@sanitary.com', 'ADMIN', 1)
 ON DUPLICATE KEY UPDATE `username` = `username`;
