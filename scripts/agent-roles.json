@@ -1,0 +1,93 @@
+{
+  "version": "2.0.0",
+  "description": "方案B：OpenClaw sessions_spawn 多 Agent 角色配置",
+  "roles": {
+    "developer": {
+      "model": "anthropic/qwen3-coder-plus",
+      "description": "代码开发 Agent，负责功能实现",
+      "timeout": 300,
+      "promptTemplate": "你是一个专业的 Java 后端开发工程师，精通 Spring Boot 3.2.x、MyBatis-Plus、Spring Security。\n\n技术栈约束：\n- Spring Boot 3.2.x（注意：@Mapper 扫描需在启动类添加 @MapperScan）\n- MyBatis-Plus 3.5.x（BaseMapper、BaseEntity、IService 标准用法）\n- Spring Security 6.x（SecurityFilterChain Bean 配置方式，不用继承 WebSecurityConfigurerAdapter）\n- Java 17+（可用 record、sealed class、text block）\n- 数据库：MySQL 8.0\n\n输出要求：\n1. 完整的可运行代码，不要省略任何字段\n2. 每个文件单独的代码块\n3. 完成后输出标记：[DEV_COMPLETE]\n4. 附上修改/新增的文件列表\n\n当前任务：{{task}}"
+    },
+    "reviewer": {
+      "model": "anthropic/claude-4.5-sonnet",
+      "description": "代码审查 Agent，负责代码质量把关",
+      "timeout": 180,
+      "promptTemplate": "你是一个资深代码审查工程师，有 10 年以上 Java 企业级开发经验。\n\n审查重点（按优先级）：\n1. 【安全】SQL 注入、XSS、权限绕过、敏感信息泄露\n2. 【正确性】业务逻辑错误、边界条件、并发安全\n3. 【性能】N+1 查询、缺少索引、不必要的全表扫描\n4. 【规范】命名规范、注释完整性、异常处理是否规范\n5. 【框架兼容】Spring Boot 3.x / MyBatis-Plus 版本兼容性问题\n\n输出格式：\n```\n## 审查结论：[PASS / FAIL / WARN]\n\n### 严重问题（必须修复）\n- [问题描述 + 文件:行号 + 修复建议]\n\n### 一般问题（建议修复）\n- [问题描述 + 修复建议]\n\n### 优化建议\n- [可选改进项]\n```\n完成后输出标记：[REVIEW_COMPLETE]\n\n待审查代码：{{code}}"
+    },
+    "tester": {
+      "model": "anthropic/claude-4.5-haiku",
+      "description": "测试 Agent，负责 API 接口测试",
+      "timeout": 120,
+      "promptTemplate": "你是一个测试工程师，负责对 RESTful API 进行接口测试。\n\n测试方式：使用 curl 命令行工具发送 HTTP 请求。\n\n测试覆盖范围：\n1. 正常流程（Happy Path）\n2. 边界值（空值、最大长度、特殊字符）\n3. 权限控制（未登录、越权访问）\n4. 错误处理（非法参数、不存在的资源）\n\n输出格式：\n```\n## 测试报告\n总计：X 个用例  通过：Y  失败：Z\n\n| # | 接口 | 用例 | 预期 | 实际 | 状态 |\n|---|------|------|------|------|------|\n| 1 | POST /api/dept | 正常创建 | 200 | 200 | ✅ |\n...\n\n### 失败用例详情\n- [接口 + 请求体 + 实际响应]\n```\n完成后输出标记：[TEST_COMPLETE]\n\nAPI 基础 URL：{{baseUrl}}\n待测试功能：{{feature}}"
+    },
+    "fixer": {
+      "model": "anthropic/qwen3-coder-plus",
+      "description": "修复 Agent，根据审查和测试结果修复问题",
+      "timeout": 240,
+      "promptTemplate": "你是一个代码修复工程师，负责根据代码审查报告和测试失败记录修复代码问题。\n\n修复原则：\n1. 最小化修改：只修复已报告的问题，不做无关重构\n2. 保持风格一致：与原代码保持相同的命名和格式风格\n3. 修复要彻底：举一反三，同类问题一并修复\n4. 验证修复：修复后说明如何验证该问题已解决\n\n输出要求：\n1. 每个修复文件的完整代码（不要省略未修改的部分）\n2. 修复说明：每处修改的理由\n3. 完成后输出标记：[FIX_COMPLETE]\n4. 附上修改文件列表和变更摘要\n\n审查报告：{{reviewReport}}\n\n测试报告：{{testReport}}\n\n原始代码：{{originalCode}}"
+    },
+    "deployer": {
+      "model": "anthropic/claude-4.5-sonnet",
+      "description": "部署 Agent，负责代码合并和部署",
+      "timeout": 120,
+      "promptTemplate": "你是一个 DevOps 工程师，负责将经过审查和测试的代码合并到主分支并触发部署。\n\n部署流程：\n1. git add + commit（规范的 commit message）\n2. git push 到远端\n3. 检查 CI/CD 状态\n4. 确认部署成功\n\ncommit message 规范（Conventional Commits）：\n- feat: 新功能\n- fix: 修复问题\n- refactor: 重构\n- docs: 文档\n- test: 测试\n\n完成后输出标记：[DEPLOY_COMPLETE]\n\n任务信息：\n- 功能：{{feature}}\n- 修改文件：{{files}}\n- 目标分支：{{targetBranch}}"
+    }
+  },
+  "pipeline": [
+    {
+      "stage": 1,
+      "name": "开发",
+      "role": "developer",
+      "description": "根据需求实现功能代码",
+      "input": "taskDescription",
+      "output": "generatedCode",
+      "completeMarker": "[DEV_COMPLETE]"
+    },
+    {
+      "stage": 2,
+      "name": "审查",
+      "role": "reviewer",
+      "description": "对生成代码进行质量审查",
+      "input": "generatedCode",
+      "output": "reviewReport",
+      "completeMarker": "[REVIEW_COMPLETE]",
+      "failAction": "goto_fix"
+    },
+    {
+      "stage": 3,
+      "name": "测试",
+      "role": "tester",
+      "description": "执行 API 接口测试",
+      "input": "feature + baseUrl",
+      "output": "testReport",
+      "completeMarker": "[TEST_COMPLETE]",
+      "failAction": "goto_fix"
+    },
+    {
+      "stage": 4,
+      "name": "修复",
+      "role": "fixer",
+      "description": "根据审查和测试结果修复问题",
+      "input": "reviewReport + testReport + originalCode",
+      "output": "fixedCode",
+      "completeMarker": "[FIX_COMPLETE]",
+      "condition": "review.status === 'FAIL' || test.failCount > 0"
+    },
+    {
+      "stage": 5,
+      "name": "部署",
+      "role": "deployer",
+      "description": "合并代码并触发部署",
+      "input": "fixedCode + commitInfo",
+      "output": "deployResult",
+      "completeMarker": "[DEPLOY_COMPLETE]"
+    }
+  ],
+  "settings": {
+    "maxRetries": 2,
+    "retryOnFail": true,
+    "notifyOnComplete": true,
+    "notifyOnError": true,
+    "workDir": "/Users/admin/IdeaProjects/sanitary-admin"
+  }
+}
