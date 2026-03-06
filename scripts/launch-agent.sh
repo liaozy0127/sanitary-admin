@@ -120,10 +120,17 @@ case "$AGENT_TYPE" in
         ;;
 esac
 
-# 在后台启动 claude CLI
-log "在后台启动 claude CLI..."
-nohup bash -c "cd '$WORKTREE_PATH' && claude $MODEL_FLAG --print '$TASK_DESC' 2>&1" >> "$LOG_FILE" 2>&1 &
-AGENT_PID=$!
+# 将任务描述写入临时文件，避免特殊字符转义问题
+PROMPT_FILE=$(mktemp /tmp/agent-prompt-XXXXXX.txt)
+echo "$TASK_DESC" > "$PROMPT_FILE"
+
+# 使用 tmux 启动（提供完整伪终端，解决 BashTool pre-flight 卡死问题）
+TMUX_SESSION="agent-${TASK_ID}"
+log "在 tmux 会话中启动 claude CLI（session: $TMUX_SESSION）..."
+tmux new-session -d -s "$TMUX_SESSION" \
+    -c "$WORKTREE_PATH" \
+    "claude $MODEL_FLAG --dangerously-skip-permissions --print \"\$(cat $PROMPT_FILE)\" 2>&1 | tee -a '$LOG_FILE'; rm -f '$PROMPT_FILE'"
+AGENT_PID=$(tmux list-panes -t "$TMUX_SESSION" -F "#{pane_pid}" 2>/dev/null | head -1)
 
 log "${GREEN}Agent 已启动，PID: $AGENT_PID${NC}"
 
