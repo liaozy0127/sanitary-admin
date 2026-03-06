@@ -19,6 +19,30 @@ const routes = [
         name: 'User',
         component: () => import('@/views/user/index.vue'),
         meta: { title: '用户管理', requiresAuth: true }
+      },
+      {
+        path: 'dept',
+        name: 'Dept',
+        component: () => import('@/views/dept/DeptList.vue'),
+        meta: { title: '部门管理', requiresAuth: true }
+      },
+      {
+        path: 'role',
+        name: 'Role',
+        component: () => import('@/views/role/RoleList.vue'),
+        meta: { title: '角色管理', requiresAuth: true }
+      },
+      {
+        path: 'menu',
+        name: 'Menu',
+        component: () => import('@/views/menu/MenuList.vue'),
+        meta: { title: '菜单管理', requiresAuth: true }
+      },
+      {
+        path: 'log',
+        name: 'Log',
+        component: () => import('@/views/log/LogList.vue'),
+        meta: { title: '操作日志', requiresAuth: true }
       }
     ]
   },

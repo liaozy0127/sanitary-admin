@@ -19,6 +19,22 @@
           <el-icon><User /></el-icon>
           <template #title>用户管理</template>
         </el-menu-item>
+        <el-menu-item index="/dept">
+          <el-icon><OfficeBuilding /></el-icon>
+          <template #title>部门管理</template>
+        </el-menu-item>
+        <el-menu-item index="/role">
+          <el-icon><UserFilled /></el-icon>
+          <template #title>角色管理</template>
+        </el-menu-item>
+        <el-menu-item index="/menu">
+          <el-icon><Menu /></el-icon>
+          <template #title>菜单管理</template>
+        </el-menu-item>
+        <el-menu-item index="/log">
+          <el-icon><Document /></el-icon>
+          <template #title>操作日志</template>
+        </el-menu-item>
       </el-menu>
     </el-aside>
 
@@ -59,7 +75,7 @@
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { User, Fold, Expand, ArrowDown } from '@element-plus/icons-vue'
+import { User, Fold, Expand, ArrowDown, OfficeBuilding, UserFilled, Menu, Document } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
