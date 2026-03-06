@@ -32,10 +32,4 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
                 .eq(SysUser::getUsername, username));
     }
     
-    @Override
-    public boolean removeById(Long id) {
-        // 在这里可以添加删除前的检查逻辑
-        // 例如：检查用户是否有关联的数据，根据实际业务需求
-        return super.removeById(id);
-    }
 }
