@@ -12,9 +12,7 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
     @Override
     public List<SysDept> listDepts(String deptName) {
         LambdaQueryWrapper<SysDept> wrapper = new LambdaQueryWrapper<>();
-        if (StringUtils.hasText(deptName)) {
-            wrapper.like(SysDept::getDeptName, deptName);
-        }
+        if (StringUtils.hasText(deptName)) { wrapper.like(SysDept::getDeptName, deptName); }
         wrapper.orderByAsc(SysDept::getSort);
         return this.list(wrapper);
     }

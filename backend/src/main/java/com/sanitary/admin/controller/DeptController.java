@@ -20,18 +20,14 @@ public class DeptController {
     }
     @PostMapping
     public Result<Void> add(@RequestBody SysDept dept) {
-        sysDeptService.save(dept);
-        return Result.success();
+        sysDeptService.save(dept); return Result.success();
     }
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody SysDept dept) {
-        dept.setId(id);
-        sysDeptService.updateById(dept);
-        return Result.success();
+        dept.setId(id); sysDeptService.updateById(dept); return Result.success();
     }
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
-        sysDeptService.removeById(id);
-        return Result.success();
+        sysDeptService.removeById(id); return Result.success();
     }
 }
