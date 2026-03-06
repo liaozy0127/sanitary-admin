@@ -25,3 +25,12 @@ jwt:
 logging:
   level:
     com.sanitary: debug
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
