@@ -1,0 +1,31 @@
+{
+  "agents": {
+    "claude-sonnet": {
+      "model": "anthropic/claude-4.5-sonnet",
+      "description": "综合能力强，适合复杂任务",
+      "useFor": ["后端逻辑", "复杂重构", "多文件修改"]
+    },
+    "claude-haiku": {
+      "model": "anthropic/claude-4.5-haiku",
+      "description": "轻量快速，适合简单任务",
+      "useFor": ["简单 bug 修复", "文档更新", "小功能"]
+    },
+    "claude-qwen": {
+      "model": "anthropic/qwen3-coder-plus",
+      "description": "代码能力强，适合编程密集任务",
+      "useFor": ["算法实现", "性能优化", "代码重构"]
+    }
+  },
+  "selectionStrategy": {
+    "default": "claude-sonnet",
+    "byKeyword": {
+      "前端": "claude-sonnet",
+      "UI": "claude-sonnet",
+      "算法": "claude-qwen",
+      "性能": "claude-qwen",
+      "重构": "claude-qwen",
+      "文档": "claude-haiku",
+      "bugfix": "claude-haiku"
+    }
+  }
+}

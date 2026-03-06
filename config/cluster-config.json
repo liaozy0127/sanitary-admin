@@ -1,0 +1,9 @@
+{
+  "maxConcurrentAgents": 4,
+  "worktreeBaseDir": "../agent-cluster-worktrees",
+  "taskTimeoutMinutes": 60,
+  "monitorIntervalMinutes": 10,
+  "retryOnFailure": true,
+  "maxRetries": 3,
+  "autoCleanupDays": 7
+}

@@ -1,0 +1,23 @@
+# Agent 运行时
+tasks/*.json
+logs/*.log
+../agent-cluster-worktrees/
+
+# Java
+target/
+*.class
+*.jar
+*.war
+
+# Node
+node_modules/
+dist/
+.env
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
