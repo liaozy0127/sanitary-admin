@@ -120,16 +120,18 @@ case "$AGENT_TYPE" in
         ;;
 esac
 
-# 将任务描述写入临时文件，避免特殊字符转义问题
+# 将任务描述写入临时文件（用文件传递，完全避免 shell 转义中文字符问题）
 PROMPT_FILE=$(mktemp /tmp/agent-prompt-XXXXXX.txt)
-echo "$TASK_DESC" > "$PROMPT_FILE"
+printf '%s' "$TASK_DESC" > "$PROMPT_FILE"
 
 # 使用 tmux 启动（提供完整伪终端，解决 BashTool pre-flight 卡死问题）
+# 关键：用 cat file | claude --print -（stdin 管道）代替 --print "$(cat file)"
+# 原因：$(cat ...) 在 tmux shell 中展开多字节字符（中文）时会出错导致卡死
 TMUX_SESSION="agent-${TASK_ID}"
 log "在 tmux 会话中启动 claude CLI（session: $TMUX_SESSION）..."
 tmux new-session -d -s "$TMUX_SESSION" \
     -c "$WORKTREE_PATH" \
-    "claude $MODEL_FLAG --dangerously-skip-permissions --print \"\$(cat $PROMPT_FILE)\" 2>&1 | tee -a '$LOG_FILE'; rm -f '$PROMPT_FILE'"
+    "cat '$PROMPT_FILE' | claude $MODEL_FLAG --dangerously-skip-permissions --print - 2>&1 | tee -a '$LOG_FILE'; rm -f '$PROMPT_FILE'; echo '[AGENT DONE]' >> '$LOG_FILE'"
 AGENT_PID=$(tmux list-panes -t "$TMUX_SESSION" -F "#{pane_pid}" 2>/dev/null | head -1)
 
 log "${GREEN}Agent 已启动，PID: $AGENT_PID${NC}"
