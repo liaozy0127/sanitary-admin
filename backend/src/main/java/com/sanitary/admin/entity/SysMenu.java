@@ -1,15 +1,21 @@
 package com.sanitary.admin.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
+@ToString(exclude = "children")
+@EqualsAndHashCode(exclude = "children")
 @TableName("sys_menu")
 public class SysMenu {
     @TableId(type = IdType.AUTO)
     private Long id;
+    @NotBlank(message = "菜单名称不能为空")
     private String menuName;
     private String menuPath;
     private String menuIcon;
