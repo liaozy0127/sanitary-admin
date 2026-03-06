@@ -37,18 +37,17 @@
         :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
       >
         <el-table-column prop="menuName" label="菜单名称" min-width="150" />
-        <el-table-column prop="path" label="路径" min-width="150" />
-        <el-table-column prop="icon" label="图标" width="80" align="center">
+        <el-table-column prop="menuPath" label="路径" min-width="150" />
+        <el-table-column prop="menuIcon" label="图标" width="80" align="center">
           <template #default="{ row }">
-            <el-icon v-if="row.icon">
-              <component :is="row.icon" />
-            </el-icon>
+            <span v-if="row.menuIcon">{{ row.menuIcon }}</span>
+            <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="type" label="类型" width="100" align="center">
+        <el-table-column prop="menuType" label="类型" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.type === 'menu' ? 'primary' : 'success'" size="small">
-              {{ row.type === 'menu' ? '菜单' : '按钮' }}
+            <el-tag :type="row.menuType === 1 ? 'primary' : row.menuType === 2 ? 'success' : 'warning'" size="small">
+              {{ row.menuType === 1 ? '目录' : row.menuType === 2 ? '菜单' : '按钮' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -101,16 +100,17 @@
         <el-form-item label="菜单名称" prop="menuName">
           <el-input v-model="form.menuName" placeholder="请输入菜单名称" />
         </el-form-item>
-        <el-form-item label="路径" prop="path">
-          <el-input v-model="form.path" placeholder="请输入路径" />
+        <el-form-item label="路径" prop="menuPath">
+          <el-input v-model="form.menuPath" placeholder="请输入路径，如 /system/user" />
         </el-form-item>
-        <el-form-item label="图标" prop="icon">
-          <el-input v-model="form.icon" placeholder="请输入图标组件名" />
+        <el-form-item label="图标" prop="menuIcon">
+          <el-input v-model="form.menuIcon" placeholder="请输入图标名" />
         </el-form-item>
-        <el-form-item label="类型" prop="type">
-          <el-radio-group v-model="form.type">
-            <el-radio label="menu">菜单</el-radio>
-            <el-radio label="button">按钮</el-radio>
+        <el-form-item label="类型" prop="menuType">
+          <el-radio-group v-model="form.menuType">
+            <el-radio :label="1">目录</el-radio>
+            <el-radio :label="2">菜单</el-radio>
+            <el-radio :label="3">按钮</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="排序" prop="sort">
@@ -149,9 +149,9 @@ const form = reactive({
   id: null,
   parentId: null,
   menuName: '',
-  path: '',
-  icon: '',
-  type: 'menu',
+  menuPath: '',
+  menuIcon: '',
+  menuType: 2,
   sort: 0,
   status: 1
 })
@@ -161,10 +161,12 @@ const formRules = {
     { required: true, message: '请输入菜单名称', trigger: 'blur' },
     { min: 2, max: 50, message: '菜单名称长度在 2 到 50 个字符', trigger: 'blur' }
   ],
-  path: [
+  menuPath: [
     { required: true, message: '请输入路径', trigger: 'blur' },
-    { min: 1, max: 100, message: '路径长度在 1 到 100 个字符', trigger: 'blur' },
-    { pattern: /^\/[a-zA-Z0-9/_-]*$/, message: '路径必须以/开头，只能包含字母、数字、下划线、横线和/', trigger: 'blur' }
+    { min: 1, max: 200, message: '路径长度在 1 到 200 个字符', trigger: 'blur' }
+  ],
+  menuType: [
+    { required: true, message: '请选择菜单类型', trigger: 'change' }
   ]
 }
 
@@ -213,9 +215,9 @@ const openDialog = (row = null) => {
       id: row.id,
       parentId: row.parentId,
       menuName: row.menuName,
-      path: row.path,
-      icon: row.icon,
-      type: row.type,
+      menuPath: row.menuPath,
+      menuIcon: row.menuIcon,
+      menuType: row.menuType,
       sort: row.sort,
       status: row.status
     })
@@ -237,9 +239,9 @@ const resetForm = () => {
     id: null,
     parentId: null,
     menuName: '',
-    path: '',
-    icon: '',
-    type: 'menu',
+    menuPath: '',
+    menuIcon: '',
+    menuType: 2,
     sort: 0,
     status: 1
   })
