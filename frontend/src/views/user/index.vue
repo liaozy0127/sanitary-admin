@@ -9,6 +9,7 @@
             placeholder="请输入用户名"
             clearable
             style="width: 200px"
+            @keyup.enter="fetchUsers"
           />
         </el-form-item>
         <el-form-item label="状态">
@@ -54,7 +55,7 @@
             />
           </template>
         </el-table-column>
-        <el-table-column prop="createdAt" label="创建时间" width="180" />
+        <el-table-column prop="createTime" label="创建时间" width="180" />
         <el-table-column label="操作" width="160" align="center" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link :icon="Edit" @click="openDialog(row)">编辑</el-button>
@@ -179,7 +180,7 @@ const fetchUsers = async () => {
       status: searchForm.status !== null ? searchForm.status : undefined
     }
     const res = await getUserList(params)
-    tableData.value = res.data.list || []
+    tableData.value = res.data.records || [] // 修改为records以匹配后端返回格式
     pagination.total = res.data.total || 0
   } catch (err) {
     ElMessage.error(err.message || '获取用户列表失败')

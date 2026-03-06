@@ -4,8 +4,10 @@ import com.sanitary.admin.common.PageResult;
 import com.sanitary.admin.common.Result;
 import com.sanitary.admin.entity.SysUser;
 import com.sanitary.admin.service.SysUserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -17,6 +19,7 @@ public class UserController {
     private final PasswordEncoder passwordEncoder;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','USER_VIEW')")
     public Result<PageResult<SysUser>> list(
             @RequestParam(defaultValue = "1") Integer pageNum,
             @RequestParam(defaultValue = "10") Integer pageSize,
@@ -25,12 +28,14 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','USER_VIEW')")
     public Result<SysUser> getById(@PathVariable Long id) {
         return Result.success(sysUserService.getById(id));
     }
 
     @PostMapping
-    public Result<Void> add(@RequestBody SysUser user) {
+    @PreAuthorize("hasAnyRole('ADMIN','USER_ADD')")
+    public Result<Void> add(@Valid @RequestBody SysUser user) {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setStatus(1);
         sysUserService.save(user);
@@ -38,7 +43,8 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    public Result<Void> update(@PathVariable Long id, @RequestBody SysUser user) {
+    @PreAuthorize("hasAnyRole('ADMIN','USER_EDIT')")
+    public Result<Void> update(@PathVariable Long id, @Valid @RequestBody SysUser user) {
         user.setId(id);
         if (user.getPassword() != null && !user.getPassword().isEmpty()) {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
@@ -50,6 +56,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','USER_DELETE')")
     public Result<Void> delete(@PathVariable Long id) {
         sysUserService.removeById(id);
         return Result.success();

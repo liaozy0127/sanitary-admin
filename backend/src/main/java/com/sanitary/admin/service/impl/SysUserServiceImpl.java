@@ -31,4 +31,11 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         return this.getOne(new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getUsername, username));
     }
+    
+    @Override
+    public boolean removeById(java.io.Serializable id) {
+        // 在这里可以添加删除前的检查逻辑
+        // 例如：检查用户是否有关联的数据，根据实际业务需求
+        return super.removeById(id);
+    }
 }

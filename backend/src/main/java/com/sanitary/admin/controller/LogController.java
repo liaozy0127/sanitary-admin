@@ -5,6 +5,7 @@ import com.sanitary.admin.common.Result;
 import com.sanitary.admin.entity.SysLog;
 import com.sanitary.admin.service.SysLogService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -14,6 +15,7 @@ public class LogController {
     private final SysLogService sysLogService;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','LOG_VIEW')")
     public Result<IPage<SysLog>> page(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -23,6 +25,7 @@ public class LogController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','LOG_VIEW')")
     public Result<SysLog> getById(@PathVariable Long id) {
         SysLog log = sysLogService.getById(id);
         if (log == null) return Result.error(404, "日志不存在");
@@ -30,6 +33,7 @@ public class LogController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','LOG_DELETE')")
     public Result<Void> delete(@PathVariable Long id) {
         sysLogService.removeById(id);
         return Result.success();

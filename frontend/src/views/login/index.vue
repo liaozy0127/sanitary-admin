@@ -84,7 +84,12 @@ const handleLogin = async () => {
   try {
     const res = await login(loginForm)
     userStore.setToken(res.data.token)
-    userStore.setUserInfo(res.data.userInfo)
+    // 从登录响应中提取用户信息
+    const userInfo = {
+      username: res.data.username,
+      role: res.data.role
+    }
+    userStore.setUserInfo(userInfo)
     ElMessage.success('登录成功')
     router.push('/')
   } catch (err) {
