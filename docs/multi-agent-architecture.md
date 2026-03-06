@@ -26,10 +26,10 @@
   开发者
     ↓ 下达需求
   主控 Agent（项目经理）
-    ├── 开发 Agent（程序员）→ Qwen3（代码专项）
-    ├── 审查 Agent（Code Reviewer）→ Sonnet（深度推理）
-    ├── 测试 Agent（QA）→ Haiku（快速执行）
-    └── 修复 Agent（Bug Fixer）→ Qwen3（代码修改）
+    ├── 开发 Agent（程序员）→ 代码专项模型
+    ├── 审查 Agent（Code Reviewer）→ 深度推理模型
+    ├── 测试 Agent（QA）→ 快速执行模型
+    └── 修复 Agent（Bug Fixer）→ 代码修改模型
 ```
 
 每个角色专注自己的职责，用最合适的模型，主控 Agent 协调整个流水线。
@@ -48,7 +48,7 @@
                            │
 ┌──────────────────────────▼──────────────────────────────────┐
 │               主控 Agent（OpenClaw）                          │
-│               模型：claude-4.5-sonnet                        │
+│               模型：强推理模型（如 Sonnet）                    │
 │  职责：理解需求、任务拆解、Sub-Agent 调度、结果汇总             │
 └───┬───────────┬───────────┬───────────┬──────────────────────┘
     │           │           │           │
@@ -56,7 +56,7 @@
 ┌───────┐  ┌───────┐  ┌───────┐  ┌───────┐
 │开发    │  │审查    │  │测试    │  │修复    │
 │Agent  │  │Agent  │  │Agent  │  │Agent  │
-│Qwen3  │  │Sonnet │  │Haiku  │  │Qwen3  │
+│代码模型│  │推理模型│  │快速模型│  │代码模型│
 └───┬───┘  └───┬───┘  └───┬───┘  └───┬───┘
     │           │           │           │
     ▼           ▼           ▼           ▼
@@ -74,16 +74,6 @@
 | Sub-Agent | 执行具体任务（写代码、审查、测试、修复） | 后台运行，完成后自动推送结果 |
 
 **关键原则：主控 Agent 不能被阻塞。** 任何超过 10 秒的任务都要交给 Sub-Agent。
-
-### 为什么不同角色用不同模型
-
-| Agent 角色 | 模型 | 选择理由 |
-|-----------|------|---------|
-| 主控 Agent | claude-4.5-sonnet | 需要强推理能力，理解复杂意图，做任务调度决策 |
-| 开发 Agent | qwen3-coder-plus | 专门针对代码生成优化，Java/TS 语法更精准，废话少 |
-| 审查 Agent | claude-4.5-sonnet | 需要深度理解业务逻辑、判断安全风险、给出改进方案 |
-| 测试 Agent | claude-4.5-haiku | 任务明确重复（跑 curl），速度快 3-5 倍，没必要用重型模型 |
-| 修复 Agent | qwen3-coder-plus | 本质是代码任务，同开发 Agent |
 
 ---
 
@@ -111,7 +101,7 @@ openclaw onboard
 ```python
 sessions_spawn(
     task="你的任务描述...",
-    model="anthropic/qwen3-coder-plus",  # 指定模型
+    model="your-code-model",  # 指定模型
     mode="run",       # run=一次性任务，session=持久会话
     runtime="subagent",
     cleanup="keep"    # 保留会话历史
@@ -126,15 +116,6 @@ subagents(action="list")   # 查看所有运行中的 Sub-Agent
 subagents(action="kill", target="run-id")  # 强制终止
 subagents(action="steer", target="run-id", message="...")  # 引导方向
 ```
-
-### 模型选型参考
-
-| 模型 | 适合任务 | 速度 | 推理深度 |
-|------|---------|------|---------|
-| claude-4.5-sonnet | 复杂推理、代码审查、架构设计 | 中 | 强 |
-| claude-4.5-haiku | 简单执行、格式转换、快速问答 | 快 | 一般 |
-| qwen3-coder-plus | 代码生成、代码修改、技术实现 | 中 | 代码强 |
-| glm-5 | 中文理解、文档写作 | 中 | 中文强 |
 
 ---
 
@@ -157,7 +138,7 @@ tmux new-session -d -s "agent-${TASK_ID}" \
 
 **优点：** 简单直接，5 分钟能跑起来  
 **缺点：**
-- 只支持 `claude-*` 模型，Qwen/GLM 用不了
+- 只支持 `claude-*` 模型，其他模型用不了
 - tmux 会话不稳定，可能被系统清理
 - 监控靠轮询日志文件，不优雅
 - 中文 prompt 会触发 shell 转义 bug（`$(cat file)` 方式）
@@ -182,7 +163,7 @@ sessions_spawn(
     {task_description}
     完成后输出：TASK_COMPLETE
     """,
-    model="anthropic/qwen3-coder-plus",
+    model="your-code-model",
     mode="run",
     runtime="subagent"
 )
@@ -203,6 +184,65 @@ sessions_spawn(
 | 中断/重试 | 手动 kill tmux | `subagents(kill/steer)` |
 | 并发控制 | 手写计数逻辑 | OpenClaw 内置（默认 8 个）|
 
+### 4.5 Orchestrator 模式：真正的全自动流水线
+
+方案 B 存在一个问题：每个阶段的 Sub-Agent 完成后，需要主 Agent 人工触发下一阶段。这对于复杂的多阶段流水线来说，仍然有改进空间。
+
+真正的解法是 **Orchestrator 模式**：把整条流水线封装进一个 Sub-Agent，由它内部顺序执行所有阶段。
+
+```
+❌ 接力模式（需要主 Agent 中转）：
+主 Agent → Stage1完成 → 主 Agent → Stage2完成 → 主 Agent → Stage3...
+
+✅ Orchestrator 模式（全自动）：
+主 Agent → Orchestrator（内部：Stage1 → Stage2 → Stage3 → Stage4）→ 主 Agent（最终报告）
+```
+
+**Orchestrator 模式的优势：**
+
+| 优势 | 说明 |
+|------|------|
+| 主 Agent 全程空闲 | 随时响应用户的新需求，不会被流水线占用 |
+| 无需人工触发 | 每个 Sub-Agent 完成后自动执行下一阶段 |
+| 上下文传递 | 审查结果可以直接传给修复 Agent，测试失败可以自动触发修复 |
+| 统一汇报 | 只需在流水线结束时汇报一次最终结果 |
+
+**实现方式：**
+
+Orchestrator 本质上是一个"总控 Sub-Agent"，它的 prompt 包含了整个流水线的逻辑：
+
+```python
+sessions_spawn(
+    task="""
+    你是流水线 Orchestrator，请顺序执行以下阶段：
+    
+    ## Stage 1: 开发
+    创建部门管理模块的所有文件...
+    
+    ## Stage 2: 审查
+    审查 Stage 1 生成的代码，输出问题列表...
+    
+    ## Stage 3: 修复
+    根据 Stage 2 的审查结果修复代码...
+    
+    ## Stage 4: 测试
+    执行接口测试，验证所有修复生效...
+    
+    完成后输出：PIPELINE_COMPLETE + 最终报告
+    """,
+    model="strong-reasoning-model",  # 需要 Orchestrator 做复杂调度
+    mode="run",
+    runtime="subagent"
+)
+```
+
+**适用场景：**
+
+- ✅ 适合：标准化的多阶段流水线（开发→审查→修复→测试）
+- ✅ 适合：需要阶段间传递上下文的场景（审查结果→修复）
+- ❌ 不适合：需要人工决策的流水线（比如审查后需要人确认再修）
+- ❌ 不适合：高度定制化的任务（每次流水线都不同）
+
 ---
 
 ## 5. 实战演示：部门管理功能全流程
@@ -212,7 +252,7 @@ sessions_spawn(
 项目：`sanitary-admin` 卫浴管理系统（Spring Boot 3 + Vue3）  
 任务：新增「部门管理」模块，走完完整的 开发→审查→测试→修复→部署 流水线
 
-### Stage 1：开发 Agent（Qwen3）写代码
+### Stage 1：开发 Agent 写代码
 
 **Prompt 示例：**
 ```
@@ -232,7 +272,7 @@ sessions_spawn(
 
 **结果：** 约 70 秒，5 个文件全部创建完成，自动提交。
 
-### Stage 2：审查 Agent（Sonnet）发现 3 个严重问题
+### Stage 2：审查 Agent 发现 3 个严重问题
 
 **Prompt 示例：**
 ```
@@ -253,7 +293,7 @@ sessions_spawn(
 | 2 | POST/PUT 无 `@Validated` 参数校验，空 deptName 可入库 | 🔴 严重 |
 | 3 | 删除前未校验是否有子部门，可破坏树结构 | 🔴 严重 |
 
-### Stage 3：测试 Agent（Haiku）执行接口测试
+### Stage 3：测试 Agent 执行接口测试
 
 **Prompt 示例：**
 ```
@@ -267,7 +307,7 @@ sessions_spawn(
 
 **初始测试：5/5 PASS（基础 CRUD 正常）**
 
-### Stage 4：修复 Agent（Qwen3）修复所有问题
+### Stage 4：修复 Agent 修复所有问题
 
 根据审查报告，修复 3 个严重问题：
 
@@ -319,11 +359,11 @@ public void removeDeptById(Long id) {
 
 ## 6. 关键经验与踩坑记录
 
-### 坑1：claude CLI 的中文 prompt 卡死
+### 坑1：中文 prompt 卡死问题
 
-**现象：** `launch-agent.sh` 里用 `--print "$(cat $PROMPT_FILE)"` 启动 Agent，中文任务时 Agent 永久卡死，没有任何输出。
+**现象：** 启动 Agent 时，中文任务导致 Agent 永久卡死，没有任何输出。
 
-**原因：** tmux shell 展开 `$(cat ...)` 时，多字节中文字符会被截断，claude 收到空 prompt 后进入交互等待模式。
+**原因：** shell 展开多字节中文字符时可能被截断，模型收到空 prompt 后进入交互等待模式。
 
 **修复：**
 ```bash
@@ -377,7 +417,7 @@ export PATH="$JAVA_HOME/bin:$PATH"
 
 **现象：** 数据库里存的 hash 和 Spring Security 的 `BCryptPasswordEncoder` 对不上，登录一直 401。
 
-**根因：** 网上找的 `$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi` 这个"万能 hash"并不可靠，不同版本的 BCrypt 实现可能有差异。
+**根因：** 网上找的"万能 hash"并不可靠，不同版本的 BCrypt 实现可能有差异。
 
 **最佳做法：** 用 Python 在本机实时生成：
 ```python
@@ -390,30 +430,135 @@ hash = bcrypt.hashpw('admin123'.encode(), bcrypt.gensalt(10)).decode()
 
 ## 7. 进阶：模型分工最佳实践
 
-### 任务-模型选择指南
+### 模型选择的核心决策维度
 
-| 任务类型 | 推荐模型 | 理由 |
-|---------|---------|------|
-| 功能代码开发 | qwen3-coder-plus | 代码专项，精准高效 |
-| 架构设计 / 技术方案 | claude-4.5-sonnet | 强推理，宏观视角 |
-| 代码审查 / 安全分析 | claude-4.5-sonnet | 需要深度理解上下文 |
-| 单元测试生成 | qwen3-coder-plus | 代码任务，结构固定 |
-| 接口测试执行 | claude-4.5-haiku | 简单重复，速度优先 |
-| 中文文档写作 | glm-5 | 中文语言更自然 |
-| 快速问答 / 格式转换 | claude-4.5-haiku | 轻量快速 |
-| 复杂调试 / 根因分析 | claude-4.5-sonnet | 需要强推理链 |
+选择合适的模型需要考虑以下四个关键维度：
 
-### 成本与质量的平衡
+| 维度 | 说明 | 如何评估 |
+|------|------|---------|
+| **代码能力** | 代码生成、语法理解、调试能力 | 用简单编程任务测试，看生成质量 |
+| **推理深度** | 复杂逻辑分析、架构设计、问题诊断 | 给复杂业务场景，看推理链是否完整 |
+| **响应速度** | 单次请求耗时、并发能力 | 对比相同任务的响应时间 |
+| **语言支持** | 中文理解、中文写作流畅度 | 让模型用中文解释技术概念 |
 
-**原则：** 用最便宜能完成任务的模型，贵的模型留给真正需要推理的场景。
+### 任务-模型选择决策矩阵
+
+根据任务类型和模型特性的匹配度：
+
+| 任务类型 | 代码能力 | 推理深度 | 响应速度 | 中文支持 | 推荐模型类型 |
+|---------|:-------:|:-------:|:-------:|:-------:|-------------|
+| 功能代码开发 | ⭐⭐⭐ | ⭐⭐ | ⭐⭐ | ⭐⭐ | 代码专项模型 |
+| 架构设计 | ⭐⭐ | ⭐⭐⭐ | ⭐ | ⭐⭐ | 强推理模型 |
+| 代码审查 | ⭐⭐ | ⭐⭐⭐ | ⭐ | ⭐⭐ | 强推理模型 |
+| 安全分析 | ⭐⭐ | ⭐⭐⭐ | ⭐ | ⭐⭐ | 强推理模型 |
+| 单元测试生成 | ⭐⭐⭐ | ⭐ | ⭐⭐ | ⭐ | 代码专项模型 |
+| 接口测试执行 | ⭐ | ⭐ | ⭐⭐⭐ | ⭐ | 快速执行模型 |
+| Bug 修复 | ⭐⭐⭐ | ⭐⭐ | ⭐⭐ | ⭐⭐ | 代码专项模型 |
+| 中文文档写作 | ⭐ | ⭐⭐ | ⭐⭐ | ⭐⭐⭐ | 中文优化模型 |
+| 快速问答 | ⭐ | ⭐ | ⭐⭐⭐ | ⭐⭐ | 快速执行模型 |
+| 复杂调试 | ⭐⭐ | ⭐⭐⭐ | ⭐ | ⭐⭐ | 强推理模型 |
+
+### 决策树：如何选择模型
+
+```
+你的任务是什么？
+│
+├── 生成/修改代码？
+│   ├── 简单重复（CRUD、模板代码）→ 快速模型 或 代码模型
+│   └── 复杂实现（算法、架构）→ 强推理模型
+│
+├── 需要深度分析？
+│   ├── 代码审查 / 安全审计 → 强推理模型
+│   ├── 架构设计 / 技术方案 → 强推理模型
+│   └── Bug 定位 / 根因分析 → 强推理模型
+│
+├── 简单执行类任务？
+│   ├── 接口测试 / 格式转换 → 快速模型
+│   └── 简单问答 / 信息检索 → 快速模型
+│
+└── 中文写作？
+    ├── 技术文档 / 报告 → 中文优化模型
+    └── 注释 / README → 任意模型
+```
+
+### 本项目实际使用的模型示例
+
+以下是本项目的实际模型配置，**你可以替换为你公司可用的同类模型**：
+
+| Agent 角色 | 本项目使用 | 选择理由 | 可替换为 |
+|-----------|-----------|---------|---------|
+| 主控 Agent | claude-4.5-sonnet | 强推理，理解复杂意图 | 任意强推理模型 |
+| 开发 Agent | qwen3-coder-plus | 代码专项，Java/TS 精准 | 其他代码模型 |
+| 审查 Agent | claude-4.5-sonnet | 深度理解业务逻辑 | 任意强推理模型 |
+| 测试 Agent | claude-4.5-haiku | 任务明确，速度快 3-5 倍 | 其他快速模型 |
+| 修复 Agent | qwen3-coder-plus | 本质是代码任务 | 其他代码模型 |
+| 文档写作 Agent | glm-5 | 中文技术文档流畅自然 | 其他中文优化模型 |
+
+> **注意**：本文本身就是由 GLM-5 文档写作 Agent 生成的，作为多模型协同架构中"文档写作"角色的实际验证。
+
+### 如何确认你的模型白名单
+
+不同公司/环境的模型白名单不同，在使用前建议先验证模型是否可用：
+
+**方法一：直接测试**
+
+```python
+# 在 OpenClaw 中执行
+sessions_spawn(
+    task="输出 'Hello, 我可用了！'",
+    model="your-model-id",
+    mode="run"
+)
+```
+
+如果成功返回结果，说明该模型在你的环境中可用。
+
+**方法二：查看配置文件**
+
+检查 `openclaw.json` 中的 `models.providers` 配置：
+
+```json
+{
+  "models": {
+    "providers": {
+      "anthropic": {
+        "models": [
+          {"id": "claude-4.5-sonnet", "name": "Sonnet"},
+          {"id": "claude-4.5-haiku", "name": "Haiku"}
+        ]
+      }
+    }
+  }
+}
+```
+
+**方法三：询问管理员**
+
+如果你使用的是公司内部的 AI 平台，直接询问 IT 或 AI 团队：
+- 哪些模型可用？
+- 每个模型的配额和限制？
+- 是否需要特殊的 API key？
+
+### 成本与质量的平衡原则
+
+**核心原则：** 用最便宜能完成任务的模型，贵的模型留给真正需要推理的场景。
 
 ```
 任务复杂度评估：
-  明确、重复、结构化  →  Haiku（快 + 省）
-  代码生成、代码修改  →  Qwen3（专项 + 精准）
-  推理、判断、分析    →  Sonnet（强 + 准）
-  中文语境           →  GLM-5（自然 + 流畅）
+  明确、重复、结构化  →  快速模型（省成本）
+  代码生成、代码修改  →  代码模型（专项精准）
+  推理、判断、分析    →  强推理模型（高质量）
+  中文语境           →  中文优化模型（更自然）
 ```
+
+**成本对比参考（相对值）：**
+
+| 模型类型 | 相对成本 | 适用场景 |
+|---------|:-------:|---------|
+| 快速模型 | 1x | 简单任务 |
+| 代码模型 | 2-3x | 代码开发 |
+| 强推理模型 | 5-10x | 复杂分析 |
+| 中文优化模型 | 2-4x | 中文写作 |
 
 ---
 
@@ -442,8 +587,8 @@ openclaw onboard
         "baseUrl": "https://your-company-endpoint.com",
         "api": "anthropic-messages",
         "models": [
-          {"id": "claude-4.5-sonnet", "name": "Sonnet"},
-          {"id": "claude-4.5-haiku", "name": "Haiku"}
+          {"id": "your-sonnet-model", "name": "Sonnet"},
+          {"id": "your-haiku-model", "name": "Haiku"}
         ]
       }
     }
@@ -451,33 +596,24 @@ openclaw onboard
 }
 ```
 
-### 5 分钟搭建第一个 Agent 流水线
+### 核心步骤
 
-**Step 1：准备项目仓库**
-```bash
-mkdir my-project && cd my-project
-git init
-```
+1. **准备项目仓库**
+   ```bash
+   mkdir my-project && cd my-project
+   git init
+   ```
 
-**Step 2：启动第一个开发 Sub-Agent**
+2. **启动第一个 Sub-Agent**
+   
+   在 OpenClaw 对话中输入：
+   ```
+   帮我 spawn 一个 Sub-Agent，用代码模型，任务是在当前目录创建一个 Spring Boot 项目骨架
+   ```
 
-在 OpenClaw 对话中输入：
-```
-帮我 spawn 一个 Sub-Agent，用 qwen3-coder-plus 模型，
-任务是在当前目录创建一个 Hello World 的 Spring Boot 项目骨架
-```
-
-**Step 3：监控和接收结果**
-```
-查看 subagents 状态
-```
-
-Sub-Agent 完成后会自动推送结果，你无需做任何等待。
-
-**Step 4：验证效果**
-```bash
-ls -la  # 查看生成的文件
-```
+3. **监控和接收结果**
+   
+   Sub-Agent 完成后会自动推送结果，无需等待。
 
 ### 常见问题 FAQ
 
@@ -485,26 +621,21 @@ ls -la  # 查看生成的文件
 ```python
 subagents(action="list")  # 先查状态
 subagents(action="kill", target="run-id")  # 强制终止
-# 重新 spawn 一个
 ```
 
 **Q: 如何让 Sub-Agent 的结果传给下一个 Sub-Agent？**
 
 通过共享文件系统：
 - Sub-Agent A 把结果写入 `/tmp/review-result.md`
-- Sub-Agent B 的 prompt 里说"读取 `/tmp/review-result.md` 的审查结果"
+- Sub-Agent B 的 prompt 里说"读取 `/tmp/review-result.md`"
 
 **Q: 主 Agent 能同时跑几个 Sub-Agent？**
 
-默认 8 个并发（`agents.defaults.subagents.maxConcurrent: 8`），可在 openclaw.json 中调整。
-
-**Q: 用哪个模型写 prompt 效果最好？**
-
-Sonnet。写 prompt 本质是"解释任务意图"，需要模型准确理解后传递给 Sub-Agent。
+默认 8 个并发，可在 openclaw.json 中调整。
 
 **Q: Sub-Agent 能访问本地文件系统吗？**
 
-可以，Sub-Agent 拥有和主 Agent 相同的工具权限（read/write/exec），可以读写本地文件、执行 shell 命令。
+可以，Sub-Agent 拥有和主 Agent 相同的工具权限。
 
 ---
 
@@ -543,4 +674,4 @@ GitHub: https://github.com/liaozy0127/sanitary-admin
 
 *本文所有代码和架构均来自实际项目的生产实践，非理论推导。*
 
-[ARTICLE_COMPLETE]
+> 本文由 GLM-5 模型生成，作为多模型协同架构中"文档写作 Agent"角色的实际验证。
