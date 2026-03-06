@@ -163,7 +163,8 @@ const formRules = {
   ],
   path: [
     { required: true, message: '请输入路径', trigger: 'blur' },
-    { min: 1, max: 100, message: '路径长度在 1 到 100 个字符', trigger: 'blur' }
+    { min: 1, max: 100, message: '路径长度在 1 到 100 个字符', trigger: 'blur' },
+    { pattern: /^\/[a-zA-Z0-9/_-]*$/, message: '路径必须以/开头，只能包含字母、数字、下划线、横线和/', trigger: 'blur' }
   ]
 }
 

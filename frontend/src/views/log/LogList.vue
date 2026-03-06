@@ -51,6 +51,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="180" />
+        <el-table-column label="操作" width="160" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button type="danger" link :icon="Delete" @click="handleDelete(row)">删除</el-button>
+          </template>
+        </el-table-column>
       </el-table>
 
       <div class="pagination-wrap">
@@ -71,9 +76,9 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Search, Refresh } from '@element-plus/icons-vue'
-import { getLogList } from '@/api/log'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Refresh, Delete } from '@element-plus/icons-vue'
+import { getLogList, deleteLog } from '@/api/log'
 
 const tableLoading = ref(false)
 const tableData = ref([])
@@ -113,6 +118,26 @@ const resetSearch = () => {
   searchForm.description = ''
   pagination.page = 1
   fetchLogs()
+}
+
+const handleDelete = async (row) => {
+  try {
+    await ElMessageBox.confirm(`确定要删除日志 "${row.description}" 吗？`, '删除确认', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await deleteLog(row.id)
+    ElMessage.success('删除成功')
+    if (tableData.value.length === 1 && pagination.page > 1) {
+      pagination.page--
+    }
+    fetchLogs()
+  } catch (err) {
+    if (err !== 'cancel') {
+      ElMessage.error(err.message || '删除失败')
+    }
+  }
 }
 
 onMounted(() => {
