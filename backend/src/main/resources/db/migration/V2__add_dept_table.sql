@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS sys_dept (id BIGINT PRIMARY KEY AUTO_INCREMENT, dept_name VARCHAR(50) NOT NULL, dept_code VARCHAR(50), parent_id BIGINT DEFAULT 0, sort INT DEFAULT 0, status TINYINT DEFAULT 1, remark VARCHAR(200), create_time DATETIME, update_time DATETIME, deleted TINYINT DEFAULT 0) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+INSERT INTO sys_dept(dept_name,dept_code,parent_id,sort,status) VALUES('总公司','ROOT',0,0,1),('研发部','DEV',1,1,1),('销售部','SALES',1,2,1);
