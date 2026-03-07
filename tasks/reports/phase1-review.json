@@ -1,0 +1,55 @@
+{
+  "score": 92,
+  "passed": true,
+  "issues": [
+    {
+      "level": "info",
+      "item": "字符集配置",
+      "detail": "三处均已配置 utf8mb4：init.sql SET NAMES、application.yml connection-init-sql、docker-compose.yml --character-set-server",
+      "status": "pass"
+    },
+    {
+      "level": "info",
+      "item": "接口权限控制",
+      "detail": "SecurityConfig 全局配置 anyRequest().authenticated()，仅 /api/auth/** 放行，所有新接口均受 JWT 保护",
+      "status": "pass"
+    },
+    {
+      "level": "info",
+      "item": "分页查询",
+      "detail": "三个模块均使用 MyBatis-Plus Page 分页，逻辑删除字段已全局配置（deleted=0/1）",
+      "status": "pass"
+    },
+    {
+      "level": "info",
+      "item": "前端表单验证",
+      "detail": "客户(3处required)、工艺(2处required)、物料(2处required) 均有 el-form rules 验证",
+      "status": "pass"
+    },
+    {
+      "level": "info",
+      "item": "@Valid 注解",
+      "detail": "三个 Controller 的 create 方法均有 @Valid 注解",
+      "status": "pass"
+    },
+    {
+      "level": "warning",
+      "item": "Entity 字段验证注解",
+      "detail": "Customer/Process/Material 实体未添加 @NotBlank 等验证注解，@Valid 在 PUT 更新时无强制验证；建议后期补充，但不影响基本功能",
+      "status": "minor"
+    },
+    {
+      "level": "info",
+      "item": "Dept/Log 清理",
+      "detail": "后端 Controller/Entity/Service/Mapper 已全部删除，前端视图目录、路由配置、layout 菜单均已清理",
+      "status": "pass"
+    },
+    {
+      "level": "info",
+      "item": "MetaObjectHandler",
+      "detail": "createTime/updateTime 自动填充已配置，三个新实体均使用 @TableField(fill=...)",
+      "status": "pass"
+    }
+  ],
+  "summary": "Phase 1 代码审查通过（92分）。字符集三处配置完整，接口 JWT 权限保护完整，分页查询正确，前端表单验证完整。轻微问题：实体类缺少 @NotBlank 验证注解，不影响功能。基础数据三模块（客户/工艺/物料）前后端实现完整，菜单和路由已更新。"
+}

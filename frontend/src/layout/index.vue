@@ -15,26 +15,101 @@
         text-color="#bfcbd9"
         active-text-color="#409EFF"
       >
-        <el-menu-item index="/user">
-          <el-icon><User /></el-icon>
-          <template #title>用户管理</template>
-        </el-menu-item>
-        <el-menu-item index="/dept">
-          <el-icon><OfficeBuilding /></el-icon>
-          <template #title>部门管理</template>
-        </el-menu-item>
-        <el-menu-item index="/role">
-          <el-icon><UserFilled /></el-icon>
-          <template #title>角色管理</template>
-        </el-menu-item>
-        <el-menu-item index="/menu">
-          <el-icon><Menu /></el-icon>
-          <template #title>菜单管理</template>
-        </el-menu-item>
-        <el-menu-item index="/log">
-          <el-icon><Document /></el-icon>
-          <template #title>操作日志</template>
-        </el-menu-item>
+        <!-- 系统管理 -->
+        <el-sub-menu index="sys">
+          <template #title>
+            <el-icon><Setting /></el-icon>
+            <span>系统管理</span>
+          </template>
+          <el-menu-item index="/user">
+            <el-icon><User /></el-icon>
+            <template #title>用户管理</template>
+          </el-menu-item>
+          <el-menu-item index="/role">
+            <el-icon><UserFilled /></el-icon>
+            <template #title>角色管理</template>
+          </el-menu-item>
+          <el-menu-item index="/menu">
+            <el-icon><Menu /></el-icon>
+            <template #title>菜单管理</template>
+          </el-menu-item>
+        </el-sub-menu>
+
+        <!-- 基础数据 -->
+        <el-sub-menu index="base">
+          <template #title>
+            <el-icon><Files /></el-icon>
+            <span>基础数据</span>
+          </template>
+          <el-menu-item index="/customer">
+            <el-icon><OfficeBuilding /></el-icon>
+            <template #title>客户管理</template>
+          </el-menu-item>
+          <el-menu-item index="/process">
+            <el-icon><Operation /></el-icon>
+            <template #title>工艺管理</template>
+          </el-menu-item>
+          <el-menu-item index="/material">
+            <el-icon><Box /></el-icon>
+            <template #title>物料管理</template>
+          </el-menu-item>
+        </el-sub-menu>
+
+        <!-- 生产管理 -->
+        <el-sub-menu index="prod">
+          <template #title>
+            <el-icon><SetUp /></el-icon>
+            <span>生产管理</span>
+          </template>
+          <el-menu-item index="/receipt">
+            <el-icon><Download /></el-icon>
+            <template #title>收货管理</template>
+          </el-menu-item>
+          <el-menu-item index="/production">
+            <el-icon><Calendar /></el-icon>
+            <template #title>排产管理</template>
+          </el-menu-item>
+          <el-menu-item index="/shipment">
+            <el-icon><Upload /></el-icon>
+            <template #title>发货管理</template>
+          </el-menu-item>
+          <el-menu-item index="/rework">
+            <el-icon><RefreshRight /></el-icon>
+            <template #title>返工管理</template>
+          </el-menu-item>
+        </el-sub-menu>
+
+        <!-- 财务管理 -->
+        <el-sub-menu index="finance">
+          <template #title>
+            <el-icon><Money /></el-icon>
+            <span>财务管理</span>
+          </template>
+          <el-menu-item index="/payment">
+            <el-icon><Wallet /></el-icon>
+            <template #title>收款记录</template>
+          </el-menu-item>
+          <el-menu-item index="/statement">
+            <el-icon><Document /></el-icon>
+            <template #title>对账单</template>
+          </el-menu-item>
+        </el-sub-menu>
+
+        <!-- 库存报表 -->
+        <el-sub-menu index="stock">
+          <template #title>
+            <el-icon><DataAnalysis /></el-icon>
+            <span>库存报表</span>
+          </template>
+          <el-menu-item index="/inventory">
+            <el-icon><Box /></el-icon>
+            <template #title>库存查询</template>
+          </el-menu-item>
+          <el-menu-item index="/report">
+            <el-icon><TrendCharts /></el-icon>
+            <template #title>月度报表</template>
+          </el-menu-item>
+        </el-sub-menu>
       </el-menu>
     </el-aside>
 
@@ -75,7 +150,11 @@
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { User, Fold, Expand, ArrowDown, OfficeBuilding, UserFilled, Menu, Document } from '@element-plus/icons-vue'
+import {
+  User, Fold, Expand, ArrowDown, OfficeBuilding, UserFilled, Menu,
+  Setting, Files, Operation, Box, SetUp, Download, Upload, RefreshRight,
+  Money, Wallet, Document, DataAnalysis, TrendCharts, Calendar
+} from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
@@ -104,6 +183,7 @@ const handleCommand = async (command) => {
 .layout-container {
   height: 100vh;
   overflow: hidden;
+  position: relative;
 }
 
 .layout-aside {
@@ -173,7 +253,9 @@ const handleCommand = async (command) => {
 
 .layout-main {
   background-color: #f0f2f5;
-  overflow-y: auto;
+  overflow: auto;
   padding: 20px;
+  height: calc(100vh - 60px);
+  box-sizing: border-box;
 }
 </style>

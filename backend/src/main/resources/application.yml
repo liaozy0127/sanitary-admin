@@ -1,5 +1,10 @@
 server:
   port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
 
 spring:
   datasource:
@@ -7,6 +12,8 @@ spring:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:sanitary_admin}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: ${DB_USER:root}
     password: ${DB_PASS:root}
+    hikari:
+      connection-init-sql: "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
 
 mybatis-plus:
   configuration:

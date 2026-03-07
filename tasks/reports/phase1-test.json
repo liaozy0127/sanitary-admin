@@ -1,0 +1,18 @@
+{
+  "phase": "Phase 1 - 基础数据模块",
+  "buildPassed": true,
+  "dockerPassed": true,
+  "testResults": [
+    {"name": "登录接口", "status": "pass", "statusCode": 200, "note": "返回 JWT token，admin/admin123 认证成功"},
+    {"name": "客户列表", "status": "pass", "statusCode": 200, "note": "GET /api/customers?page=1&size=5 返回分页数据"},
+    {"name": "新增客户", "status": "pass", "statusCode": 200, "note": "POST /api/customers 成功创建测试客户 TEST001"},
+    {"name": "工艺列表", "status": "pass", "statusCode": 200, "note": "GET /api/processes?page=1&size=5 返回分页数据"},
+    {"name": "物料列表", "status": "pass", "statusCode": 200, "note": "GET /api/materials?page=1&size=5 返回分页数据"},
+    {"name": "客户下拉列表", "status": "pass", "statusCode": 200, "note": "GET /api/customers/all 返回下拉数据"},
+    {"name": "工艺下拉列表", "status": "pass", "statusCode": 200, "note": "GET /api/processes/all 返回下拉数据"}
+  ],
+  "allPassed": true,
+  "serviceUrl": "http://localhost:8080",
+  "frontendUrl": "http://localhost:80",
+  "summary": "Phase 1 冒烟测试全部通过（7/7）。登录、客户/工艺/物料的列表查询、新增、下拉接口均正常。构建修复：JDBC URL charset 由 utf8mb4 改为 utf8（MySQL JDBC 兼容），Security 放行 /actuator/health，Controller import 由 javax 改为 jakarta（Spring Boot 3 要求）。"
+}
