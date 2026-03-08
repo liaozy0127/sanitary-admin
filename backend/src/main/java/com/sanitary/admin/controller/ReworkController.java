@@ -39,16 +39,13 @@ public class ReworkController {
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody Rework rework) {
         rework.setId(id);
-        if (rework.getQuantity() != null && rework.getUnitPrice() != null) {
-            rework.setAmount(rework.getQuantity().multiply(rework.getUnitPrice()));
-        }
-        reworkService.updateById(rework);
+        reworkService.updateRework(rework);
         return Result.success();
     }
 
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
-        reworkService.removeById(id);
+        reworkService.deleteRework(id);
         return Result.success();
     }
 }

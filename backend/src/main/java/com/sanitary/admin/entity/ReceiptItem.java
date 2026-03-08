@@ -26,7 +26,9 @@ public class ReceiptItem {
     private BigDecimal shippedQty;
     private BigDecimal unshippedQty;
     private BigDecimal plannedQty;
+    @TableField("warehoused_qty")
     private BigDecimal wareHousedQty;
+    @TableField("unwarehoused_qty")
     private BigDecimal unwareHousedQty;
     private BigDecimal unitPrice;
     private BigDecimal amount;

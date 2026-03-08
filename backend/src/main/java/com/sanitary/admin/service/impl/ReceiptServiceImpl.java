@@ -21,6 +21,7 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -114,7 +115,6 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
     }
 
     @Override
-    @Transactional
     public Map<String, Object> importExcel(MultipartFile file, String mode) {
         int success = 0;
         int fail = 0;
@@ -224,7 +224,7 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
             String receiptNo = entry.getKey();
             Receipt receipt = entry.getValue();
             try {
-                save(receipt);
+                getBaseMapper().insert(receipt);
                 List<ReceiptItem> items = itemsMap.get(receiptNo);
                 receiptItemService.saveItems(receipt.getId(), receipt.getReceiptNo(), items);
                 success++;

@@ -228,7 +228,7 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
             String productionNo = entry.getKey();
             Production production = entry.getValue();
             try {
-                save(production);
+                getBaseMapper().insert(production);
                 List<ProductionItem> items = itemsMap.get(productionNo);
                 productionItemService.saveItems(production.getId(), production.getProductionNo(), items);
                 success++;

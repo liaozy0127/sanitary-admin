@@ -24,6 +24,7 @@ public class ProductionItem {
     private String unit;
     private BigDecimal plannedQty;
     private BigDecimal actualQty;
+    @TableField("unwarehoused_qty")
     private BigDecimal unwareHousedQty;
     private BigDecimal outsourcePrice;
     private BigDecimal platingPrice;

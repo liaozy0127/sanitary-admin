@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotBlank;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @TableName("rework")
@@ -28,23 +29,8 @@ public class Rework {
     @NotBlank(message = "客户名称不能为空")
     private String customerName;
 
-    private Long materialId;
-
-    @NotBlank(message = "物料名称不能为空")
-    private String materialName;
-
-    private String materialCode;
-    private String spec;
-    private Long processId;
-    private String processName;
-
-    @NotNull(message = "返工数量不能为空")
-    private BigDecimal quantity;
-
-    private BigDecimal unitPrice;
-    private BigDecimal amount;
-    private String reworkReason;
     private String reworkStatus;
+    private String remark;
 
     @TableLogic
     private Integer deleted;
@@ -54,4 +40,7 @@ public class Rework {
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
+
+    @TableField(exist = false)
+    private List<ReworkItem> items;
 }
