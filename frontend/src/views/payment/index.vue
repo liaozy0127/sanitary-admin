@@ -3,7 +3,7 @@
     <el-card class="search-card">
       <el-form :model="searchForm" inline>
         <el-form-item label="客户">
-          <el-select v-model="searchForm.customerId" placeholder="全部现金客户" clearable style="width: 180px" filterable>
+          <el-select v-model="searchForm.customerId" placeholder="全部现金客户" clearable style="width: 180px" @change="fetchList" filterable>
             <el-option v-for="c in customerList" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
         </el-form-item>

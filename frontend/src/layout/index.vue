@@ -189,7 +189,20 @@ const handleCommand = async (command) => {
 .layout-aside {
   background-color: #304156;
   transition: width 0.3s;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* 自定义滚动条样式，与侧边栏背景融合 */
+.layout-aside::-webkit-scrollbar {
+  width: 4px;
+}
+.layout-aside::-webkit-scrollbar-thumb {
+  background: #4a6080;
+  border-radius: 2px;
+}
+.layout-aside::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .logo {

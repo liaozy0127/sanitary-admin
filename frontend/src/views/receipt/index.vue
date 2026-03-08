@@ -7,7 +7,7 @@
           <el-input v-model="searchForm.keyword" placeholder="单号/客户/物料" clearable style="width: 180px" @keyup.enter="fetchList" />
         </el-form-item>
         <el-form-item label="客户">
-          <el-select v-model="searchForm.customerId" placeholder="全部客户" clearable style="width: 160px">
+          <el-select v-model="searchForm.customerId" placeholder="全部客户" clearable style="width: 160px" @change="fetchList">
             <el-option v-for="c in customerList" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
         </el-form-item>
