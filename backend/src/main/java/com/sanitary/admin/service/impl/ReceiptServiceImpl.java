@@ -197,6 +197,14 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
                         Material mat = materialMapper.selectById(materialId);
                         if (mat != null) {
                             item.setMaterialCode(mat.getMaterialCode());
+                            // 若物料单价为空或0，用收货单单价回填
+                            if (item.getUnitPrice() != null
+                                    && item.getUnitPrice().compareTo(java.math.BigDecimal.ZERO) > 0
+                                    && (mat.getDefaultPrice() == null
+                                        || mat.getDefaultPrice().compareTo(java.math.BigDecimal.ZERO) == 0)) {
+                                mat.setDefaultPrice(item.getUnitPrice());
+                                materialMapper.updateById(mat);
+                            }
                         }
                     }
 
