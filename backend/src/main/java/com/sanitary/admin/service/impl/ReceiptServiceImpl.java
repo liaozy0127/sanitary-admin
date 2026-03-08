@@ -3,8 +3,10 @@ package com.sanitary.admin.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.sanitary.admin.entity.Customer;
 import com.sanitary.admin.entity.Material;
 import com.sanitary.admin.entity.Receipt;
+import com.sanitary.admin.mapper.CustomerMapper;
 import com.sanitary.admin.mapper.MaterialMapper;
 import com.sanitary.admin.mapper.ReceiptMapper;
 import com.sanitary.admin.service.InventoryService;
@@ -37,6 +39,7 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
 
     private final GenerateNoUtil generateNoUtil;
     private final MaterialMapper materialMapper;
+    private final CustomerMapper customerMapper;
     private final InventoryService inventoryService;
 
     @Override
@@ -125,14 +128,40 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
                     receipt.setQuantity(parseBigDecimal(getCellString(row, 5)));
                     receipt.setUnitPrice(parseBigDecimal(getCellString(row, 6)));
                     receipt.setRemark(getCellString(row, 7));
-                    receipt.setCustomerId(0L);
-                    receipt.setMaterialId(0L);
+
+                    // 根据客户名称查找客户ID
+                    Long customerId = findOrCreateCustomerIdByName(receipt.getCustomerName());
+                    receipt.setCustomerId(customerId);
+
+                    // 根据物料名称查找物料ID
+                    Long materialId = findOrCreateMaterialIdByName(receipt.getMaterialName(), receipt.getSpec());
+                    receipt.setMaterialId(materialId);
+
                     if (receipt.getQuantity() != null && receipt.getUnitPrice() != null) {
                         receipt.setAmount(receipt.getQuantity().multiply(receipt.getUnitPrice()));
                     }
                     receipt.setReceiptNo(generateNoUtil.generate("RH", "receipt", "receipt_no"));
                     receipt.setStatus(1);
                     save(receipt);
+
+                    // Update inventory
+                    inventoryService.updateInventory(
+                            receipt.getMaterialId(),
+                            receipt.getCustomerId(),
+                            receipt.getProcessId(),
+                            receipt.getMaterialCode(), // 注意：这里可能会为空，但我们使用物料名称
+                            receipt.getMaterialName(),
+                            receipt.getCustomerName(),
+                            receipt.getSpec(),
+                            receipt.getProcessName(),
+                            receipt.getQuantity(),
+                            1,  // 收货
+                            "RECEIPT",
+                            receipt.getId(),
+                            receipt.getReceiptNo(),
+                            receipt.getReceiptDate()
+                    );
+
                     success++;
                 } catch (Exception e) {
                     fail++;
@@ -211,6 +240,49 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
             return new BigDecimal(s);
         } catch (Exception e) {
             return BigDecimal.ZERO;
+        }
+    }
+
+    private Long findOrCreateCustomerIdByName(String customerName) {
+        // 根据客户名称查找客户ID
+        LambdaQueryWrapper<Customer> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Customer::getCustomerName, customerName);
+
+        Customer customer = customerMapper.selectOne(wrapper);
+        if (customer != null) {
+            return customer.getId();
+        } else {
+            // 如果客户不存在，创建一个新的客户
+            Customer newCustomer = new Customer();
+            newCustomer.setCustomerName(customerName);
+            newCustomer.setCustomerCode("AUTO_" + System.currentTimeMillis()); // 自动生成编码
+            newCustomer.setStatus(1);
+            customerMapper.insert(newCustomer);
+            return newCustomer.getId();
+        }
+    }
+
+    private Long findOrCreateMaterialIdByName(String materialName, String spec) {
+        // 根据物料名称和规格查找物料ID
+        // 使用 materialMapper 来查询已存在的物料
+        LambdaQueryWrapper<Material> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Material::getMaterialName, materialName);
+        if (spec != null && !spec.trim().isEmpty()) {
+            wrapper.eq(Material::getSpec, spec);
+        }
+
+        Material material = materialMapper.selectOne(wrapper);
+        if (material != null) {
+            return material.getId();
+        } else {
+            // 如果物料不存在，创建一个新的物料
+            Material newMaterial = new Material();
+            newMaterial.setMaterialName(materialName);
+            newMaterial.setSpec(spec);
+            newMaterial.setMaterialCode("AUTO_" + System.currentTimeMillis()); // 自动生成编码
+            newMaterial.setStatus(1);
+            materialMapper.insert(newMaterial);
+            return newMaterial.getId();
         }
     }
 }

@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS inventory (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     material_id BIGINT NOT NULL COMMENT '物料ID',
     customer_id BIGINT NOT NULL COMMENT '客户ID',
-    process_id BIGINT COMMENT '工艺ID',
+    process_id BIGINT NOT NULL DEFAULT 0 COMMENT '工艺ID，0表示无特定工艺',
     material_code VARCHAR(100) COMMENT '物料编码',
     material_name VARCHAR(200) COMMENT '物料名称',
     customer_name VARCHAR(200) COMMENT '客户名称',
@@ -45,29 +45,29 @@ CREATE TABLE IF NOT EXISTS inventory_log (
 -- 3. 给各单据表添加字段
 
 -- 给收货单表添加字段
-ALTER TABLE receipt ADD COLUMN receipt_source VARCHAR(100) COMMENT '收货来源';
-ALTER TABLE receipt ADD COLUMN customer_order_no VARCHAR(100) COMMENT '客户订单号';
-ALTER TABLE receipt ADD COLUMN detail_remark TEXT COMMENT '详细备注';
+ALTER TABLE receipt ADD COLUMN IF NOT EXISTS receipt_source VARCHAR(100) COMMENT '收货来源';
+ALTER TABLE receipt ADD COLUMN IF NOT EXISTS customer_order_no VARCHAR(100) COMMENT '客户订单号';
+ALTER TABLE receipt ADD COLUMN IF NOT EXISTS detail_remark TEXT COMMENT '详细备注';
 
 -- 给生产单表添加字段
-ALTER TABLE production ADD COLUMN unit VARCHAR(50) COMMENT '单位';
-ALTER TABLE production ADD COLUMN receipt_type VARCHAR(50) COMMENT '收货类型';
-ALTER TABLE production ADD COLUMN outsource_price DECIMAL(12,2) COMMENT '外协价格';
-ALTER TABLE production ADD COLUMN plating_price DECIMAL(12,2) COMMENT '电镀价格';
-ALTER TABLE production ADD COLUMN plating_amount DECIMAL(12,2) COMMENT '电镀金额';
-ALTER TABLE production ADD COLUMN customer_order_no VARCHAR(100) COMMENT '客户订单号';
-ALTER TABLE production ADD COLUMN production_type VARCHAR(50) COMMENT '生产类型';
+ALTER TABLE production ADD COLUMN IF NOT EXISTS unit VARCHAR(50) COMMENT '单位';
+ALTER TABLE production ADD COLUMN IF NOT EXISTS receipt_type VARCHAR(50) COMMENT '收货类型';
+ALTER TABLE production ADD COLUMN IF NOT EXISTS outsource_price DECIMAL(12,2) COMMENT '外协价格';
+ALTER TABLE production ADD COLUMN IF NOT EXISTS plating_price DECIMAL(12,2) COMMENT '电镀价格';
+ALTER TABLE production ADD COLUMN IF NOT EXISTS plating_amount DECIMAL(12,2) COMMENT '电镀金额';
+ALTER TABLE production ADD COLUMN IF NOT EXISTS customer_order_no VARCHAR(100) COMMENT '客户订单号';
+ALTER TABLE production ADD COLUMN IF NOT EXISTS production_type VARCHAR(50) COMMENT '生产类型';
 
 -- 给发货单表添加字段
-ALTER TABLE shipment ADD COLUMN customer_order_no VARCHAR(100) COMMENT '客户订单号';
-ALTER TABLE shipment ADD COLUMN detail_remark TEXT COMMENT '详细备注';
-ALTER TABLE shipment ADD COLUMN shipment_type VARCHAR(50) COMMENT '发货类型';
+ALTER TABLE shipment ADD COLUMN IF NOT EXISTS customer_order_no VARCHAR(100) COMMENT '客户订单号';
+ALTER TABLE shipment ADD COLUMN IF NOT EXISTS detail_remark TEXT COMMENT '详细备注';
+ALTER TABLE shipment ADD COLUMN IF NOT EXISTS shipment_type VARCHAR(50) COMMENT '发货类型';
 
 -- 4. 从客户表删除字段
-ALTER TABLE customer DROP COLUMN area_name;
-ALTER TABLE customer DROP COLUMN industry;
-ALTER TABLE customer DROP COLUMN email;
-ALTER TABLE customer DROP COLUMN finance_contact;
-ALTER TABLE customer DROP COLUMN finance_phone;
-ALTER TABLE customer DROP COLUMN price_adjust_rate;
-ALTER TABLE customer DROP COLUMN ship_warning_days;
+ALTER TABLE customer DROP COLUMN IF EXISTS area_name;
+ALTER TABLE customer DROP COLUMN IF EXISTS industry;
+ALTER TABLE customer DROP COLUMN IF EXISTS email;
+ALTER TABLE customer DROP COLUMN IF EXISTS finance_contact;
+ALTER TABLE customer DROP COLUMN IF EXISTS finance_phone;
+ALTER TABLE customer DROP COLUMN IF EXISTS price_adjust_rate;
+ALTER TABLE customer DROP COLUMN IF EXISTS ship_warning_days;

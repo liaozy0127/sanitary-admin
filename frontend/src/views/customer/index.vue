@@ -109,16 +109,6 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="区域名称">
-              <el-input v-model="formData.areaName" placeholder="请输入区域名称" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="所属行业">
-              <el-input v-model="formData.industry" placeholder="请输入所属行业" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
             <el-form-item label="业务员">
               <el-input v-model="formData.salesperson" placeholder="请输入业务员" />
             </el-form-item>
@@ -142,50 +132,14 @@
             <el-form-item label="联系电话">
               <el-input v-model="formData.contactPhone" placeholder="请输入联系电话" />
             </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="电子邮箱">
-              <el-input v-model="formData.email" placeholder="请输入邮箱" />
-            </el-form-item>
-          </el-col>
         </el-row>
 
         <!-- 财务信息 -->
         <el-divider content-position="left">财务信息</el-divider>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="开户银行">
-              <el-input v-model="formData.bankName" placeholder="请输入开户银行" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="银行账号">
-              <el-input v-model="formData.bankAccount" placeholder="请输入银行账号" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
             <el-form-item label="税号">
               <el-input v-model="formData.taxNo" placeholder="请输入税号" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="财务联系人">
-              <el-input v-model="formData.financeContact" placeholder="请输入财务联系人" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="财务联系电话">
-              <el-input v-model="formData.financePhone" placeholder="请输入财务联系电话" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="调价率(%)">
-              <el-input-number v-model="formData.priceAdjustRate" :precision="2" :step="0.01" style="width:100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="发货预警天数">
-              <el-input-number v-model="formData.shipWarningDays" :min="0" style="width:100%" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -222,10 +176,9 @@ const searchForm = reactive({ keyword: '', customerType: '' })
 const pagination = reactive({ page: 1, size: 20, total: 0 })
 
 const formData = reactive({
-  customerCode: '', customerName: '', areaName: '', customerType: '现金',
-  industry: '', address: '', contactPerson: '', contactPhone: '', email: '',
-  salesperson: '', bankName: '', bankAccount: '', taxNo: '', financeContact: '',
-  financePhone: '', priceAdjustRate: 0, shipWarningDays: 0, remark: '', status: 1
+  customerCode: '', customerName: '', customerType: '现金',
+  address: '', contactPerson: '', contactPhone: '',
+  salesperson: '', bankName: '', bankAccount: '', taxNo: '', remark: '', status: 1
 })
 
 const rules = {
@@ -272,10 +225,9 @@ const openDialog = (row) => {
 const resetForm = () => {
   formRef.value?.resetFields()
   Object.assign(formData, {
-    customerCode: '', customerName: '', areaName: '', customerType: '现金',
-    industry: '', address: '', contactPerson: '', contactPhone: '', email: '',
-    salesperson: '', bankName: '', bankAccount: '', taxNo: '', financeContact: '',
-    financePhone: '', priceAdjustRate: 0, shipWarningDays: 0, remark: '', status: 1
+    customerCode: '', customerName: '', customerType: '现金',
+    address: '', contactPerson: '', contactPhone: '',
+    salesperson: '', bankName: '', bankAccount: '', taxNo: '', remark: '', status: 1
   })
 }
 

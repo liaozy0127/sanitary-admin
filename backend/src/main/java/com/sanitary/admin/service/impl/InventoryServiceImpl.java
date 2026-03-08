@@ -29,28 +29,39 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
                                 String customerName, String spec, String processName,
                                 BigDecimal changeQty, int changeType, String orderType,
                                 Long orderId, String orderNo, LocalDate orderDate) {
-        // 查询现有库存记录
-        LambdaQueryWrapper<Inventory> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(Inventory::getMaterialId, materialId)
-                .eq(Inventory::getCustomerId, customerId);
 
-        if (processId != null) {
-            queryWrapper.eq(Inventory::getProcessId, processId);
-        } else {
-            queryWrapper.isNull(Inventory::getProcessId);
+        // 将 null 的 processId 统一处理为 0L，确保唯一约束正常工作
+        Long effectiveProcessId = processId != null ? processId : 0L;
+
+        // 如果是发货（changeType == 2），需要先检查库存是否足够
+        if (changeType == 2) { // 发货
+            LambdaQueryWrapper<Inventory> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(Inventory::getMaterialId, materialId)
+                    .eq(Inventory::getCustomerId, customerId)
+                    .eq(Inventory::getProcessId, effectiveProcessId);
+
+            Inventory inventory = this.getOne(queryWrapper, false);
+            if (inventory != null) {
+                BigDecimal currentQty = inventory.getQuantity() != null ? inventory.getQuantity() : BigDecimal.ZERO;
+                BigDecimal shipQty = changeQty.abs(); // changeQty 是负数，取绝对值
+                if (currentQty.compareTo(shipQty) < 0) {
+                    throw new RuntimeException("库存不足，当前库存：" + currentQty + "，发货数量：" + shipQty);
+                }
+            } else {
+                // 如果库存记录不存在，而又要发货，则不允许
+                throw new RuntimeException("库存不足，当前库存：0，发货数量：" + changeQty.abs());
+            }
         }
 
-        Inventory inventory = this.getOne(queryWrapper, false);
+        // 首先尝试原子更新现有库存记录
+        int rowsAffected = this.baseMapper.incrementQuantity(materialId, customerId, effectiveProcessId, changeQty);
 
-        BigDecimal beforeQty = BigDecimal.ZERO;
-        BigDecimal afterQty;
-
-        if (inventory == null) {
-            // 创建新的库存记录
-            inventory = new Inventory();
+        if (rowsAffected == 0) {
+            // 如果没有更新任何记录，则说明库存记录不存在，需要插入新记录
+            Inventory inventory = new Inventory();
             inventory.setMaterialId(materialId);
             inventory.setCustomerId(customerId);
-            inventory.setProcessId(processId);
+            inventory.setProcessId(effectiveProcessId);
             inventory.setMaterialCode(materialCode);
             inventory.setMaterialName(materialName);
             inventory.setCustomerName(customerName);
@@ -66,27 +77,25 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
             }
 
             this.save(inventory);
-            beforeQty = BigDecimal.ZERO;
-            afterQty = changeQty;
+
+            // 记录库存变动日志
+            insertLog(materialId, customerId, effectiveProcessId, materialCode, materialName, customerName, spec, processName,
+                    changeType, changeQty, BigDecimal.ZERO, changeQty, orderType, orderId, orderNo, orderDate, null);
         } else {
-            // 更新现有库存记录
-            beforeQty = inventory.getQuantity() != null ? inventory.getQuantity() : BigDecimal.ZERO;
-            afterQty = beforeQty.add(changeQty);
-            inventory.setQuantity(afterQty);
+            // 查询更新后的库存数量用于记录日志
+            LambdaQueryWrapper<Inventory> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(Inventory::getMaterialId, materialId)
+                    .eq(Inventory::getCustomerId, customerId)
+                    .eq(Inventory::getProcessId, effectiveProcessId);
 
-            // 设置时间
-            if (changeType == 1) { // 收货
-                inventory.setLastReceiveTime(LocalDateTime.now());
-            } else if (changeType == 2) { // 发货
-                inventory.setLastShipTime(LocalDateTime.now());
-            }
+            Inventory inventory = this.getOne(queryWrapper, false);
+            BigDecimal afterQty = inventory != null ? inventory.getQuantity() : changeQty;
+            BigDecimal beforeQty = afterQty.subtract(changeQty);
 
-            this.updateById(inventory);
+            // 记录库存变动日志
+            insertLog(materialId, customerId, effectiveProcessId, materialCode, materialName, customerName, spec, processName,
+                    changeType, changeQty, beforeQty, afterQty, orderType, orderId, orderNo, orderDate, null);
         }
-
-        // 记录库存变动日志
-        insertLog(materialId, customerId, processId, materialCode, materialName, customerName, spec, processName,
-                changeType, changeQty, beforeQty, afterQty, orderType, orderId, orderNo, orderDate, null);
     }
 
     /**
