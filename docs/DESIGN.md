@@ -255,27 +255,61 @@ shipment_item 明细表：
 | detail_remark | VARCHAR(500) | 明细备注 |
 | deleted | TINYINT | 逻辑删除 |
 
-#### statement（对账单）
+#### statement（对账单主表）
+
+> 📌 对账单采用**主从表设计**，与收货单/排产单/发货单一致。主表记录汇总数据，明细表按物料展示每行数据（与老系统 Excel 格式对应）。
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | BIGINT PK | |
-| statement_no | VARCHAR(30) | 对账单号 |
+| statement_no | VARCHAR(30) | 对账单号，格式 DZ+年月+流水 |
 | statement_month | VARCHAR(7) | 对账月份，格式 YYYY-MM |
 | customer_id | BIGINT | 客户 ID |
 | customer_name | VARCHAR(100) | 客户名称（冗余）|
-| receipt_qty | DECIMAL(12,2) | 本月收货数量 |
-| shipment_qty | DECIMAL(12,2) | 本月发货数量 |
-| receipt_amount | DECIMAL(12,2) | 本月收货金额 |
-| shipment_amount | DECIMAL(12,2) | 本月发货金额 |
+| receipt_qty | DECIMAL(12,2) | 本月收货合计数量（明细汇总）|
+| shipment_qty | DECIMAL(12,2) | 本月发货合计数量（明细汇总）|
+| receipt_amount | DECIMAL(12,2) | 本月收货合计金额 |
+| shipment_amount | DECIMAL(12,2) | 本月发货合计金额 |
 | remark | VARCHAR(500) | 备注 |
 | status | VARCHAR(20) | 状态：草稿/已确认 |
 | deleted | TINYINT | 逻辑删除 |
 
-> **老系统对账单 Excel 列映射**（用于 POST /api/statements/import）：
+#### statement_item（对账单明细表）⏳ 待建表
+
+> 按物料维度存储每行数据，对应老系统 Excel 的每一行。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT PK | |
+| statement_id | BIGINT | 所属对账单 ID |
+| statement_no | VARCHAR(30) | 对账单号（冗余）|
+| material_id | BIGINT | 物料 ID |
+| material_code | VARCHAR(50) | 物料编码（冗余）|
+| material_name | VARCHAR(200) | 物料名称（冗余）|
+| process_id | BIGINT | 工艺 ID |
+| process_name | VARCHAR(100) | 工艺名称（冗余）|
+| prev_balance_qty | DECIMAL(12,2) | 上月结余数量（col3，库存初始化用）|
+| receipt_qty | DECIMAL(12,2) | 本月收货合计（col5）|
+| shipment_qty | DECIMAL(12,2) | 本月发货合计（col8）|
+| curr_balance_qty | DECIMAL(12,2) | 本月结余数量（col9）|
+| unit_price | DECIMAL(10,4) | 单价（col10）|
+| shipment_amount | DECIMAL(12,2) | 发货合计金额（col12）|
+| remark | VARCHAR(500) | 备注（col13）|
+| deleted | TINYINT | 逻辑删除 |
+| create_time | DATETIME | |
+| update_time | DATETIME | |
+
+> **老系统 Excel 列映射**（用于 `POST /api/statements/import`）：
 > - col0: 产品代码，col1: 产品名称，col2: 工艺要求
-> - col3: 上月结余数量（库存初始化用），col5: 本月收货合计
-> - col8: 本月发货合计，col10: 单价，col12: 合计金额，col13: 备注
+> - col3: 上月结余 → `prev_balance_qty`（库存初始化用）
+> - col5: 本月收货合计 → `receipt_qty`
+> - col8: 本月发货合计 → `shipment_qty`
+> - col9: 本月结余 → `curr_balance_qty`
+> - col10: 单价 → `unit_price`
+> - col12: 合计金额 → `shipment_amount`
+> - col13: 备注 → `remark`
+>
+> **跳过规则**：col0 = "合计" 或 "应收金额" 的行跳过；前2行为表头跳过。
 
 #### inventory（库存表）
 | 字段 | 类型 | 说明 |
