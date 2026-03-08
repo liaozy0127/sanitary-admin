@@ -69,7 +69,8 @@ customer ◄──── production       (排产单属于客户)
 production ◄── production_item  (一单多明细)
 customer ◄──── shipment         (发货单属于客户)
 shipment ◄──── shipment_item    (一单多明细)
-customer ◄──── rework           (返工单，单表)
+customer ◄──── rework           (返工单主表，待改造)
+rework   ◄──── rework_item      (返工单明细，待建表)
 customer ◄──── payment          (收款记录)
 customer ◄──── statement        (对账单)
 material ◄──── inventory        (库存，三维唯一)
@@ -218,6 +219,63 @@ shipment_item 明细表：
 | unit_price/amount | | 单价/金额 |
 | customer_order_no | | 客户单号 |
 | detail_remark | | 明细备注 |
+
+#### rework（返工单主表）⏳ 待改造
+
+> 当前为单表设计，待改造为主从表。改造后字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT PK | |
+| rework_no | VARCHAR(30) | 返工单号，唯一，格式 FG+年月+流水 |
+| rework_date | DATE | 返工日期 |
+| customer_id | BIGINT | 客户 ID |
+| customer_name | VARCHAR(100) | 客户名称（冗余）|
+| rework_status | VARCHAR(20) | 返工状态：待返工/返工中/已完成 |
+| remark | VARCHAR(500) | 备注 |
+| deleted | TINYINT | 逻辑删除 |
+
+#### rework_item（返工单明细表）⏳ 待建表
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT PK | |
+| rework_id | BIGINT | 所属返工单 ID |
+| rework_no | VARCHAR(30) | 返工单号（冗余）|
+| material_id | BIGINT | 物料 ID |
+| material_name | VARCHAR(200) | 物料名称 |
+| material_code | VARCHAR(50) | 物料编码 |
+| spec | VARCHAR(200) | 规格 |
+| process_id | BIGINT | 工艺 ID |
+| process_name | VARCHAR(100) | 工艺名称 |
+| quantity | DECIMAL(12,2) | 返工数量 |
+| unit_price | DECIMAL(10,4) | 单价 |
+| amount | DECIMAL(12,2) | 金额 |
+| rework_reason | VARCHAR(500) | 返工原因 |
+| detail_remark | VARCHAR(500) | 明细备注 |
+| deleted | TINYINT | 逻辑删除 |
+
+#### statement（对账单）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT PK | |
+| statement_no | VARCHAR(30) | 对账单号 |
+| statement_month | VARCHAR(7) | 对账月份，格式 YYYY-MM |
+| customer_id | BIGINT | 客户 ID |
+| customer_name | VARCHAR(100) | 客户名称（冗余）|
+| receipt_qty | DECIMAL(12,2) | 本月收货数量 |
+| shipment_qty | DECIMAL(12,2) | 本月发货数量 |
+| receipt_amount | DECIMAL(12,2) | 本月收货金额 |
+| shipment_amount | DECIMAL(12,2) | 本月发货金额 |
+| remark | VARCHAR(500) | 备注 |
+| status | VARCHAR(20) | 状态：草稿/已确认 |
+| deleted | TINYINT | 逻辑删除 |
+
+> **老系统对账单 Excel 列映射**（用于 POST /api/statements/import）：
+> - col0: 产品代码，col1: 产品名称，col2: 工艺要求
+> - col3: 上月结余数量（库存初始化用），col5: 本月收货合计
+> - col8: 本月发货合计，col10: 单价，col12: 合计金额，col13: 备注
 
 #### inventory（库存表）
 | 字段 | 类型 | 说明 |
@@ -439,11 +497,16 @@ ReceiptServiceImpl.importExcel()
 ### 5.3 库存初始化流程（上线一次性操作）
 
 ```
-1. 准备对账单 Excel（包含「上月结余」列）
+1. 准备对账单 Excel（包含「上月结余」col3列）
 2. POST /api/inventory/init-from-statement（传入 Excel 文件）
-3. 系统按物料+客户+工艺写入 inventory 表
-4. 之后收货单/排产单用 mode=history 导入，不影响库存
-5. 新增的收货/发货单正常触发库存更新
+   ├── 若 inventory 表已有数据 → 拒绝执行，返回错误（防止重复初始化）
+   ├── 按物料代码(col0)+工艺(col2) 查找 material_id 和 process_id
+   └── 写入 inventory 表（quantity = 上月结余数量）
+3. 之后收货单/排产单/对账单历史数据用 mode=history 导入，不影响库存
+4. 新增的收货/发货单正常触发库存更新
+
+注意：对账单导入（POST /api/statements/import）和库存初始化是两个独立接口，
+互不触发。历史对账单数据导入不影响库存。
 ```
 
 ---
@@ -452,10 +515,11 @@ ReceiptServiceImpl.importExcel()
 
 | 问题 | 优先级 | 状态 |
 |------|--------|------|
-| 返工单未改造为主从表 | 中 | 待开发 |
-| 收货单分批上传（前端按3000行拆分）尚未实现 | 高 | 待开发 |
+| 返工单改造为主从表（rework + rework_item）| 高 | **待开发** |
+| 对账单历史数据导入接口（POST /api/statements/import）| 高 | **待开发** |
+| 库存初始化接口防重复执行（已有数据时拒绝）| 高 | **待修复** |
+| 收货单分批上传（前端按3000行拆分）| 中 | 待开发 |
 | inventory 查询接口带 keyword 参数时返回 400 | 中 | 待修复 |
-| 飞书文档图片插入（upload_image API 报400）| 低 | 搁置 |
 
 ---
 
