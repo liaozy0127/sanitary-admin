@@ -44,8 +44,7 @@
         </div>
       </template>
 
-      <div class="table-scroll-wrap">
-      <el-table v-loading="loading" :data="tableData" stripe border style="width: 100%; min-width: 900px" max-height="calc(100vh - 230px)">
+      <el-table v-loading="loading" :data="tableData" stripe border style="width: 100%" max-height="calc(100vh - 230px)">
         <el-table-column type="index" label="#" width="50" align="center" />
         <el-table-column prop="materialCode" label="物料代码" width="120" />
         <el-table-column prop="materialName" label="物料名称" min-width="120" />
@@ -74,7 +73,6 @@
           </template>
         </el-table-column>
       </el-table>
-      </div>
 
       <div class="pagination-wrap">
         <el-pagination

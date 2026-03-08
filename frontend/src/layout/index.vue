@@ -191,6 +191,7 @@ const handleCommand = async (command) => {
   transition: width 0.3s;
   overflow-y: auto;
   overflow-x: hidden;
+  height: 100vh;
 }
 
 /* 自定义滚动条样式，与侧边栏背景融合 */

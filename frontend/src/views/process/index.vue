@@ -28,8 +28,7 @@
         </div>
       </template>
 
-      <div class="table-scroll-wrap">
-      <el-table v-loading="loading" :data="tableData" stripe border style="width: 100%; min-width: 750px" max-height="calc(100vh - 230px)">
+      <el-table v-loading="loading" :data="tableData" stripe border style="width: 100%" max-height="calc(100vh - 230px)">
         <el-table-column type="index" label="#" width="50" align="center" />
         <el-table-column prop="processCode" label="工艺代码" width="100" />
         <el-table-column prop="processName" label="工艺名称" min-width="120" />
@@ -53,7 +52,6 @@
           </template>
         </el-table-column>
       </el-table>
-      </div>
 
       <div class="pagination-wrap">
         <el-pagination

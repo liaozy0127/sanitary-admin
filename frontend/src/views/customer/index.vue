@@ -34,8 +34,7 @@
         </div>
       </template>
 
-      <div class="table-scroll-wrap">
-      <el-table v-loading="loading" :data="tableData" stripe border style="width: 100%; min-width: 1000px" max-height="calc(100vh - 230px)">
+      <el-table v-loading="loading" :data="tableData" stripe border style="width: 100%" max-height="calc(100vh - 230px)">
         <el-table-column type="index" label="#" width="50" align="center" />
         <el-table-column prop="customerCode" label="客户代码" width="100" />
         <el-table-column prop="customerName" label="客户名称" min-width="150" />
@@ -66,7 +65,6 @@
           </template>
         </el-table-column>
       </el-table>
-      </div>
 
       <div class="pagination-wrap">
         <el-pagination
