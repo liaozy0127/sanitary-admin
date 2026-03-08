@@ -31,7 +31,7 @@
       </template>
 
       <el-table v-loading="loading" :data="tableData" stripe border style="width: 100%"
-        max-height="calc(100vh - 260px)" row-key="id">
+        max-height="calc(100vh - 260px)" row-key="id" @expand-change="onExpandChange">
         <el-table-column type="expand">
           <template #default="{ row }">
             <div class="expand-area">
@@ -59,9 +59,8 @@
         <el-table-column prop="productionDate" label="排产日期" width="110" />
         <el-table-column prop="customerName" label="客户名称" min-width="120" />
         <el-table-column prop="remark" label="备注" min-width="120" />
-        <el-table-column label="操作" width="180" align="center" fixed="right">
+        <el-table-column label="操作" width="140" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" type="info" :icon="View" @click="loadItems(row)">明细</el-button>
             <el-button size="small" type="primary" :icon="Edit" @click="openDialog(row)">编辑</el-button>
             <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(row)">删除</el-button>
           </template>
@@ -292,6 +291,13 @@ const loadItems = async (row) => {
     row.items = res.data
   } catch (e) {
     row.items = []
+  }
+}
+
+const onExpandChange = async (row, expandedRows) => {
+  // 只在展开时加载，且未加载过
+  if (expandedRows.some(r => r.id === row.id) && (!row.items || row.items.length === 0)) {
+    await loadItems(row)
   }
 }
 

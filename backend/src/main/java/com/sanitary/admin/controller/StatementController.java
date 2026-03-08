@@ -6,6 +6,7 @@ import com.sanitary.admin.entity.Statement;
 import com.sanitary.admin.service.StatementService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
@@ -27,7 +28,7 @@ public class StatementController {
 
     @GetMapping("/{id}")
     public Result<Statement> getById(@PathVariable Long id) {
-        return Result.success(statementService.getById(id));
+        return Result.success(statementService.getByIdWithItems(id));
     }
 
     @PostMapping("/generate")
@@ -35,6 +36,15 @@ public class StatementController {
         Long customerId = Long.valueOf(params.get("customerId").toString());
         String statementMonth = params.get("statementMonth").toString();
         return Result.success(statementService.generate(customerId, statementMonth));
+    }
+
+    @PostMapping("/import")
+    public Result<java.util.Map<String, Object>> importExcel(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam Long customerId,
+            @RequestParam String statementMonth,
+            @RequestParam(defaultValue = "false") Boolean initInventory) {
+        return Result.success(statementService.importExcel(file, customerId, statementMonth, initInventory));
     }
 
     @PutMapping("/{id}/confirm")

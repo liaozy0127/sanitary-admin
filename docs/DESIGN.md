@@ -69,10 +69,11 @@ customer ◄──── production       (排产单属于客户)
 production ◄── production_item  (一单多明细)
 customer ◄──── shipment         (发货单属于客户)
 shipment ◄──── shipment_item    (一单多明细)
-customer ◄──── rework           (返工单主表，待改造)
-rework   ◄──── rework_item      (返工单明细，待建表)
+customer ◄──── rework           (返工单主表，✅已改造)
+rework   ◄──── rework_item      (返工单明细，✅已建表)
 customer ◄──── payment          (收款记录)
-customer ◄──── statement        (对账单)
+customer ◄──── statement        (对账单主表，✅已改造主从表)
+statement ◄─── statement_item   (对账单明细，✅已建表)
 material ◄──── inventory        (库存，三维唯一)
 inventory ◄─── inventory_log    (库存流水)
 ```
@@ -220,9 +221,9 @@ shipment_item 明细表：
 | customer_order_no | | 客户单号 |
 | detail_remark | | 明细备注 |
 
-#### rework（返工单主表）⏳ 待改造
+#### rework（返工单主表）✅ 已改造
 
-> 当前为单表设计，待改造为主从表。改造后字段：
+> 已完成主从表改造（2026-03-08）。
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -235,7 +236,7 @@ shipment_item 明细表：
 | remark | VARCHAR(500) | 备注 |
 | deleted | TINYINT | 逻辑删除 |
 
-#### rework_item（返工单明细表）⏳ 待建表
+#### rework_item（返工单明细表）✅ 已建表
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -274,7 +275,7 @@ shipment_item 明细表：
 | status | VARCHAR(20) | 状态：草稿/已确认 |
 | deleted | TINYINT | 逻辑删除 |
 
-#### statement_item（对账单明细表）⏳ 待建表
+#### statement_item（对账单明细表）✅ 已建表
 
 > 按物料维度存储每行数据，对应老系统 Excel 的每一行。
 
@@ -549,9 +550,11 @@ ReceiptServiceImpl.importExcel()
 
 | 问题 | 优先级 | 状态 |
 |------|--------|------|
-| 返工单改造为主从表（rework + rework_item）| 高 | **待开发** |
-| 对账单历史数据导入接口（POST /api/statements/import）| 高 | **待开发** |
-| 库存初始化接口防重复执行（已有数据时拒绝）| 高 | **待修复** |
+| 返工单改造为主从表（rework + rework_item）| 高 | ✅ 已完成（2026-03-08）|
+| 对账单历史数据导入接口（POST /api/statements/import）| 高 | ✅ 已完成（2026-03-08）|
+| 对账单改造为主从表（statement + statement_item）| 高 | ✅ 已完成（2026-03-08）|
+| 库存初始化防重复执行（已有数据时拒绝）| 高 | ✅ 已实现（initInventory 参数 + 数量判断）|
+| 对账单前端展示物料明细（展开行）| 高 | **待开发** |
 | 收货单分批上传（前端按3000行拆分）| 中 | 待开发 |
 | inventory 查询接口带 keyword 参数时返回 400 | 中 | 待修复 |
 

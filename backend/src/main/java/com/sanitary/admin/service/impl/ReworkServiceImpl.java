@@ -43,8 +43,7 @@ public class ReworkServiceImpl extends ServiceImpl<ReworkMapper, Rework> impleme
         return page(new Page<>(page, size), wrapper);
     }
 
-    @Override
-    public Rework getById(Long id) {
+    public Rework getByIdWithItems(Long id) {
         Rework rework = super.getById(id);
         if (rework != null) {
             rework.setItems(reworkItemService.getByReworkId(id));
@@ -92,5 +91,16 @@ public class ReworkServiceImpl extends ServiceImpl<ReworkMapper, Rework> impleme
         reworkItemService.deleteByReworkId(id);
         // 再删除主单
         return removeById(id);
+    }
+
+    @Override
+    @Transactional
+    public void confirm(Long id) {
+        Rework rework = getById(id);
+        if (rework == null) {
+            throw new RuntimeException("返工单不存在");
+        }
+        rework.setReworkStatus("已完成");
+        updateById(rework);
     }
 }

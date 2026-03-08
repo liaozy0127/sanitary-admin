@@ -7,4 +7,8 @@ import com.sanitary.admin.entity.Rework;
 public interface ReworkService extends IService<Rework> {
     Page<Rework> pageList(int page, int size, String keyword, Long customerId, String reworkStatus);
     Rework createRework(Rework rework);
+    Rework updateRework(Rework rework);
+    boolean deleteRework(Long id);
+    void confirm(Long id);
+    Rework getByIdWithItems(Long id);
 }
