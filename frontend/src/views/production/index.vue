@@ -337,6 +337,29 @@ const onItemProcessChange = (id, index) => {
   formData.items[index].processName = process?.name || ''
 }
 
+
+const searchMaterial = async (query, index) => {
+  if (!formData.customerId) return
+  const row = formData.items[index]
+  if (!row) return
+  if (!query || !query.trim()) {
+    row._matOptions.splice(0, row._matOptions.length, ...defaultMatOptions.value)
+    return
+  }
+  row._matLoading = true
+  try {
+    const res = await request.get('/materials/search', {
+      params: { keyword: query.trim(), customerId: formData.customerId }
+    })
+    const list = Array.isArray(res) ? res : (res.data || [])
+    row._matOptions.splice(0, row._matOptions.length, ...list)
+  } catch (e) {
+    row._matOptions.splice(0, row._matOptions.length)
+  } finally {
+    row._matLoading = false
+  }
+}
+
 const addItem = () => {
   formData.items.push({
     materialId: null, materialName: '', materialCode: '', spec: '',
