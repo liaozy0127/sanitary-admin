@@ -489,6 +489,36 @@ layout/index.vue          — 主布局（左侧菜单 + 右侧内容）
 - 主题色：Element Plus 默认主题
 - 表格横向滚动：`el-table` 直接设置 `overflow-x: auto`，**不要**嵌套 `.table-scroll-wrap` div
 - 侧边菜单滚动：`.layout-aside` 需设置 `height: 100vh; overflow-y: auto`
+- 操作列按钮并排：所有页面 `<style scoped>` 中加 `:deep(.el-table .cell) { white-space: nowrap; }`，操作列宽度按按钮数量计算（每按钮 ~75px）
+- 状态列：使用 `el-tag` 点击切换，不用 `el-switch`（避免文字被截断）
+
+### 4.4 物料下拉搜索规范
+
+> 适用于：收货单/排产单/发货单/返工单 新增/编辑弹窗中的物料选择
+
+**交互设计**：
+1. 选择客户后，自动预加载该客户前 100 条物料（`/api/materials/search?customerId=xxx`）
+2. 物料下拉使用 `el-select` 的 `remote` + `filterable` 模式
+3. 用户输入关键词时，调用 `searchMaterial(query, rowIndex)`，请求 `/api/materials/search?customerId=xxx&keyword=xxx`（返回 ≤100 条）
+4. 每行明细有独立的 `_matOptions`（不共享，多行搜索互不干扰）
+
+**选中物料后自动填充**：
+- 物料名称、编码、规格
+- 单价：**先清零**，再从物料的 `defaultPrice` 填入（无单价则保持 0）
+- 工艺：调用 `/api/receipt-items/latest-process?customerId=xxx&materialId=xxx`，查该客户该物料最近一次收货单里的工艺，自动填入
+
+**切换物料时**：单价和工艺都先重置为 0/null，再按新物料重新带出。
+
+### 4.5 收货单明细未设价提醒
+
+**规则**：收货单列表展开行中，明细行满足以下条件时标红显示：
+- `receiptSource === '正常'`（正常收货，非返工/样品）
+- `unitPrice` 为 0 或 null
+
+**实现**：
+- `el-table` 的 `:row-class-name="itemRowClass"` 绑定 `row-no-price` class
+- 单价列额外显示 `el-tooltip` 提示「正常收货未设置单价」，文字显示「未设价」
+- CSS：`:deep(.row-no-price td) { background: #fff0f0 }; :deep(.row-no-price .cell) { color: #f56c6c }`
 
 ---
 
@@ -554,7 +584,11 @@ ReceiptServiceImpl.importExcel()
 | 对账单历史数据导入接口（POST /api/statements/import）| 高 | ✅ 已完成（2026-03-08）|
 | 对账单改造为主从表（statement + statement_item）| 高 | ✅ 已完成（2026-03-08）|
 | 库存初始化防重复执行（已有数据时拒绝）| 高 | ✅ 已实现（initInventory 参数 + 数量判断）|
-| 对账单前端展示物料明细（展开行）| 高 | **待开发** |
+| 对账单前端展示物料明细（展开行）| 高 | ✅ 已完成（2026-03-08）|
+| 物料下拉改为远程搜索（默认100条+关键词过滤）| 高 | ✅ 已完成（2026-03-08）|
+| 选物料自动带出单价+工艺（查最近收货单）| 高 | ✅ 已完成（2026-03-08）|
+| 收货单明细未设价标红提醒 | 中 | ✅ 已完成（2026-03-08）|
+| 收货单导入自动回填物料 default_price | 中 | ✅ 已完成（2026-03-08）|
 | 收货单分批上传（前端按3000行拆分）| 中 | 待开发 |
 | inventory 查询接口带 keyword 参数时返回 400 | 中 | 待修复 |
 
@@ -572,7 +606,12 @@ ReceiptServiceImpl.importExcel()
 6. **xls 文件头损坏**：老系统 xls 文件 `file size not 512+multiple of sector size`，需用 Python xlrd 先转 xlsx
 7. **收货单 OOM**：65535 行 xlsx 一次性加载会 OOM，需分批（每批 3000 行）上传
 8. **YAML 重复 spring: 块**：修改 application.yml 时注意不要出现两个 `spring:` 顶层 key
+9. **axios GET params 传参**：`request.get(url, params)` 不会把 params 附加到 URL，必须写 `request.get(url, { params })`；否则客户筛选等条件静默失效
+10. **Vue 响应式数组更新**：直接赋值 `row._matOptions = [...]` 不触发 UI 更新，必须用 `row._matOptions.splice(0, length, ...newItems)` 或 `row._matOptions = reactive([...])`
+11. **el-select remote 模式**：模板引用 `materialList` 改为 `row._matOptions` 后，`onItemMaterialChange` 也要从 `row._matOptions` 里查，否则找不到选中的物料信息
+12. **驼峰命名与 DB 列名不一致**：字段名含连续大写（如 `wareHousedQty`）MyBatis-Plus 转下划线为 `ware_housed_qty`，与实际列名 `warehoused_qty` 不符，需显式 `@TableField("warehoused_qty")`
+13. **单价回填 Excel 日期污染**：导入 Excel 时日期值会被读为数字（如 43673），需加 `unitPrice ≤ 10000` 上限过滤
 
 ---
 
-*文档版本：v1.0 | 最后更新：2026-03-08*
+*文档版本：v1.2 | 最后更新：2026-03-08*
