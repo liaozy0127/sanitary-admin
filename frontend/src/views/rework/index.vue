@@ -306,14 +306,18 @@ const onCustomerChange = async (id) => {
 }
 
 const onItemMaterialChange = (id, index) => {
-  const material = materialList.value.find(m => m.id === id)
+  const row = formData.items[index]
+  if (!row) return
+  // 从当前行的搜索结果里找（remote 模式下 materialList 已不再维护）
+  const material = (row._matOptions || []).find(m => m.id === id)
   if (material) {
-    formData.items[index].materialName = material.name
-    formData.items[index].materialCode = material.code || ''
-    formData.items[index].spec = material.spec || ''
-    if (material.defaultPrice > 0) {
-      formData.items[index].unitPrice = Number(material.defaultPrice)
-      calcItemAmount(formData.items[index])
+    row.materialName = material.name
+    row.materialCode = material.code || ''
+    row.spec = material.spec || ''
+    // 带出默认单价（若物料有单价且当前单价为0）
+    if (material.defaultPrice && Number(material.defaultPrice) > 0) {
+      row.unitPrice = Number(material.defaultPrice)
+      if (typeof calcItemAmount === 'function') calcItemAmount(row)
     }
   }
 }
