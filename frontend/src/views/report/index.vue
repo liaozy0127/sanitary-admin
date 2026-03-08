@@ -96,4 +96,7 @@ onMounted(fetchReport)
 .search-card { margin-bottom: 16px; }
 .table-header { display: flex; justify-content: space-between; align-items: center; }
 .empty-tip { text-align: center; padding: 40px; color: #909399; font-size: 14px; }
+
+/* 操作列按钮并排 */
+:deep(.el-table .cell) { white-space: nowrap; }
 </style>

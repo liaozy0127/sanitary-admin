@@ -41,7 +41,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" align="center" fixed="right">
+        <el-table-column label="操作" width="170" align="center" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link :icon="Edit" @click="openDialog(row)">编辑</el-button>
             <el-button type="danger" link :icon="Delete" @click="handleDelete(row)">删除</el-button>
@@ -255,4 +255,7 @@ onMounted(() => {
   justify-content: flex-end;
   margin-top: 16px;
 }
+
+/* 操作列按钮并排 */
+:deep(.el-table .cell) { white-space: nowrap; }
 </style>

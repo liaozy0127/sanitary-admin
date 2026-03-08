@@ -183,4 +183,7 @@ onMounted(() => {
 .search-card { margin-bottom: 16px; }
 .table-header { display: flex; justify-content: space-between; align-items: center; }
 .pagination-wrap { margin-top: 16px; display: flex; justify-content: flex-end; }
+
+/* 操作列按钮并排 */
+:deep(.el-table .cell) { white-space: nowrap; }
 </style>

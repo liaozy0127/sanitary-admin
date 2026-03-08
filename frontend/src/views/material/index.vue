@@ -56,17 +56,14 @@
           </template>
         </el-table-column>
         <el-table-column prop="unit" label="单位" width="70" align="center" />
-        <el-table-column prop="status" label="状态" width="80" align="center">
+        <el-table-column prop="status" label="状态" width="90" align="center">
           <template #default="{ row }">
-            <el-switch
-              :model-value="row.status === 1"
-              @change="toggleStatus(row)"
-              active-text="启用"
-              inactive-text="停用"
-            />
+            <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small" style="cursor:pointer" @click="toggleStatus(row)">
+              {{ row.status === 1 ? '启用' : '禁用' }}
+            </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" align="center" fixed="right">
+        <el-table-column label="操作" width="170" align="center" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" :icon="Edit" @click="openDialog(row)">编辑</el-button>
             <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(row)">删除</el-button>
@@ -274,4 +271,7 @@ onMounted(async () => {
 .table-scroll-wrap { overflow-x: auto; }
 
 
+
+/* 操作列按钮并排 */
+:deep(.el-table .cell) { white-space: nowrap; }
 </style>

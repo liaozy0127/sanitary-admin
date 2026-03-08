@@ -89,7 +89,7 @@
             <el-tag :type="row.status === '已确认' ? 'success' : 'warning'" size="small">{{ row.status }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" align="center" fixed="right">
+        <el-table-column label="操作" width="170" align="center" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="success" @click="handleConfirm(row)"
               :disabled="row.status === '已确认'">确认</el-button>
@@ -231,7 +231,7 @@ const onExpandChange = async (row, expandedRows) => {
   row._itemsLoading = true
   try {
     const res = await request.get('/statement-items', { params: { statementId: row.id } })
-    row.items = res.data || []
+    row.items = Array.isArray(res) ? res : (res.data || [])
   } catch (e) {
     row.items = []
   } finally {
@@ -317,4 +317,7 @@ onMounted(() => { fetchList(); loadCustomers() })
   font-size: 13px;
   color: #333;
 }
+
+/* 操作列按钮并排 */
+:deep(.el-table .cell) { white-space: nowrap; }
 </style>

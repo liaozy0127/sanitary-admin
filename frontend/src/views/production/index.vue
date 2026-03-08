@@ -7,7 +7,7 @@
           <el-input v-model="searchForm.keyword" placeholder="单号/客户" clearable style="width: 180px" @keyup.enter="fetchList" />
         </el-form-item>
         <el-form-item label="客户">
-          <el-select v-model="searchForm.customerId" placeholder="全部客户" clearable style="width: 160px" @change="fetchList">
+          <el-select v-model="searchForm.customerId" placeholder="全部客户" clearable style="width: 160px" @change="fetchList" filterable>
             <el-option v-for="c in customerList" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
         </el-form-item>
@@ -59,7 +59,7 @@
         <el-table-column prop="productionDate" label="排产日期" width="110" />
         <el-table-column prop="customerName" label="客户名称" min-width="120" />
         <el-table-column prop="remark" label="备注" min-width="120" />
-        <el-table-column label="操作" width="140" align="center" fixed="right">
+        <el-table-column label="操作" width="170" align="center" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" :icon="Edit" @click="openDialog(row)">编辑</el-button>
             <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(row)">删除</el-button>
@@ -188,7 +188,7 @@
               <el-input v-model="row.detailRemark" size="small" />
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="60" align="center">
+          <el-table-column label="操作" width="120" align="center">
             <template #default="{ $index }">
               <el-button size="small" type="danger" :icon="Delete" @click="removeItem($index)" circle />
             </template>
@@ -288,7 +288,7 @@ const loadItems = async (row) => {
   if (row.items && row.items.length > 0) return
   try {
     const res = await request.get('/production-items', { params: { productionId: row.id } })
-    row.items = res.data
+    row.items = Array.isArray(res) ? res : (res.data || [])
   } catch (e) {
     row.items = []
   }
@@ -358,7 +358,7 @@ const openDialog = async (row) => {
     // Load items
     try {
       const res = await request.get('/production-items', { params: { productionId: row.id } })
-      formData.items = res.data || []
+      formData.items = Array.isArray(res) ? res : (res.data || [])
     } catch (e) {
       formData.items = []
     }
@@ -446,4 +446,7 @@ onMounted(() => {
 .expand-area { padding: 12px 20px; background: #f5f7fa; }
 .items-section { margin-top: 16px; }
 .items-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; }
+
+/* 操作列按钮并排 */
+:deep(.el-table .cell) { white-space: nowrap; }
 </style>

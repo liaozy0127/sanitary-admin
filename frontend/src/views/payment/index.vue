@@ -39,7 +39,7 @@
         <el-table-column prop="paymentMethod" label="收款方式" width="120" />
         <el-table-column prop="referenceNo" label="参考单号" width="140" />
         <el-table-column prop="remark" label="备注" min-width="100" show-overflow-tooltip />
-        <el-table-column label="操作" width="150" align="center" fixed="right">
+        <el-table-column label="操作" width="170" align="center" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" :icon="Edit" @click="openDialog(row)">编辑</el-button>
             <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(row)">删除</el-button>
@@ -190,4 +190,7 @@ onMounted(() => { fetchList(); loadCustomers() })
 .search-card { margin-bottom: 16px; }
 .table-header { display: flex; justify-content: space-between; align-items: center; }
 .pagination-wrap { margin-top: 16px; display: flex; justify-content: flex-end; }
+
+/* 操作列按钮并排 */
+:deep(.el-table .cell) { white-space: nowrap; }
 </style>
