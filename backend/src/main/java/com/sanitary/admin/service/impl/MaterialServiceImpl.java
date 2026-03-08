@@ -49,16 +49,11 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w.like(Material::getMaterialName, keyword)
                     .or().like(Material::getMaterialCode, keyword));
-            // 有关键词时限制500条（足够覆盖搜索结果）
-            wrapper.last("LIMIT 500");
+            // 有关键词时限制100条
+            wrapper.last("LIMIT 100");
         } else {
-            if (customerId != null) {
-                // 无关键词按客户加载，限制500条
-                wrapper.last("LIMIT 500");
-            } else {
-                // 无客户无关键词，限制100条防止过多
-                wrapper.last("LIMIT 100");
-            }
+            // 无关键词：默认加载前100条（前端用于初始展示）
+            wrapper.last("LIMIT 100");
         }
         if (customerId != null) {
             wrapper.eq(Material::getCustomerId, customerId);

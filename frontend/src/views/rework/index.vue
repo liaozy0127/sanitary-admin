@@ -209,6 +209,7 @@ const editId = ref(null)
 const customerList = ref([])
 const materialList = ref([])
 const processList = ref([])
+const defaultMatOptions = ref([])  // 当前客户默认前100条物料
 
 const searchForm = reactive({ keyword: '', customerId: null, reworkStatus: '' })
 const pagination = reactive({ page: 1, size: 20, total: 0 })
@@ -284,11 +285,24 @@ const onExpandChange = async (row, expandedRows) => {
   }
 }
 
-const onCustomerChange = (id) => {
+const onCustomerChange = async (id) => {
   const customer = customerList.value.find(c => c.id === id)
   formData.customerName = customer?.name || ''
-  // 切换客户时清空所有行的物料搜索结果
-  formData.items.forEach(item => { item._matOptions = []; item.materialId = null; item.materialName = ''; item.materialCode = '' })
+  // 切换客户时清空所有行，并预加载默认100条
+  formData.items.forEach(item => {
+    item._matOptions = []
+    item.materialId = null
+    item.materialName = ''
+    item.materialCode = ''
+  })
+  if (id) {
+    try {
+      const res = await request.get('/materials/search', { params: { customerId: id, keyword: '' } })
+      defaultMatOptions.value = Array.isArray(res) ? res : (res.data || [])
+    } catch (e) { defaultMatOptions.value = [] }
+  } else {
+    defaultMatOptions.value = []
+  }
 }
 
 const onItemMaterialChange = (id, index) => {
@@ -318,7 +332,7 @@ const calcItemAmount = (item) => {
 const addItem = () => {
   formData.items.push({
     materialId: null, materialName: '', materialCode: '', spec: '',
-    processId: null, processName: '', _matOptions: [], _matLoading: false,
+    processId: null, processName: '', _matOptions: [...defaultMatOptions.value], _matLoading: false,
     quantity: 0, unitPrice: 0, amount: '0.00',
     reworkReason: '', detailRemark: ''
   })
@@ -349,7 +363,11 @@ const openDialog = async (row) => {
       remark: row.remark || '',
       items: []
     })
-    loadMaterials(row.customerId)
+    // 加载默认物料列表（前100条）
+    try {
+      const mres = await request.get('/materials/search', { params: { customerId: row.customerId, keyword: '' } })
+      defaultMatOptions.value = Array.isArray(mres) ? mres : (mres.data || [])
+    } catch(e) { defaultMatOptions.value = [] }
     // Load items
     try {
       const res = await request.get('/rework-items', { params: { reworkId: row.id } })
