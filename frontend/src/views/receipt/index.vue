@@ -40,7 +40,7 @@
         <el-table-column type="expand">
           <template #default="{ row }">
             <div class="expand-area">
-              <el-table :data="row.items || []" border size="small" style="width: 100%">
+              <el-table :data="row.items || []" border size="small" style="width: 100%" :row-class-name="itemRowClass">
                 <el-table-column prop="materialName" label="产品名称" min-width="150" />
                 <el-table-column prop="spec" label="型号规格" width="120" />
                 <el-table-column prop="processName" label="工艺" width="100" />
@@ -48,7 +48,15 @@
                 <el-table-column prop="quantity" label="收货数量" width="90" align="right" />
                 <el-table-column prop="shippedQty" label="发货数量" width="90" align="right" />
                 <el-table-column prop="unshippedQty" label="未发货" width="80" align="right" />
-                <el-table-column prop="unitPrice" label="单价" width="80" align="right" />
+                <el-table-column prop="unitPrice" label="单价" width="80" align="right">
+                  <template #default="{ row: item }">
+                    <el-tooltip v-if="item.receiptSource === '正常' && (!item.unitPrice || Number(item.unitPrice) === 0)"
+                      content="正常收货未设置单价" placement="top">
+                      <span style="color:#f56c6c;font-weight:bold">未设价</span>
+                    </el-tooltip>
+                    <span v-else>{{ item.unitPrice }}</span>
+                  </template>
+                </el-table-column>
                 <el-table-column prop="amount" label="金额" width="90" align="right">
                   <template #default="{ row: item }">
                     {{ item.amount ? Number(item.amount).toFixed(2) : '0.00' }}
@@ -282,6 +290,13 @@ const loadItems = async (row) => {
   } catch (e) {
     row.items = []
   }
+}
+
+const itemRowClass = ({ row: item }) => {
+  if (item.receiptSource === '正常' && (!item.unitPrice || Number(item.unitPrice) === 0)) {
+    return 'row-no-price'
+  }
+  return ''
 }
 
 const onExpandChange = async (row, expandedRows) => {
@@ -522,4 +537,7 @@ onMounted(() => {
 
 /* 操作列按钮并排 */
 :deep(.el-table .cell) { white-space: nowrap; }
+/* 未设单价行标红 */
+:deep(.row-no-price td) { background-color: #fff0f0 !important; }
+:deep(.row-no-price td .cell) { color: #f56c6c; }
 </style>
