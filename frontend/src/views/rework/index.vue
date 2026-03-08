@@ -130,9 +130,10 @@
         <el-table :data="formData.items" border size="small" style="width: 100%">
           <el-table-column label="产品名称" min-width="160">
             <template #default="{ row, $index }">
-              <el-select v-model="row.materialId" placeholder="选择物料" filterable clearable size="small"
+              <el-select v-model="row.materialId" placeholder="输入物料名称搜索" filterable clearable size="small" remote
+                :remote-method="(q) => searchMaterial(q, $index)" :loading="row._matLoading || false"
                 style="width:100%" @change="(id) => onItemMaterialChange(id, $index)" :disabled="!formData.customerId">
-                <el-option v-for="m in materialList" :key="m.id" :label="m.name" :value="m.id" />
+                <el-option v-for="m in (row._matOptions || [])" :key="m.id" :label="m.name" :value="m.id" />
               </el-select>
             </template>
           </el-table-column>
@@ -286,7 +287,8 @@ const onExpandChange = async (row, expandedRows) => {
 const onCustomerChange = (id) => {
   const customer = customerList.value.find(c => c.id === id)
   formData.customerName = customer?.name || ''
-  loadMaterials(id)
+  // 切换客户时清空所有行的物料搜索结果
+  formData.items.forEach(item => { item._matOptions = []; item.materialId = null; item.materialName = ''; item.materialCode = '' })
 }
 
 const onItemMaterialChange = (id, index) => {
@@ -316,7 +318,7 @@ const calcItemAmount = (item) => {
 const addItem = () => {
   formData.items.push({
     materialId: null, materialName: '', materialCode: '', spec: '',
-    processId: null, processName: '',
+    processId: null, processName: '', _matOptions: [], _matLoading: false,
     quantity: 0, unitPrice: 0, amount: '0.00',
     reworkReason: '', detailRemark: ''
   })
@@ -351,7 +353,8 @@ const openDialog = async (row) => {
     // Load items
     try {
       const res = await request.get('/rework-items', { params: { reworkId: row.id } })
-      formData.items = Array.isArray(res) ? res : (res.data || [])
+      const rawItems = Array.isArray(res) ? res : (res.data || [])
+      formData.items = rawItems.map(item => ({ ...item, _matOptions: item.materialId ? [{ id: item.materialId, name: item.materialName, code: item.materialCode, spec: item.spec }] : [], _matLoading: false }))
     } catch (e) {
       formData.items = []
     }
