@@ -41,4 +41,18 @@ public class ReceiptItemServiceImpl extends ServiceImpl<ReceiptItemMapper, Recei
     public void deleteByReceiptId(Long receiptId) {
         remove(new LambdaQueryWrapper<ReceiptItem>().eq(ReceiptItem::getReceiptId, receiptId));
     }
+
+    @Override
+    public ReceiptItem getLatestProcessByMaterial(Long customerId, Long materialId) {
+        return getBaseMapper().selectOne(
+            new LambdaQueryWrapper<ReceiptItem>()
+                .eq(ReceiptItem::getMaterialId, materialId)
+                .isNotNull(ReceiptItem::getProcessId)
+                .ne(ReceiptItem::getProcessId, 0L)
+                .inSql(ReceiptItem::getReceiptId,
+                    "SELECT id FROM receipt WHERE customer_id = " + customerId + " AND deleted = 0")
+                .orderByDesc(ReceiptItem::getId)
+                .last("LIMIT 1")
+        );
+    }
 }

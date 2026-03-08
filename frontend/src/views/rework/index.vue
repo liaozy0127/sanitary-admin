@@ -305,20 +305,39 @@ const onCustomerChange = async (id) => {
   }
 }
 
-const onItemMaterialChange = (id, index) => {
+const onItemMaterialChange = async (id, index) => {
   const row = formData.items[index]
   if (!row) return
-  // 从当前行的搜索结果里找（remote 模式下 materialList 已不再维护）
+  // 先重置单价和工艺
+  row.unitPrice = 0
+  row.processId = null
+  row.processName = ''
+  if (typeof calcItemAmount === 'function') calcItemAmount(row)
+  if (!id) return
+  // 从当前行搜索结果找物料信息
   const material = (row._matOptions || []).find(m => m.id === id)
   if (material) {
     row.materialName = material.name
     row.materialCode = material.code || ''
     row.spec = material.spec || ''
-    // 带出默认单价（若物料有单价且当前单价为0）
+    // 带出默认单价
     if (material.defaultPrice && Number(material.defaultPrice) > 0) {
       row.unitPrice = Number(material.defaultPrice)
       if (typeof calcItemAmount === 'function') calcItemAmount(row)
     }
+  }
+  // 自动带出工艺：查该客户+物料最近收货单里的工艺
+  if (formData.customerId && id) {
+    try {
+      const res = await request.get('/receipt-items/latest-process', {
+        params: { customerId: formData.customerId, materialId: id }
+      })
+      const data = Array.isArray(res) ? null : res
+      if (data && data.processId) {
+        row.processId = data.processId
+        row.processName = data.processName || ''
+      }
+    } catch (e) { /* 查不到工艺不影响录入 */ }
   }
 }
 
