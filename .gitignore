@@ -22,3 +22,7 @@ dist/
 # OS
 .DS_Store
 .env
+
+# 大文件忽略
+dist-package/*.zip
+dist-package/*.tar
