@@ -230,7 +230,7 @@ const fetchList = async () => {
       startDate: searchForm.dateRange?.[0] || undefined,
       endDate: searchForm.dateRange?.[1] || undefined
     }
-    const res = await request.get('/shipments', params)
+    const res = await request.get('/shipments', { params })
     tableData.value = res.data.records
     pagination.total = res.data.total
   } finally {

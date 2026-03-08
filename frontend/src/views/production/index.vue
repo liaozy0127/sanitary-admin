@@ -262,7 +262,7 @@ const fetchList = async () => {
       customerId: searchForm.customerId || undefined,
       prodStatus: undefined // prodStatus param retained for API compatibility but no longer stored on main entity
     }
-    const res = await request.get('/productions', params)
+    const res = await request.get('/productions', { params })
     tableData.value = res.data.records
     pagination.total = res.data.total
   } finally {
