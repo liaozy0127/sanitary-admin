@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sanitary.admin.entity.Production;
+import com.sanitary.admin.entity.ProductionItem;
 import com.sanitary.admin.entity.Customer;
 import com.sanitary.admin.entity.Material;
 import com.sanitary.admin.entity.Process;
@@ -11,6 +12,7 @@ import com.sanitary.admin.mapper.ProductionMapper;
 import com.sanitary.admin.mapper.CustomerMapper;
 import com.sanitary.admin.mapper.MaterialMapper;
 import com.sanitary.admin.mapper.ProcessMapper;
+import com.sanitary.admin.service.ProductionItemService;
 import com.sanitary.admin.service.ProductionService;
 import com.sanitary.admin.util.GenerateNoUtil;
 import lombok.RequiredArgsConstructor;
@@ -22,9 +24,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -36,20 +38,17 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
     private final CustomerMapper customerMapper;
     private final MaterialMapper materialMapper;
     private final ProcessMapper processMapper;
+    private final ProductionItemService productionItemService;
 
     @Override
     public Page<Production> pageList(int page, int size, String keyword, Long customerId, String prodStatus) {
         LambdaQueryWrapper<Production> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w.like(Production::getProductionNo, keyword)
-                    .or().like(Production::getCustomerName, keyword)
-                    .or().like(Production::getMaterialName, keyword));
+                    .or().like(Production::getCustomerName, keyword));
         }
         if (customerId != null) {
             wrapper.eq(Production::getCustomerId, customerId);
-        }
-        if (StringUtils.hasText(prodStatus)) {
-            wrapper.eq(Production::getProdStatus, prodStatus);
         }
         wrapper.orderByDesc(Production::getCreateTime);
         return page(new Page<>(page, size), wrapper);
@@ -59,17 +58,40 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
     @Transactional
     public Production createProduction(Production production) {
         production.setProductionNo(generateNoUtil.generate("PC", "production", "production_no"));
-        if (production.getProdStatus() == null) {
-            production.setProdStatus("待生产");
-        }
-        if (production.getActualQty() == null) {
-            production.setActualQty(BigDecimal.ZERO);
-        }
-        if (production.getPlannedQty() != null && production.getUnitPrice() != null) {
-            production.setAmount(production.getPlannedQty().multiply(production.getUnitPrice()));
-        }
         save(production);
+
+        if (production.getItems() != null && !production.getItems().isEmpty()) {
+            productionItemService.saveItems(production.getId(), production.getProductionNo(), production.getItems());
+        }
+
         return production;
+    }
+
+    @Override
+    @Transactional
+    public Production updateProduction(Production production) {
+        // 先删除旧的明细
+        productionItemService.deleteByProductionId(production.getId());
+        
+        // 更新主表
+        updateById(production);
+        
+        // 保存新的明细
+        if (production.getItems() != null && !production.getItems().isEmpty()) {
+            productionItemService.saveItems(production.getId(), production.getProductionNo(), production.getItems());
+        }
+        
+        return production;
+    }
+
+    @Override
+    @Transactional
+    public boolean deleteProduction(Long id) {
+        // 先删除明细
+        productionItemService.deleteByProductionId(id);
+        
+        // 再删除主表记录
+        return removeById(id);
     }
 
     @Override
@@ -79,16 +101,20 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
         int skip = 0;
         List<String> errors = new ArrayList<>();
 
+        Map<String, Production> productionMap = new LinkedHashMap<>();
+        Map<String, List<ProductionItem>> itemsMap = new LinkedHashMap<>();
+
+        String lastProductionNo = null;
+
         try (java.io.InputStream is = file.getInputStream();
              Workbook workbook = WorkbookFactory.create(is)) {
             Sheet sheet = workbook.getSheetAt(0);
-            String lastProductionNo = null;
             for (int i = 1; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
                 if (row == null) continue;
 
                 try {
-                    String productionNo = getCellString(row, 1); // 排产单号 (col 1 in 0-based index)
+                    String productionNo = getCellString(row, 1);
                     if (productionNo.isEmpty()) {
                         if (lastProductionNo == null) { skip++; continue; }
                         productionNo = lastProductionNo;
@@ -96,36 +122,50 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
                         lastProductionNo = productionNo;
                     }
 
-                    // Check for duplicates (idempotency)
+                    // Skip if already exists in DB (idempotency)
                     if (productionExists(productionNo)) {
                         skip++;
                         continue;
                     }
 
-                    Production production = new Production();
-                    production.setProductionNo(productionNo);
-                    production.setProductionDate(parseExcelDate(getCellString(row, 2))); // 日期 (col 2)
+                    // Build master record (only on first occurrence)
+                    if (!productionMap.containsKey(productionNo)) {
+                        Production production = new Production();
+                        production.setProductionNo(productionNo);
+                        production.setProductionDate(parseExcelDate(getCellString(row, 2)));
 
-                    String customerName = getCellString(row, 4); // 客户名称 (col 4)
-                    if (!customerName.isEmpty()) {
-                        Customer customer = customerMapper.selectOne(
-                            new LambdaQueryWrapper<Customer>()
-                                .eq(Customer::getCustomerName, customerName.trim())
-                        );
-                        if (customer != null) {
-                            production.setCustomerId(customer.getId());
-                            production.setCustomerName(customer.getCustomerName());
+                        String customerName = getCellString(row, 4);
+                        if (!customerName.isEmpty()) {
+                            Customer customer = customerMapper.selectOne(
+                                new LambdaQueryWrapper<Customer>()
+                                    .eq(Customer::getCustomerName, customerName.trim())
+                                    .last("LIMIT 1")
+                            );
+                            if (customer != null) {
+                                production.setCustomerId(customer.getId());
+                                production.setCustomerName(customer.getCustomerName());
+                            } else {
+                                fail++;
+                                errors.add("第" + (i + 1) + "行: 客户「" + customerName + "」不存在");
+                                continue;
+                            }
                         } else {
                             fail++;
-                            errors.add("第" + (i + 1) + "行: 客户「" + customerName + "」不存在");
+                            errors.add("第" + (i + 1) + "行: 客户名称为空");
                             continue;
                         }
+
+                        productionMap.put(productionNo, production);
+                        itemsMap.put(productionNo, new ArrayList<>());
                     }
 
-                    String materialName = getCellString(row, 5); // 产品名称 (col 5)
+                    // Build item record for this row
+                    ProductionItem item = new ProductionItem();
+                    item.setProductionNo(productionNo);
+
+                    String materialName = getCellString(row, 5);
                     if (!materialName.isEmpty()) {
-                        // 先按客户+名称查，找不到再按名称查
-                        Long custId = production.getCustomerId();
+                        Long custId = productionMap.get(productionNo).getCustomerId();
                         LambdaQueryWrapper<Material> mWrapper = new LambdaQueryWrapper<Material>()
                                 .eq(Material::getMaterialName, materialName.trim());
                         if (custId != null) mWrapper.eq(Material::getCustomerId, custId);
@@ -136,67 +176,44 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
                                     .eq(Material::getMaterialName, materialName.trim()).last("LIMIT 1"));
                         }
                         if (material != null) {
-                            production.setMaterialId(material.getId());
-                            production.setMaterialName(material.getMaterialName());
-                            production.setMaterialCode(material.getMaterialCode());
-                            production.setSpec(material.getSpec());
+                            item.setMaterialId(material.getId());
+                            item.setMaterialName(material.getMaterialName());
+                            item.setMaterialCode(material.getMaterialCode());
+                            item.setSpec(material.getSpec());
                         } else {
-                            fail++;
-                            errors.add("第" + (i + 1) + "行: 物料「" + materialName + "」不存在");
-                            continue;
+                            item.setMaterialName(materialName.trim());
                         }
                     }
 
-                    String processName = getCellString(row, 6); // 工艺名称 (col 6)
+                    String processName = getCellString(row, 6);
                     if (!processName.isEmpty()) {
                         Process process = processMapper.selectOne(
                             new LambdaQueryWrapper<Process>()
                                 .eq(Process::getProcessName, processName.trim())
+                                .last("LIMIT 1")
                         );
                         if (process != null) {
-                            production.setProcessId(process.getId());
-                            production.setProcessName(process.getProcessName());
+                            item.setProcessId(process.getId());
+                            item.setProcessName(process.getProcessName());
                         } else {
-                            fail++;
-                            errors.add("第" + (i + 1) + "行: 工艺「" + processName + "」不存在");
-                            continue;
+                            item.setProcessName(processName.trim());
                         }
                     }
 
-                    production.setReceiptType(getCellString(row, 7)); // 收货类型 (col 7)
-                    production.setUnit(getCellString(row, 8)); // 计量单位 (col 8)
-                    production.setPlannedQty(parseBigDecimal(getCellString(row, 9))); // 排产数量 (col 9)
+                    item.setReceiptType(getCellString(row, 7));
+                    item.setUnit(getCellString(row, 8));
+                    item.setPlannedQty(parseBigDecimal(getCellString(row, 9)));
+                    item.setActualQty(parseBigDecimal(getCellString(row, 10)));
+                    item.setUnwareHousedQty(parseBigDecimal(getCellString(row, 11)));
+                    item.setOutsourcePrice(parseBigDecimal(getCellString(row, 12)));
+                    item.setPlatingAmount(parseBigDecimal(getCellString(row, 13)));
+                    item.setPlatingPrice(parseBigDecimal(getCellString(row, 14)));
+                    item.setDetailRemark(getCellString(row, 15));
+                    item.setCustomerOrderNo(getCellString(row, 16));
+                    item.setProductionType(getCellString(row, 17));
 
-                    String outsourcePriceStr = getCellString(row, 12); // 委外单价 (col 12)
-                    if (!outsourcePriceStr.isEmpty()) {
-                        try {
-                            production.setOutsourcePrice(new BigDecimal(outsourcePriceStr));
-                        } catch (NumberFormatException e) {
-                            production.setOutsourcePrice(BigDecimal.ZERO);
-                        }
-                    }
+                    itemsMap.get(productionNo).add(item);
 
-                    String platingPriceStr = getCellString(row, 14); // 电镀单价 (col 14)
-                    if (!platingPriceStr.isEmpty()) {
-                        try {
-                            production.setPlatingPrice(new BigDecimal(platingPriceStr));
-                        } catch (NumberFormatException e) {
-                            production.setPlatingPrice(BigDecimal.ZERO);
-                        }
-                    }
-
-                    production.setCustomerOrderNo(getCellString(row, 16)); // 客户单号 (col 16)
-                    production.setProductionType(getCellString(row, 17)); // 排产方式 (col 17)
-
-                    production.setProdStatus("待生产"); // 默认状态
-                    production.setActualQty(BigDecimal.ZERO); // 实际数量初始化为0
-
-                    if (production.getPlannedQty() != null && production.getUnitPrice() != null) {
-                        production.setAmount(production.getPlannedQty().multiply(production.getUnitPrice()));
-                    }
-
-                    save(production);
-                    success++;
                 } catch (Exception e) {
                     fail++;
                     errors.add("第" + (i + 1) + "行: " + e.getMessage());
@@ -205,6 +222,22 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
         } catch (Exception e) {
             throw new RuntimeException("Excel解析失败: " + e.getMessage());
         }
+
+        // Batch save all productions and their items
+        for (Map.Entry<String, Production> entry : productionMap.entrySet()) {
+            String productionNo = entry.getKey();
+            Production production = entry.getValue();
+            try {
+                save(production);
+                List<ProductionItem> items = itemsMap.get(productionNo);
+                productionItemService.saveItems(production.getId(), production.getProductionNo(), items);
+                success++;
+            } catch (Exception e) {
+                fail++;
+                errors.add("单号" + productionNo + ": " + e.getMessage());
+            }
+        }
+
         Map<String, Object> result = new HashMap<>();
         result.put("success", success);
         result.put("fail", fail);
@@ -240,7 +273,7 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
                 double d = Double.parseDouble(value);
                 return LocalDate.of(1899, 12, 30).plusDays((long) d);
             } catch (Exception e2) {
-                return null; // 日期解析失败，不中断
+                return null;
             }
         }
     }

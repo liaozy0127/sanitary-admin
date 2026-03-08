@@ -5,10 +5,14 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sanitary.admin.entity.Customer;
 import com.sanitary.admin.entity.Receipt;
+import com.sanitary.admin.entity.ReceiptItem;
 import com.sanitary.admin.entity.Shipment;
+import com.sanitary.admin.entity.ShipmentItem;
 import com.sanitary.admin.entity.Statement;
 import com.sanitary.admin.mapper.CustomerMapper;
+import com.sanitary.admin.mapper.ReceiptItemMapper;
 import com.sanitary.admin.mapper.ReceiptMapper;
+import com.sanitary.admin.mapper.ShipmentItemMapper;
 import com.sanitary.admin.mapper.ShipmentMapper;
 import com.sanitary.admin.mapper.StatementMapper;
 import com.sanitary.admin.service.StatementService;
@@ -23,6 +27,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,7 +35,9 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
 
     private final GenerateNoUtil generateNoUtil;
     private final ReceiptMapper receiptMapper;
+    private final ReceiptItemMapper receiptItemMapper;
     private final ShipmentMapper shipmentMapper;
+    private final ShipmentItemMapper shipmentItemMapper;
     private final CustomerMapper customerMapper;
 
     @Override
@@ -67,13 +74,18 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                 .ge(Receipt::getReceiptDate, startDate)
                 .le(Receipt::getReceiptDate, endDate);
         List<Receipt> receipts = receiptMapper.selectList(receiptWrapper);
-        BigDecimal receiptQty = receipts.stream()
-                .map(Receipt::getQuantity)
-                .filter(q -> q != null)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal receiptAmount = receipts.stream()
-                .map(r -> r.getAmount() != null ? r.getAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Aggregate qty and amount from receipt_item
+        List<Long> receiptIds = receipts.stream().map(Receipt::getId).collect(java.util.stream.Collectors.toList());
+        BigDecimal receiptQty = BigDecimal.ZERO;
+        BigDecimal receiptAmount = BigDecimal.ZERO;
+        if (!receiptIds.isEmpty()) {
+            List<ReceiptItem> receiptItems = receiptItemMapper.selectList(
+                new LambdaQueryWrapper<ReceiptItem>().in(ReceiptItem::getReceiptId, receiptIds));
+            receiptQty = receiptItems.stream()
+                .map(ReceiptItem::getQuantity).filter(q -> q != null).reduce(BigDecimal.ZERO, BigDecimal::add);
+            receiptAmount = receiptItems.stream()
+                .map(i -> i.getAmount() != null ? i.getAmount() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
 
         // Calculate shipment totals
         LambdaQueryWrapper<Shipment> shipmentWrapper = new LambdaQueryWrapper<Shipment>()
@@ -82,13 +94,18 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                 .ge(Shipment::getShipmentDate, startDate)
                 .le(Shipment::getShipmentDate, endDate);
         List<Shipment> shipments = shipmentMapper.selectList(shipmentWrapper);
-        BigDecimal shipmentQty = shipments.stream()
-                .map(Shipment::getQuantity)
-                .filter(q -> q != null)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal shipmentAmount = shipments.stream()
-                .map(s -> s.getAmount() != null ? s.getAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Aggregate qty and amount from shipment_item
+        List<Long> shipmentIds = shipments.stream().map(Shipment::getId).collect(java.util.stream.Collectors.toList());
+        BigDecimal shipmentQty = BigDecimal.ZERO;
+        BigDecimal shipmentAmount = BigDecimal.ZERO;
+        if (!shipmentIds.isEmpty()) {
+            List<ShipmentItem> shipmentItems = shipmentItemMapper.selectList(
+                new LambdaQueryWrapper<ShipmentItem>().in(ShipmentItem::getShipmentId, shipmentIds));
+            shipmentQty = shipmentItems.stream()
+                .map(ShipmentItem::getQuantity).filter(q -> q != null).reduce(BigDecimal.ZERO, BigDecimal::add);
+            shipmentAmount = shipmentItems.stream()
+                .map(i -> i.getAmount() != null ? i.getAmount() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
 
         // Check if statement already exists for this customer/month
         LambdaQueryWrapper<Statement> existWrapper = new LambdaQueryWrapper<Statement>()

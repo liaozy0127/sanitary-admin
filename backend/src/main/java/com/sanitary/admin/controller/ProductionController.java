@@ -3,6 +3,7 @@ package com.sanitary.admin.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sanitary.admin.common.Result;
 import com.sanitary.admin.entity.Production;
+import com.sanitary.admin.service.ProductionItemService;
 import com.sanitary.admin.service.ProductionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +18,7 @@ import java.util.Map;
 public class ProductionController {
 
     private final ProductionService productionService;
+    private final ProductionItemService productionItemService;
 
     @GetMapping
     public Result<Page<Production>> list(
@@ -30,7 +32,11 @@ public class ProductionController {
 
     @GetMapping("/{id}")
     public Result<Production> getById(@PathVariable Long id) {
-        return Result.success(productionService.getById(id));
+        Production production = productionService.getById(id);
+        if (production != null) {
+            production.setItems(productionItemService.listByProductionId(id));
+        }
+        return Result.success(production);
     }
 
     @PostMapping
@@ -41,25 +47,17 @@ public class ProductionController {
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody Production production) {
         production.setId(id);
-        if (production.getPlannedQty() != null && production.getUnitPrice() != null) {
-            production.setAmount(production.getPlannedQty().multiply(production.getUnitPrice()));
-        }
         productionService.updateById(production);
+        if (production.getItems() != null) {
+            productionItemService.deleteByProductionId(id);
+            productionItemService.saveItems(id, production.getProductionNo(), production.getItems());
+        }
         return Result.success();
     }
 
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         productionService.removeById(id);
-        return Result.success();
-    }
-
-    @PutMapping("/{id}/status")
-    public Result<Void> updateStatus(@PathVariable Long id, @RequestParam String prodStatus) {
-        Production production = new Production();
-        production.setId(id);
-        production.setProdStatus(prodStatus);
-        productionService.updateById(production);
         return Result.success();
     }
 

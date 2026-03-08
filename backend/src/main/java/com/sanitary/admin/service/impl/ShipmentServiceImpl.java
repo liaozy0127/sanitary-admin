@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sanitary.admin.entity.Shipment;
+import com.sanitary.admin.entity.ShipmentItem;
 import com.sanitary.admin.mapper.ShipmentMapper;
 import com.sanitary.admin.service.InventoryService;
+import com.sanitary.admin.service.ShipmentItemService;
 import com.sanitary.admin.service.ShipmentService;
 import com.sanitary.admin.util.GenerateNoUtil;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +24,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
 
     private final GenerateNoUtil generateNoUtil;
     private final InventoryService inventoryService;
+    private final ShipmentItemService shipmentItemService;
 
     @Override
     public Page<Shipment> pageList(int page, int size, String keyword, Long customerId,
@@ -29,8 +32,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
         LambdaQueryWrapper<Shipment> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w.like(Shipment::getShipmentNo, keyword)
-                    .or().like(Shipment::getCustomerName, keyword)
-                    .or().like(Shipment::getMaterialName, keyword));
+                    .or().like(Shipment::getCustomerName, keyword));
         }
         if (customerId != null) {
             wrapper.eq(Shipment::getCustomerId, customerId);
@@ -52,29 +54,39 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
         if (shipment.getStatus() == null) {
             shipment.setStatus(1);
         }
-        if (shipment.getQuantity() != null && shipment.getUnitPrice() != null) {
-            shipment.setAmount(shipment.getQuantity().multiply(shipment.getUnitPrice()));
-        }
         save(shipment);
 
-        // Update inventory (subtract shipped quantity)
-        inventoryService.updateInventory(
-                shipment.getMaterialId(),
-                shipment.getCustomerId(),
-                shipment.getProcessId(),
-                shipment.getMaterialCode(),
-                shipment.getMaterialName(),
-                shipment.getCustomerName(),
-                shipment.getSpec(),
-                shipment.getProcessName(),
-                shipment.getQuantity().negate(), // 负数表示发货减少库存
-                2,  // 发货
-                "SHIPMENT",
-                shipment.getId(),
-                shipment.getShipmentNo(),
-                shipment.getShipmentDate()
-        );
+        if (shipment.getItems() != null && !shipment.getItems().isEmpty()) {
+            shipmentItemService.saveItems(shipment.getId(), shipment.getShipmentNo(), shipment.getItems());
+        }
 
         return shipment;
+    }
+
+    @Override
+    @Transactional
+    public Shipment updateShipment(Shipment shipment) {
+        // 先删除旧的明细
+        shipmentItemService.deleteByShipmentId(shipment.getId());
+        
+        // 更新主表
+        updateById(shipment);
+        
+        // 保存新的明细
+        if (shipment.getItems() != null && !shipment.getItems().isEmpty()) {
+            shipmentItemService.saveItems(shipment.getId(), shipment.getShipmentNo(), shipment.getItems());
+        }
+        
+        return shipment;
+    }
+
+    @Override
+    @Transactional
+    public boolean deleteShipment(Long id) {
+        // 先删除明细
+        shipmentItemService.deleteByShipmentId(id);
+        
+        // 再删除主表记录
+        return removeById(id);
     }
 }

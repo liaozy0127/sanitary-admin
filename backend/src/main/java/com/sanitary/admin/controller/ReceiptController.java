@@ -3,6 +3,7 @@ package com.sanitary.admin.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sanitary.admin.common.Result;
 import com.sanitary.admin.entity.Receipt;
+import com.sanitary.admin.service.ReceiptItemService;
 import com.sanitary.admin.service.ReceiptService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +19,7 @@ import java.util.Map;
 public class ReceiptController {
 
     private final ReceiptService receiptService;
+    private final ReceiptItemService receiptItemService;
 
     @GetMapping
     public Result<Page<Receipt>> list(
@@ -32,7 +34,11 @@ public class ReceiptController {
 
     @GetMapping("/{id}")
     public Result<Receipt> getById(@PathVariable Long id) {
-        return Result.success(receiptService.getById(id));
+        Receipt receipt = receiptService.getById(id);
+        if (receipt != null) {
+            receipt.setItems(receiptItemService.listByReceiptId(id));
+        }
+        return Result.success(receipt);
     }
 
     @PostMapping
@@ -43,17 +49,16 @@ public class ReceiptController {
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody Receipt receipt) {
         receipt.setId(id);
-        // Recalculate amount
-        if (receipt.getQuantity() != null && receipt.getUnitPrice() != null) {
-            receipt.setAmount(receipt.getQuantity().multiply(receipt.getUnitPrice()));
-        }
         receiptService.updateById(receipt);
+        if (receipt.getItems() != null) {
+            receiptItemService.deleteByReceiptId(id);
+            receiptItemService.saveItems(id, receipt.getReceiptNo(), receipt.getItems());
+        }
         return Result.success();
     }
 
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
-        // Void (status=0)
         Receipt receipt = new Receipt();
         receipt.setId(id);
         receipt.setStatus(0);

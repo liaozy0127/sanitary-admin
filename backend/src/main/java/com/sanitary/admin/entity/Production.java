@@ -6,9 +6,9 @@ import lombok.Data;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.NotBlank;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @TableName("production")
@@ -28,33 +28,7 @@ public class Production {
     @NotBlank(message = "客户名称不能为空")
     private String customerName;
 
-    private Long materialId;
-
-    @NotBlank(message = "物料名称不能为空")
-    private String materialName;
-
-    private String materialCode;
-    private String spec;
-    private Long processId;
-    private String processName;
-
-    @NotNull(message = "计划数量不能为空")
-    private BigDecimal plannedQty;
-
-    private BigDecimal actualQty;
-    private BigDecimal unitPrice;
-    private BigDecimal amount;
-    private String prodStatus;
     private String remark;
-
-    // New fields
-    private String unit;
-    private String receiptType;
-    private BigDecimal outsourcePrice;
-    private BigDecimal platingPrice;
-    private BigDecimal platingAmount;
-    private String customerOrderNo;
-    private String productionType;
 
     @TableLogic
     private Integer deleted;
@@ -64,4 +38,7 @@ public class Production {
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
+
+    @TableField(exist = false)
+    private List<ProductionItem> items;
 }

@@ -8,4 +8,6 @@ public interface ShipmentService extends IService<Shipment> {
     Page<Shipment> pageList(int page, int size, String keyword, Long customerId,
                             String startDate, String endDate);
     Shipment createShipment(Shipment shipment);
+    Shipment updateShipment(Shipment shipment);
+    boolean deleteShipment(Long id);
 }

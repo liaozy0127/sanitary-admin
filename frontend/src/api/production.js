@@ -5,4 +5,8 @@ export const getProductionById = (id) => request.get(`/productions/${id}`)
 export const createProduction = (data) => request.post('/productions', data)
 export const updateProduction = (id, data) => request.put(`/productions/${id}`, data)
 export const deleteProduction = (id) => request.delete(`/productions/${id}`)
+export const importProductions = (data, params) => request.post('/productions/import', data, { 
+  headers: { 'Content-Type': 'multipart/form-data' }, 
+  params 
+})
 export const updateProductionStatus = (id, prodStatus) => request.put(`/productions/${id}/status`, null, { params: { prodStatus } })

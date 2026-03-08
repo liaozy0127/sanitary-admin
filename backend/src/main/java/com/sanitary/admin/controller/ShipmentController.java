@@ -3,6 +3,7 @@ package com.sanitary.admin.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sanitary.admin.common.Result;
 import com.sanitary.admin.entity.Shipment;
+import com.sanitary.admin.service.ShipmentItemService;
 import com.sanitary.admin.service.ShipmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +16,7 @@ import jakarta.validation.Valid;
 public class ShipmentController {
 
     private final ShipmentService shipmentService;
+    private final ShipmentItemService shipmentItemService;
 
     @GetMapping
     public Result<Page<Shipment>> list(
@@ -29,7 +31,11 @@ public class ShipmentController {
 
     @GetMapping("/{id}")
     public Result<Shipment> getById(@PathVariable Long id) {
-        return Result.success(shipmentService.getById(id));
+        Shipment shipment = shipmentService.getById(id);
+        if (shipment != null) {
+            shipment.setItems(shipmentItemService.listByShipmentId(id));
+        }
+        return Result.success(shipment);
     }
 
     @PostMapping
@@ -40,10 +46,11 @@ public class ShipmentController {
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody Shipment shipment) {
         shipment.setId(id);
-        if (shipment.getQuantity() != null && shipment.getUnitPrice() != null) {
-            shipment.setAmount(shipment.getQuantity().multiply(shipment.getUnitPrice()));
-        }
         shipmentService.updateById(shipment);
+        if (shipment.getItems() != null) {
+            shipmentItemService.deleteByShipmentId(id);
+            shipmentItemService.saveItems(id, shipment.getShipmentNo(), shipment.getItems());
+        }
         return Result.success();
     }
 
