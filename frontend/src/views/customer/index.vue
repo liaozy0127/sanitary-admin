@@ -132,6 +132,7 @@
             <el-form-item label="联系电话">
               <el-input v-model="formData.contactPhone" placeholder="请输入联系电话" />
             </el-form-item>
+          </el-col>
         </el-row>
 
         <!-- 财务信息 -->
