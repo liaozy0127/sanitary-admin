@@ -12,6 +12,6 @@ public interface ReceiptService extends IService<Receipt> {
     Page<Receipt> pageList(int page, int size, String keyword, Long customerId,
                            String startDate, String endDate);
     Receipt createReceipt(Receipt receipt);
-    Map<String, Object> importExcel(MultipartFile file);
+    Map<String, Object> importExcel(MultipartFile file, String mode);
     void exportTemplate(HttpServletResponse response);
 }

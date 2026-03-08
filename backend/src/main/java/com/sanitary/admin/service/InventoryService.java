@@ -1,4 +1,6 @@
 package com.sanitary.admin.service;
+import java.util.Map;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
@@ -28,4 +30,9 @@ public interface InventoryService extends IService<Inventory> {
      */
     IPage<InventoryLog> logPageList(int page, int size, Long materialId, Long customerId, Integer changeType,
                                     String startDate, String endDate);
+
+    /**
+     * 从对账单初始化库存
+     */
+    Map<String, Object> initFromStatement(MultipartFile file);
 }

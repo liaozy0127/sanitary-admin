@@ -67,7 +67,9 @@ public class ReceiptController {
     }
 
     @PostMapping("/import")
-    public Result<Map<String, Object>> importExcel(@RequestParam("file") MultipartFile file) {
-        return Result.success(receiptService.importExcel(file));
+    public Result<Map<String, Object>> importExcel(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(defaultValue = "normal") String mode) {
+        return Result.success(receiptService.importExcel(file, mode));
     }
 }

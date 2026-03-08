@@ -8,6 +8,7 @@ import com.sanitary.admin.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -44,5 +45,10 @@ public class InventoryController {
         IPage<InventoryLog> logPage = inventoryService.logPageList(page, size, materialId, customerId, changeType, startDate, endDate);
 
         return Result.success(logPage);
+    }
+
+    @PostMapping("/init-from-statement")
+    public Result<Map<String, Object>> initFromStatement(@RequestParam("file") MultipartFile file) {
+        return Result.success(inventoryService.initFromStatement(file));
     }
 }

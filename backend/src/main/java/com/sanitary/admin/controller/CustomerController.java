@@ -7,6 +7,7 @@ import com.sanitary.admin.service.CustomerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
 import java.util.List;
@@ -63,5 +64,10 @@ public class CustomerController {
         customer.setStatus(status);
         customerService.updateById(customer);
         return Result.success();
+    }
+
+    @PostMapping("/import")
+    public Result<Map<String, Object>> importExcel(@RequestParam("file") MultipartFile file) {
+        return Result.success(customerService.importFromExcel(file));
     }
 }

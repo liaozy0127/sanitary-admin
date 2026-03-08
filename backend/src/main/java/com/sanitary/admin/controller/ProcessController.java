@@ -6,6 +6,7 @@ import com.sanitary.admin.entity.Process;
 import com.sanitary.admin.service.ProcessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
 import java.util.List;
@@ -57,5 +58,10 @@ public class ProcessController {
         process.setStatus(status);
         processService.updateById(process);
         return Result.success();
+    }
+
+    @PostMapping("/import")
+    public Result<Map<String, Object>> importExcel(@RequestParam("file") MultipartFile file) {
+        return Result.success(processService.importFromExcel(file));
     }
 }

@@ -6,6 +6,7 @@ import com.sanitary.admin.entity.Production;
 import com.sanitary.admin.service.ProductionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
 import java.util.Map;
@@ -60,5 +61,12 @@ public class ProductionController {
         production.setProdStatus(prodStatus);
         productionService.updateById(production);
         return Result.success();
+    }
+
+    @PostMapping("/import")
+    public Result<Map<String, Object>> importExcel(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(defaultValue = "normal") String mode) {
+        return Result.success(productionService.importFromExcel(file, mode));
     }
 }

@@ -9,6 +9,8 @@ import com.sanitary.admin.entity.Receipt;
 import com.sanitary.admin.mapper.CustomerMapper;
 import com.sanitary.admin.mapper.MaterialMapper;
 import com.sanitary.admin.mapper.ReceiptMapper;
+import com.sanitary.admin.mapper.ProcessMapper;
+import com.sanitary.admin.entity.Process;
 import com.sanitary.admin.service.InventoryService;
 import com.sanitary.admin.service.ReceiptService;
 import com.sanitary.admin.util.GenerateNoUtil;
@@ -40,6 +42,7 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
     private final GenerateNoUtil generateNoUtil;
     private final MaterialMapper materialMapper;
     private final CustomerMapper customerMapper;
+    private final ProcessMapper processMapper;
     private final InventoryService inventoryService;
 
     @Override
@@ -108,59 +111,92 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
 
     @Override
     @Transactional
-    public Map<String, Object> importExcel(MultipartFile file) {
+    public Map<String, Object> importExcel(MultipartFile file, String mode) {
         int success = 0;
         int fail = 0;
+        int skip = 0;
         List<String> errors = new ArrayList<>();
+
+        String lastReceiptNo = ""; // Track the last receipt number for continuation
+
         try (InputStream is = file.getInputStream();
              Workbook workbook = WorkbookFactory.create(is)) {
             Sheet sheet = workbook.getSheetAt(0);
             for (int i = 1; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
                 if (row == null) continue;
+
                 try {
+                    String receiptNo = getCellString(row, 1); // 1-based index for receipt_no
+
+                    // Handle empty receipt number by continuing from previous row
+                    if (receiptNo.isEmpty()) {
+                        receiptNo = lastReceiptNo;
+                    } else {
+                        lastReceiptNo = receiptNo;
+                    }
+
+                    // Check for duplicates (idempotency)
+                    if (receiptExists(receiptNo)) {
+                        skip++;
+                        continue;
+                    }
+
                     Receipt receipt = new Receipt();
-                    receipt.setReceiptDate(parseDate(getCellString(row, 0)));
-                    receipt.setCustomerName(getCellString(row, 1));
-                    receipt.setMaterialName(getCellString(row, 2));
-                    receipt.setSpec(getCellString(row, 3));
-                    receipt.setProcessName(getCellString(row, 4));
-                    receipt.setQuantity(parseBigDecimal(getCellString(row, 5)));
-                    receipt.setUnitPrice(parseBigDecimal(getCellString(row, 6)));
-                    receipt.setRemark(getCellString(row, 7));
+                    receipt.setReceiptNo(receiptNo);
+                    receipt.setReceiptDate(parseExcelDate(getCellString(row, 2))); // 2-based index for date
+                    receipt.setCustomerName(getCellString(row, 3)); // 3-based index for customer
+                    receipt.setMaterialName(getCellString(row, 4)); // 4-based index for material
+                    receipt.setSpec(getCellString(row, 5)); // 5-based index for spec
+                    receipt.setProcessName(getCellString(row, 6)); // 6-based index for process
+                    receipt.setReceiptSource(getCellString(row, 7)); // 7-based index for receipt source
+                    receipt.setQuantity(parseBigDecimal(getCellString(row, 8))); // 8-based index for quantity
+                    receipt.setUnitPrice(parseBigDecimal(getCellString(row, 11))); // 11-based index for unit price
+                    receipt.setCustomerOrderNo(getCellString(row, 12)); // 12-based index for customer order
+                    receipt.setRemark(getCellString(row, 13)); // 13-based index for remark
+                    receipt.setDetailRemark(getCellString(row, 14)); // 14-based index for detail remark
 
                     // 根据客户名称查找客户ID
                     Long customerId = findOrCreateCustomerIdByName(receipt.getCustomerName());
                     receipt.setCustomerId(customerId);
 
                     // 根据物料名称查找物料ID
-                    Long materialId = findOrCreateMaterialIdByName(receipt.getMaterialName(), receipt.getSpec());
+                    Long materialId = findOrCreateMaterialIdByName(receipt.getMaterialName(), receipt.getSpec(), customerId);
                     receipt.setMaterialId(materialId);
+
+                    // 根据工艺名称查找工艺ID
+                    if (receipt.getProcessName() != null && !receipt.getProcessName().trim().isEmpty()) {
+                        Long processId = findProcessIdByName(receipt.getProcessName());
+                        if (processId != null) {
+                            receipt.setProcessId(processId);
+                        }
+                    }
 
                     if (receipt.getQuantity() != null && receipt.getUnitPrice() != null) {
                         receipt.setAmount(receipt.getQuantity().multiply(receipt.getUnitPrice()));
                     }
-                    receipt.setReceiptNo(generateNoUtil.generate("RH", "receipt", "receipt_no"));
                     receipt.setStatus(1);
                     save(receipt);
 
-                    // Update inventory
-                    inventoryService.updateInventory(
-                            receipt.getMaterialId(),
-                            receipt.getCustomerId(),
-                            receipt.getProcessId(),
-                            receipt.getMaterialCode(), // 注意：这里可能会为空，但我们使用物料名称
-                            receipt.getMaterialName(),
-                            receipt.getCustomerName(),
-                            receipt.getSpec(),
-                            receipt.getProcessName(),
-                            receipt.getQuantity(),
-                            1,  // 收货
-                            "RECEIPT",
-                            receipt.getId(),
-                            receipt.getReceiptNo(),
-                            receipt.getReceiptDate()
-                    );
+                    // Update inventory only if mode is not "history"
+                    if (!"history".equals(mode)) {
+                        inventoryService.updateInventory(
+                                receipt.getMaterialId(),
+                                receipt.getCustomerId(),
+                                receipt.getProcessId(),
+                                receipt.getMaterialCode(), // 注意：这里可能会为空，但我们使用物料名称
+                                receipt.getMaterialName(),
+                                receipt.getCustomerName(),
+                                receipt.getSpec(),
+                                receipt.getProcessName(),
+                                receipt.getQuantity(),
+                                1,  // 收货
+                                "RECEIPT",
+                                receipt.getId(),
+                                receipt.getReceiptNo(),
+                                receipt.getReceiptDate()
+                        );
+                    }
 
                     success++;
                 } catch (Exception e) {
@@ -174,6 +210,7 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
         Map<String, Object> result = new HashMap<>();
         result.put("success", success);
         result.put("fail", fail);
+        result.put("skip", skip);
         result.put("errors", errors);
         return result;
     }
@@ -216,31 +253,37 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
         if (cell == null) return "";
         return switch (cell.getCellType()) {
             case STRING -> cell.getStringCellValue().trim();
-            case NUMERIC -> {
-                if (DateUtil.isCellDateFormatted(cell)) {
-                    yield cell.getLocalDateTimeCellValue().toLocalDate()
-                            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-                } else {
-                    yield String.valueOf((long) cell.getNumericCellValue());
-                }
-            }
+            case NUMERIC -> DateUtil.isCellDateFormatted(cell)
+                ? cell.getLocalDateTimeCellValue().toLocalDate().toString()
+                : String.valueOf((long) cell.getNumericCellValue());
             case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
+            case FORMULA -> {
+                try { yield String.valueOf((long) cell.getNumericCellValue()); }
+                catch (Exception e) { yield cell.getStringCellValue().trim(); }
+            }
             default -> "";
         };
     }
 
-    private LocalDate parseDate(String s) {
-        if (!StringUtils.hasText(s)) return LocalDate.now();
-        return LocalDate.parse(s, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+    private LocalDate parseExcelDate(String value) {
+        if (value == null || value.trim().isEmpty()) return null;
+        value = value.trim();
+        try {
+            return LocalDate.parse(value.replace("/", "-").substring(0, 10));
+        } catch (Exception e) {
+            try {
+                double d = Double.parseDouble(value);
+                return LocalDate.of(1899, 12, 30).plusDays((long) d);
+            } catch (Exception e2) {
+                return null; // 日期解析失败，不中断
+            }
+        }
     }
 
     private BigDecimal parseBigDecimal(String s) {
-        if (!StringUtils.hasText(s)) return BigDecimal.ZERO;
-        try {
-            return new BigDecimal(s);
-        } catch (Exception e) {
-            return BigDecimal.ZERO;
-        }
+        if (s == null || s.trim().isEmpty()) return BigDecimal.ZERO;
+        try { return new BigDecimal(s.trim()); }
+        catch (Exception e) { return BigDecimal.ZERO; }
     }
 
     private Long findOrCreateCustomerIdByName(String customerName) {
@@ -262,27 +305,52 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
         }
     }
 
-    private Long findOrCreateMaterialIdByName(String materialName, String spec) {
-        // 根据物料名称和规格查找物料ID
-        // 使用 materialMapper 来查询已存在的物料
+    private Long findOrCreateMaterialIdByName(String materialName, String spec, Long customerId) {
         LambdaQueryWrapper<Material> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Material::getMaterialName, materialName);
+        if (customerId != null) {
+            wrapper.eq(Material::getCustomerId, customerId);
+        }
         if (spec != null && !spec.trim().isEmpty()) {
             wrapper.eq(Material::getSpec, spec);
         }
+        wrapper.last("LIMIT 1"); // 防止多条时报错，取第一条
 
         Material material = materialMapper.selectOne(wrapper);
         if (material != null) {
             return material.getId();
         } else {
-            // 如果物料不存在，创建一个新的物料
+            // 物料不存在则按名称模糊匹配（不带客户限制）
+            LambdaQueryWrapper<Material> fuzzy = new LambdaQueryWrapper<>();
+            fuzzy.eq(Material::getMaterialName, materialName).last("LIMIT 1");
+            Material fallback = materialMapper.selectOne(fuzzy);
+            if (fallback != null) return fallback.getId();
+            // 兜底：创建新物料
             Material newMaterial = new Material();
             newMaterial.setMaterialName(materialName);
             newMaterial.setSpec(spec);
-            newMaterial.setMaterialCode("AUTO_" + System.currentTimeMillis()); // 自动生成编码
+            newMaterial.setCustomerId(customerId);
+            newMaterial.setMaterialCode("AUTO_" + System.currentTimeMillis());
             newMaterial.setStatus(1);
             materialMapper.insert(newMaterial);
             return newMaterial.getId();
         }
+    }
+
+    private Long findProcessIdByName(String processName) {
+        // 根据工艺名称查找工艺ID
+        LambdaQueryWrapper<Process> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Process::getProcessName, processName);
+
+        Process process = processMapper.selectOne(wrapper);
+        if (process != null) {
+            return process.getId();
+        }
+        return null;
+    }
+
+    private boolean receiptExists(String receiptNo) {
+        if (receiptNo == null || receiptNo.trim().isEmpty()) return false;
+        return this.count(new LambdaQueryWrapper<Receipt>().eq(Receipt::getReceiptNo, receiptNo.trim())) > 0;
     }
 }

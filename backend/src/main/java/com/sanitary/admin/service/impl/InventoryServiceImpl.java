@@ -6,22 +6,34 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sanitary.admin.entity.Inventory;
 import com.sanitary.admin.entity.InventoryLog;
+import com.sanitary.admin.entity.Material;
+import com.sanitary.admin.entity.Process;
 import com.sanitary.admin.mapper.InventoryLogMapper;
 import com.sanitary.admin.mapper.InventoryMapper;
+import com.sanitary.admin.mapper.MaterialMapper;
+import com.sanitary.admin.mapper.ProcessMapper;
 import com.sanitary.admin.service.InventoryService;
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory> implements InventoryService {
 
     private final InventoryLogMapper inventoryLogMapper;
+    private final MaterialMapper materialMapper;
+    private final ProcessMapper processMapper;
 
     @Override
     @Transactional
@@ -177,5 +189,165 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
         queryWrapper.orderByDesc(InventoryLog::getCreateTime);
 
         return inventoryLogMapper.selectPage(new Page<>(page, size), queryWrapper);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> initFromStatement(MultipartFile file) {
+        int success = 0;
+        int fail = 0;
+        int skip = 0;
+        List<String> errors = new ArrayList<>();
+
+        String today = LocalDate.now().toString().replace("-", "");
+
+        try (java.io.InputStream is = file.getInputStream();
+             Workbook workbook = WorkbookFactory.create(is)) {
+            Sheet sheet = workbook.getSheetAt(0);
+
+            // Skip first 2 rows (headers)
+            for (int i = 2; i <= sheet.getLastRowNum(); i++) {
+                Row row = sheet.getRow(i);
+                if (row == null) continue;
+
+                try {
+                    String materialCode = getCellString(row, 0); // 产品代码 (col 0)
+                    String materialName = getCellString(row, 1); // 产品名称 (col 1)
+                    String processName = getCellString(row, 2); // 工艺要求 (col 2)
+                    String quantityStr = getCellString(row, 3); // 结余数量 (col 3)
+
+                    if (materialCode.isEmpty()) {
+                        fail++;
+                        errors.add("第" + (i + 1) + "行: 产品代码不能为空");
+                        continue;
+                    }
+
+                    // Find material by material code to get customer_id
+                    Material material = materialMapper.selectOne(
+                        new LambdaQueryWrapper<Material>()
+                            .eq(Material::getMaterialCode, materialCode.trim())
+                    );
+
+                    if (material == null) {
+                        fail++;
+                        errors.add("第" + (i + 1) + "行: 物料代码「" + materialCode + "」不存在");
+                        continue;
+                    }
+
+                    Long processId = null;
+                    if (!processName.isEmpty()) {
+                        Process process = processMapper.selectOne(
+                            new LambdaQueryWrapper<Process>()
+                                .eq(Process::getProcessName, processName.trim())
+                        );
+                        if (process != null) {
+                            processId = process.getId();
+                        } else {
+                            fail++;
+                            errors.add("第" + (i + 1) + "行: 工艺「" + processName + "」不存在");
+                            continue;
+                        }
+                    }
+
+                    BigDecimal quantity = parseBigDecimal(quantityStr);
+                    if (quantity.compareTo(BigDecimal.ZERO) < 0) {
+                        fail++;
+                        errors.add("第" + (i + 1) + "行: 结余数量不能为负数");
+                        continue;
+                    }
+
+                    // Find existing inventory record
+                    LambdaQueryWrapper<Inventory> invQuery = new LambdaQueryWrapper<>();
+                    invQuery.eq(Inventory::getMaterialId, material.getId())
+                            .eq(Inventory::getCustomerId, material.getCustomerId())
+                            .eq(Inventory::getProcessId, processId != null ? processId : 0L);
+
+                    Inventory existingInventory = this.getOne(invQuery, false);
+
+                    if (existingInventory != null) {
+                        // Update existing inventory
+                        BigDecimal oldQty = existingInventory.getQuantity() != null ? existingInventory.getQuantity() : BigDecimal.ZERO;
+
+                        // Calculate the difference to update the quantity
+                        BigDecimal diff = quantity.subtract(oldQty);
+
+                        if (diff.compareTo(BigDecimal.ZERO) != 0) {
+                            existingInventory.setQuantity(quantity);
+                            this.updateById(existingInventory);
+
+                            // Log the change (type 4 = 初始化)
+                            insertLog(material.getId(), material.getCustomerId(), processId,
+                                     material.getMaterialCode(), material.getMaterialName(),
+                                     material.getCustomerName(), material.getSpec(), processName,
+                                     4, diff, oldQty, quantity, "INVENTORY_INIT", null, "INIT-" + today,
+                                     LocalDate.now(), "库存初始化");
+                        }
+
+                        skip++; // Count as skip since we're updating existing records
+                    } else {
+                        // Create new inventory record
+                        Inventory inventory = new Inventory();
+                        inventory.setMaterialId(material.getId());
+                        inventory.setCustomerId(material.getCustomerId());
+                        inventory.setProcessId(processId != null ? processId : 0L);
+                        inventory.setMaterialCode(material.getMaterialCode());
+                        inventory.setMaterialName(material.getMaterialName());
+                        inventory.setCustomerName(material.getCustomerName());
+                        inventory.setSpec(material.getSpec());
+                        inventory.setProcessName(processName);
+                        inventory.setQuantity(quantity);
+                        inventory.setCreateTime(LocalDateTime.now());
+                        inventory.setUpdateTime(LocalDateTime.now());
+
+                        this.save(inventory);
+
+                        // Log the initial quantity (type 4 = 初始化)
+                        insertLog(material.getId(), material.getCustomerId(), processId,
+                                 material.getMaterialCode(), material.getMaterialName(),
+                                 material.getCustomerName(), material.getSpec(), processName,
+                                 4, quantity, BigDecimal.ZERO, quantity, "INVENTORY_INIT", null, "INIT-" + today,
+                                 LocalDate.now(), "库存初始化");
+
+                        success++;
+                    }
+
+                } catch (Exception e) {
+                    fail++;
+                    errors.add("第" + (i + 1) + "行: " + e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Excel解析失败: " + e.getMessage());
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", success);
+        result.put("fail", fail);
+        result.put("skip", skip);
+        result.put("errors", errors);
+        return result;
+    }
+
+    private String getCellString(Row row, int col) {
+        Cell cell = row.getCell(col);
+        if (cell == null) return "";
+        return switch (cell.getCellType()) {
+            case STRING -> cell.getStringCellValue().trim();
+            case NUMERIC -> DateUtil.isCellDateFormatted(cell)
+                ? cell.getLocalDateTimeCellValue().toLocalDate().toString()
+                : String.valueOf((long) cell.getNumericCellValue());
+            case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
+            case FORMULA -> {
+                try { yield String.valueOf((long) cell.getNumericCellValue()); }
+                catch (Exception e) { yield cell.getStringCellValue().trim(); }
+            }
+            default -> "";
+        };
+    }
+
+    private BigDecimal parseBigDecimal(String s) {
+        if (s == null || s.trim().isEmpty()) return BigDecimal.ZERO;
+        try { return new BigDecimal(s.trim()); }
+        catch (Exception e) { return BigDecimal.ZERO; }
     }
 }
