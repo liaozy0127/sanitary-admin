@@ -45,6 +45,12 @@ public class Shipment {
     private BigDecimal unitPrice;
     private BigDecimal amount;
     private String remark;
+
+    // New fields
+    private String customerOrderNo;
+    private String detailRemark;
+    private String shipmentType;
+
     private Integer status;
 
     @TableLogic

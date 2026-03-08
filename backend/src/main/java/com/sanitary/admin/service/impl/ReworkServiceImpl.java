@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sanitary.admin.entity.Rework;
 import com.sanitary.admin.mapper.ReworkMapper;
+import com.sanitary.admin.service.InventoryService;
 import com.sanitary.admin.service.ReworkService;
 import com.sanitary.admin.util.GenerateNoUtil;
 import lombok.RequiredArgsConstructor;
@@ -13,12 +14,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Service
 @RequiredArgsConstructor
 public class ReworkServiceImpl extends ServiceImpl<ReworkMapper, Rework> implements ReworkService {
 
     private final GenerateNoUtil generateNoUtil;
+    private final InventoryService inventoryService;
 
     @Override
     public Page<Rework> pageList(int page, int size, String keyword, Long customerId, String reworkStatus) {
@@ -52,6 +55,25 @@ public class ReworkServiceImpl extends ServiceImpl<ReworkMapper, Rework> impleme
             rework.setAmount(rework.getQuantity().multiply(rework.getUnitPrice()));
         }
         save(rework);
+
+        // Update inventory (for rework, typically increases inventory since it's defective items being reworked)
+        inventoryService.updateInventory(
+                rework.getMaterialId(),
+                rework.getCustomerId(),
+                rework.getProcessId(),
+                rework.getMaterialCode(),
+                rework.getMaterialName(),
+                rework.getCustomerName(),
+                rework.getSpec(),
+                rework.getProcessName(),
+                rework.getQuantity(), // Positive quantity for rework (may vary based on business logic)
+                3,  // 返工
+                "REWORK",
+                rework.getId(),
+                rework.getReworkNo(),
+                LocalDate.now() // Assuming current date for rework orders
+        );
+
         return rework;
     }
 }

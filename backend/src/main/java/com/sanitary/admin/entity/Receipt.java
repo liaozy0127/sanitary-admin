@@ -45,6 +45,12 @@ public class Receipt {
     private BigDecimal unitPrice;
     private BigDecimal amount;
     private String remark;
+
+    // New fields
+    private String receiptSource;
+    private String customerOrderNo;
+    private String detailRemark;
+
     private Integer status;
 
     @TableLogic

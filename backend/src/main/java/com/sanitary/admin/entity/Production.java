@@ -47,6 +47,15 @@ public class Production {
     private String prodStatus;
     private String remark;
 
+    // New fields
+    private String unit;
+    private String receiptType;
+    private BigDecimal outsourcePrice;
+    private BigDecimal platingPrice;
+    private BigDecimal platingAmount;
+    private String customerOrderNo;
+    private String productionType;
+
     @TableLogic
     private Integer deleted;
 

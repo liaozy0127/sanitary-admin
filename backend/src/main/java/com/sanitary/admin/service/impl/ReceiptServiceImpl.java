@@ -7,6 +7,7 @@ import com.sanitary.admin.entity.Material;
 import com.sanitary.admin.entity.Receipt;
 import com.sanitary.admin.mapper.MaterialMapper;
 import com.sanitary.admin.mapper.ReceiptMapper;
+import com.sanitary.admin.service.InventoryService;
 import com.sanitary.admin.service.ReceiptService;
 import com.sanitary.admin.util.GenerateNoUtil;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
 
     private final GenerateNoUtil generateNoUtil;
     private final MaterialMapper materialMapper;
+    private final InventoryService inventoryService;
 
     @Override
     public Page<Receipt> pageList(int page, int size, String keyword, Long customerId,
@@ -79,6 +81,25 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
                 materialMapper.updateById(material);
             }
         }
+
+        // Update inventory
+        inventoryService.updateInventory(
+                receipt.getMaterialId(),
+                receipt.getCustomerId(),
+                receipt.getProcessId(),
+                receipt.getMaterialCode(),
+                receipt.getMaterialName(),
+                receipt.getCustomerName(),
+                receipt.getSpec(),
+                receipt.getProcessName(),
+                receipt.getQuantity(),
+                1,  // 收货
+                "RECEIPT",
+                receipt.getId(),
+                receipt.getReceiptNo(),
+                receipt.getReceiptDate()
+        );
+
         return receipt;
     }
 

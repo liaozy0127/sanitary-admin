@@ -13,21 +13,14 @@ public class Customer {
     private Long id;
     private String customerCode;
     private String customerName;
-    private String areaName;
     private String customerType;
-    private String industry;
     private String address;
     private String contactPerson;
     private String contactPhone;
-    private String email;
     private String salesperson;
     private String bankName;
     private String bankAccount;
     private String taxNo;
-    private String financeContact;
-    private String financePhone;
-    private BigDecimal priceAdjustRate;
-    private Integer shipWarningDays;
     private String remark;
     private Integer status;
 

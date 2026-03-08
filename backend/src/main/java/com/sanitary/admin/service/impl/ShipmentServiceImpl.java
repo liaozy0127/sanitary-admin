@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sanitary.admin.entity.Shipment;
 import com.sanitary.admin.mapper.ShipmentMapper;
+import com.sanitary.admin.service.InventoryService;
 import com.sanitary.admin.service.ShipmentService;
 import com.sanitary.admin.util.GenerateNoUtil;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Service
@@ -19,6 +21,7 @@ import java.time.LocalDate;
 public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> implements ShipmentService {
 
     private final GenerateNoUtil generateNoUtil;
+    private final InventoryService inventoryService;
 
     @Override
     public Page<Shipment> pageList(int page, int size, String keyword, Long customerId,
@@ -53,6 +56,25 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
             shipment.setAmount(shipment.getQuantity().multiply(shipment.getUnitPrice()));
         }
         save(shipment);
+
+        // Update inventory (subtract shipped quantity)
+        inventoryService.updateInventory(
+                shipment.getMaterialId(),
+                shipment.getCustomerId(),
+                shipment.getProcessId(),
+                shipment.getMaterialCode(),
+                shipment.getMaterialName(),
+                shipment.getCustomerName(),
+                shipment.getSpec(),
+                shipment.getProcessName(),
+                shipment.getQuantity().negate(), // 负数表示发货减少库存
+                2,  // 发货
+                "SHIPMENT",
+                shipment.getId(),
+                shipment.getShipmentNo(),
+                shipment.getShipmentDate()
+        );
+
         return shipment;
     }
 }
