@@ -1,5 +1,16 @@
 # sanitary-admin 开发规范
 
+## 🔴 开发前必读（强制）
+
+**在对本项目进行任何开发或修改之前，必须先阅读以下文档：**
+
+1. [`docs/REQUIREMENTS.md`](./docs/REQUIREMENTS.md) — 需求文档，了解所有功能模块和业务规则
+2. [`docs/DESIGN.md`](./docs/DESIGN.md) — 设计文档，了解数据库结构、接口设计、关键流程和已知坑
+
+**每次修改后，如果涉及功能变更或新增，需同步更新上述文档。**
+
+---
+
 ## 项目信息
 
 - **项目路径**：/Users/admin/IdeaProjects/sanitary-admin
