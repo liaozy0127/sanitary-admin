@@ -82,6 +82,26 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
 
         if (receipt.getItems() != null && !receipt.getItems().isEmpty()) {
             receiptItemService.saveItems(receipt.getId(), receipt.getReceiptNo(), receipt.getItems());
+            
+            // 更新库存 - 收货入库
+            for (ReceiptItem item : receipt.getItems()) {
+                inventoryService.updateInventory(
+                    item.getMaterialId(),
+                    receipt.getCustomerId(),
+                    item.getProcessId(),
+                    item.getMaterialCode(),
+                    item.getMaterialName(),
+                    receipt.getCustomerName(),
+                    item.getSpec(),
+                    item.getProcessName(),
+                    item.getQuantity(),
+                    1,  // changeType: 1=收货(入库)
+                    "receipt",  // orderType
+                    receipt.getId(),
+                    receipt.getReceiptNo(),
+                    receipt.getReceiptDate()
+                );
+            }
         }
 
         return receipt;
@@ -90,6 +110,9 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
     @Override
     @Transactional
     public Receipt updateReceipt(Receipt receipt) {
+        // 先查询旧的明细，用于冲销库存
+        List<ReceiptItem> oldItems = receiptItemService.listByReceiptId(receipt.getId());
+        
         // 先删除旧的明细
         receiptItemService.deleteByReceiptId(receipt.getId());
         
@@ -101,14 +124,81 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
             receiptItemService.saveItems(receipt.getId(), receipt.getReceiptNo(), receipt.getItems());
         }
         
+        // 冲销旧库存（反向操作）
+        for (ReceiptItem oldItem : oldItems) {
+            inventoryService.updateInventory(
+                oldItem.getMaterialId(),
+                receipt.getCustomerId(),
+                oldItem.getProcessId(),
+                oldItem.getMaterialCode(),
+                oldItem.getMaterialName(),
+                receipt.getCustomerName(),
+                oldItem.getSpec(),
+                oldItem.getProcessName(),
+                oldItem.getQuantity().negate(), // 反向冲销，数量取负
+                1,  // changeType: 1=收货(入库)
+                "receipt",  // orderType
+                receipt.getId(),
+                receipt.getReceiptNo(),
+                receipt.getReceiptDate()
+            );
+        }
+        
+        // 更新新库存
+        if (receipt.getItems() != null && !receipt.getItems().isEmpty()) {
+            for (ReceiptItem item : receipt.getItems()) {
+                inventoryService.updateInventory(
+                    item.getMaterialId(),
+                    receipt.getCustomerId(),
+                    item.getProcessId(),
+                    item.getMaterialCode(),
+                    item.getMaterialName(),
+                    receipt.getCustomerName(),
+                    item.getSpec(),
+                    item.getProcessName(),
+                    item.getQuantity(),
+                    1,  // changeType: 1=收货(入库)
+                    "receipt",  // orderType
+                    receipt.getId(),
+                    receipt.getReceiptNo(),
+                    receipt.getReceiptDate()
+                );
+            }
+        }
+        
         return receipt;
     }
 
     @Override
     @Transactional
     public boolean deleteReceipt(Long id) {
+        // 查询明细，用于冲销库存
+        List<ReceiptItem> items = receiptItemService.listByReceiptId(id);
+        // 获取收货单信息
+        Receipt receipt = getById(id);
+        
         // 先删除明细
         receiptItemService.deleteByReceiptId(id);
+        
+        // 冲销库存（反向操作）
+        for (ReceiptItem item : items) {
+            inventoryService.updateInventory(
+                item.getMaterialId(),
+                receipt.getCustomerId(),
+                item.getProcessId(),
+                item.getMaterialCode(),
+                item.getMaterialName(),
+                receipt.getCustomerName(),
+                item.getSpec(),
+                item.getProcessName(),
+                item.getQuantity().negate(), // 反向冲销，数量取负
+                1,  // changeType: 1=收货(入库)
+                "receipt",  // orderType
+                receipt.getId(),
+                receipt.getReceiptNo(),
+                receipt.getReceiptDate()
+            );
+        }
         
         // 再删除主表记录
         return removeById(id);

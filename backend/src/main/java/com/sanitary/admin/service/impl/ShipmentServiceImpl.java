@@ -58,6 +58,26 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
 
         if (shipment.getItems() != null && !shipment.getItems().isEmpty()) {
             shipmentItemService.saveItems(shipment.getId(), shipment.getShipmentNo(), shipment.getItems());
+            
+            // 更新库存 - 发货出库
+            for (ShipmentItem item : shipment.getItems()) {
+                inventoryService.updateInventory(
+                    item.getMaterialId(),
+                    shipment.getCustomerId(),
+                    item.getProcessId(),
+                    item.getMaterialCode(),
+                    item.getMaterialName(),
+                    shipment.getCustomerName(),
+                    item.getSpec(),
+                    item.getProcessName(),
+                    item.getQuantity(),
+                    2,  // changeType: 2=发货(出库)
+                    "shipment",  // orderType
+                    shipment.getId(),
+                    shipment.getShipmentNo(),
+                    shipment.getShipmentDate()
+                );
+            }
         }
 
         return shipment;
@@ -66,6 +86,9 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
     @Override
     @Transactional
     public Shipment updateShipment(Shipment shipment) {
+        // 先查询旧的明细，用于冲销库存
+        List<ShipmentItem> oldItems = shipmentItemService.listByShipmentId(shipment.getId());
+        
         // 先删除旧的明细
         shipmentItemService.deleteByShipmentId(shipment.getId());
         
@@ -77,14 +100,81 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
             shipmentItemService.saveItems(shipment.getId(), shipment.getShipmentNo(), shipment.getItems());
         }
         
+        // 冲销旧库存（反向操作）
+        for (ShipmentItem oldItem : oldItems) {
+            inventoryService.updateInventory(
+                oldItem.getMaterialId(),
+                shipment.getCustomerId(),
+                oldItem.getProcessId(),
+                oldItem.getMaterialCode(),
+                oldItem.getMaterialName(),
+                shipment.getCustomerName(),
+                oldItem.getSpec(),
+                oldItem.getProcessName(),
+                oldItem.getQuantity().negate(), // 反向冲销，数量取负
+                2,  // changeType: 2=发货(出库)
+                "shipment",  // orderType
+                shipment.getId(),
+                shipment.getShipmentNo(),
+                shipment.getShipmentDate()
+            );
+        }
+        
+        // 更新新库存
+        if (shipment.getItems() != null && !shipment.getItems().isEmpty()) {
+            for (ShipmentItem item : shipment.getItems()) {
+                inventoryService.updateInventory(
+                    item.getMaterialId(),
+                    shipment.getCustomerId(),
+                    item.getProcessId(),
+                    item.getMaterialCode(),
+                    item.getMaterialName(),
+                    shipment.getCustomerName(),
+                    item.getSpec(),
+                    item.getProcessName(),
+                    item.getQuantity(),
+                    2,  // changeType: 2=发货(出库)
+                    "shipment",  // orderType
+                    shipment.getId(),
+                    shipment.getShipmentNo(),
+                    shipment.getShipmentDate()
+                );
+            }
+        }
+        
         return shipment;
     }
 
     @Override
     @Transactional
     public boolean deleteShipment(Long id) {
+        // 查询明细，用于冲销库存
+        List<ShipmentItem> items = shipmentItemService.listByShipmentId(id);
+        // 获取发货单信息
+        Shipment shipment = getById(id);
+        
         // 先删除明细
         shipmentItemService.deleteByShipmentId(id);
+        
+        // 冲销库存（反向操作）
+        for (ShipmentItem item : items) {
+            inventoryService.updateInventory(
+                item.getMaterialId(),
+                shipment.getCustomerId(),
+                item.getProcessId(),
+                item.getMaterialCode(),
+                item.getMaterialName(),
+                shipment.getCustomerName(),
+                item.getSpec(),
+                item.getProcessName(),
+                item.getQuantity().negate(), // 反向冲销，数量取负
+                2,  // changeType: 2=发货(出库)
+                "shipment",  // orderType
+                shipment.getId(),
+                shipment.getShipmentNo(),
+                shipment.getShipmentDate()
+            );
+        }
         
         // 再删除主表记录
         return removeById(id);

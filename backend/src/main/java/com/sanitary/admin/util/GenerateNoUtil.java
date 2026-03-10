@@ -41,7 +41,7 @@ public class GenerateNoUtil {
     }
 
     /**
-     * 生成对账单号（月份维度，每月重置序号）
+     * 生成对账单号（全局唯一，不按月份重置序号）
      * 格式：前缀 + yyyyMM + 4位序号，如 DZ2026030001
      * @param prefix 前缀，如 DZ
      * @param tableName 表名
@@ -50,11 +50,12 @@ public class GenerateNoUtil {
      */
     public synchronized String generateMonthly(String prefix, String tableName, String noColumn) {
         String yearMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
-        String likePattern = prefix + yearMonth + "%";
+        // 查询全表最大值，确保全局唯一，而不是按月份LIKE查询
         String sql = "SELECT MAX(" + noColumn + ") FROM `" + tableName + "` WHERE " + noColumn + " LIKE ?";
+        String likePattern = prefix + "________%"; // 匹配 DZ + 8位数字以上的格式（年月+序号）
         String maxNo = jdbcTemplate.queryForObject(sql, String.class, likePattern);
         int seq = 1;
-        if (maxNo != null && maxNo.length() >= prefix.length() + 6 + 4) {
+        if (maxNo != null && maxNo.length() >= prefix.length() + 8 + 4) {
             try {
                 seq = Integer.parseInt(maxNo.substring(maxNo.length() - 4)) + 1;
             } catch (NumberFormatException e) {
