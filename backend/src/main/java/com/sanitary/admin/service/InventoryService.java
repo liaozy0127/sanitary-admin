@@ -35,4 +35,9 @@ public interface InventoryService extends IService<Inventory> {
      * 从对账单初始化库存
      */
     Map<String, Object> initFromStatement(MultipartFile file);
+
+    /**
+     * 根据收货单和发货单重建全量库存（净额 = 收货 - 发货）
+     */
+    Map<String, Object> rebuildFromOrders();
 }

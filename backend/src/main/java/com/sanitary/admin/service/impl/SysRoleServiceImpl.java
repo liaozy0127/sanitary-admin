@@ -3,9 +3,12 @@ package com.sanitary.admin.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sanitary.admin.entity.SysRole;
+import com.sanitary.admin.entity.SysUser;
 import com.sanitary.admin.mapper.SysRoleMapper;
+import com.sanitary.admin.mapper.SysUserMapper;
 import com.sanitary.admin.service.SysRoleService;
 import com.sanitary.admin.common.exception.BusinessException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -14,6 +17,10 @@ import java.util.List;
 
 @Service
 public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> implements SysRoleService {
+    
+    @Autowired
+    private SysUserMapper sysUserMapper;
+
     @Override
     public List<SysRole> listRoles(String roleName) {
         LambdaQueryWrapper<SysRole> wrapper = new LambdaQueryWrapper<>();
@@ -65,13 +72,13 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
             throw new BusinessException("角色不存在");
         }
         
-        // 检查是否有用户关联此角色（暂时只抛出提示，不做实际关联查询）
-        // TODO: 实际关联查询应在 user-role 关联表建立后实现
-        // long userCount = sysUserRoleMapper.selectCount(
-        //         new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getRoleId, id));
-        // if (userCount > 0) {
-        //     throw new BusinessException("该角色已分配给 " + userCount + " 个用户，无法删除");
-        // }
+        // 检查是否有用户使用此角色
+        LambdaQueryWrapper<SysUser> userWrapper = new LambdaQueryWrapper<>();
+        userWrapper.eq(SysUser::getRole, existing.getRoleCode()); // 根据角色编码匹配
+        long userCount = sysUserMapper.selectCount(userWrapper);
+        if (userCount > 0) {
+            throw new BusinessException("该角色已被 " + userCount + " 个用户使用，无法删除");
+        }
         
         this.removeById(id);
     }

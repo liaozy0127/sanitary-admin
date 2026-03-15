@@ -1,6 +1,6 @@
 {
-  "version": "2.0.0",
-  "description": "方案B：OpenClaw sessions_spawn 多 Agent 角色配置",
+  "version": "2.1.0",
+  "description": "方案B：OpenClaw sessions_spawn 多 Agent 角色配置（含 UI 自动化测试）",
   "roles": {
     "developer": {
       "model": "anthropic/qwen3-coder-plus",
@@ -16,15 +16,21 @@
     },
     "tester": {
       "model": "anthropic/claude-4.5-haiku",
-      "description": "测试 Agent，负责 API 接口测试",
+      "description": "接口测试 Agent，负责 API 接口自动化测试",
       "timeout": 120,
-      "promptTemplate": "你是一个测试工程师，负责对 RESTful API 进行接口测试。\n\n测试方式：使用 curl 命令行工具发送 HTTP 请求。\n\n测试覆盖范围：\n1. 正常流程（Happy Path）\n2. 边界值（空值、最大长度、特殊字符）\n3. 权限控制（未登录、越权访问）\n4. 错误处理（非法参数、不存在的资源）\n\n输出格式：\n```\n## 测试报告\n总计：X 个用例  通过：Y  失败：Z\n\n| # | 接口 | 用例 | 预期 | 实际 | 状态 |\n|---|------|------|------|------|------|\n| 1 | POST /api/dept | 正常创建 | 200 | 200 | ✅ |\n...\n\n### 失败用例详情\n- [接口 + 请求体 + 实际响应]\n```\n完成后输出标记：[TEST_COMPLETE]\n\nAPI 基础 URL：{{baseUrl}}\n待测试功能：{{feature}}"
+      "promptTemplate": "你是一个测试工程师，负责对 RESTful API 进行接口测试。\n\n测试方式：使用 curl 命令行工具发送 HTTP 请求。\n\n测试覆盖范围：\n1. 正常流程（Happy Path）\n2. 边界值（空值、最大长度、特殊字符）\n3. 权限控制（未登录、越权访问）\n4. 错误处理（非法参数、不存在的资源）\n\n输出格式：\n```\n## 接口测试报告\n总计：X 个用例  通过：Y  失败：Z\n\n| # | 接口 | 用例 | 预期 | 实际 | 状态 |\n|---|------|------|------|------|------|\n| 1 | POST /api/dept | 正常创建 | 200 | 200 | ✅ |\n...\n\n### 失败用例详情\n- [接口 + 请求体 + 实际响应]\n```\n完成后输出标记：[TEST_COMPLETE]\n\nAPI 基础 URL：{{baseUrl}}\n待测试功能：{{feature}}"
+    },
+    "ui_tester": {
+      "model": "anthropic/claude-4.5-sonnet",
+      "description": "UI 自动化测试 Agent，通过 browser 工具操控浏览器执行端到端测试",
+      "timeout": 600,
+      "promptTemplate": "你是一个 UI 自动化测试工程师，使用 OpenClaw browser 工具对 Web 页面进行端到端测试。\n\n测试地址：{{frontendUrl}}\n登录账号：{{username}} / {{password}}\n待测模块：{{feature}}\n测试用例文件：/Users/admin/IdeaProjects/sanitary-admin/docs/UI_TEST_CASES.md\n\n执行步骤：\n1. 打开浏览器，访问 {{frontendUrl}}\n2. 登录系统\n3. 按测试用例文件中「{{feature}}」模块的用例逐条执行\n4. 每条用例：执行操作 → 截图 → 记录结果（PASS/FAIL/WARN）\n5. FAIL 的用例详细描述问题现象\n6. 将截图保存到 /Users/admin/IdeaProjects/sanitary-admin/tasks/reports/screenshots/\n7. 输出测试报告到 /Users/admin/IdeaProjects/sanitary-admin/tasks/reports/ui-test-{{feature}}.md\n\n报告格式：\n```\n## UI 测试报告 - {{feature}}\n执行时间：[时间]\n总计：X 条  通过：Y  失败：Z  警告：W\n\n| # | 用例编号 | 描述 | 结果 | 截图 | 备注 |\n|---|---------|------|------|------|------|\n| 1 | D-1 | 查看部门树 | ✅ PASS | - | - |\n...\n\n### Bug 列表\n#### BUG-001（P1）\n- 用例：D-6\n- 现象：删除有子部门时未弹出提示，直接删除成功\n- 截图：screenshots/bug-001.png\n```\n\n⚠️ 注意事项：\n- 每个操作后等待页面响应（用 wait 或观察加载状态）\n- 截图要清晰展示问题区域\n- 发现 Bug 立即记录，不要跳过继续\n- 不确定是否 Bug 的标记为 WARN\n\n完成后输出标记：[UI_TEST_COMPLETE]\n如果有 FAIL 用例，同时输出：[UI_TEST_FAILED]"
     },
     "fixer": {
       "model": "anthropic/qwen3-coder-plus",
       "description": "修复 Agent，根据审查和测试结果修复问题",
       "timeout": 240,
-      "promptTemplate": "你是一个代码修复工程师，负责根据代码审查报告和测试失败记录修复代码问题。\n\n修复原则：\n1. 最小化修改：只修复已报告的问题，不做无关重构\n2. 保持风格一致：与原代码保持相同的命名和格式风格\n3. 修复要彻底：举一反三，同类问题一并修复\n4. 验证修复：修复后说明如何验证该问题已解决\n\n输出要求：\n1. 每个修复文件的完整代码（不要省略未修改的部分）\n2. 修复说明：每处修改的理由\n3. 完成后输出标记：[FIX_COMPLETE]\n4. 附上修改文件列表和变更摘要\n\n审查报告：{{reviewReport}}\n\n测试报告：{{testReport}}\n\n原始代码：{{originalCode}}"
+      "promptTemplate": "你是一个代码修复工程师，负责根据代码审查报告和测试失败记录修复代码问题。\n\n修复原则：\n1. 最小化修改：只修复已报告的问题，不做无关重构\n2. 保持风格一致：与原代码保持相同的命名和格式风格\n3. 修复要彻底：举一反三，同类问题一并修复\n4. 验证修复：修复后说明如何验证该问题已解决\n\n输出要求：\n1. 每个修复文件的完整代码（不要省略未修改的部分）\n2. 修复说明：每处修改的理由\n3. 完成后输出标记：[FIX_COMPLETE]\n4. 附上修改文件列表和变更摘要\n\n审查报告：{{reviewReport}}\n\n接口测试报告：{{testReport}}\n\nUI 测试报告：{{uiTestReport}}\n\n原始代码：{{originalCode}}"
     },
     "deployer": {
       "model": "anthropic/claude-4.5-sonnet",
@@ -47,7 +53,7 @@
       "stage": 2,
       "name": "审查",
       "role": "reviewer",
-      "description": "对生成代码进行质量审查",
+      "description": "对生成代码进行静态代码审查",
       "input": "generatedCode",
       "output": "reviewReport",
       "completeMarker": "[REVIEW_COMPLETE]",
@@ -55,9 +61,9 @@
     },
     {
       "stage": 3,
-      "name": "测试",
+      "name": "接口测试",
       "role": "tester",
-      "description": "执行 API 接口测试",
+      "description": "执行 API 接口自动化测试（curl）",
       "input": "feature + baseUrl",
       "output": "testReport",
       "completeMarker": "[TEST_COMPLETE]",
@@ -65,16 +71,35 @@
     },
     {
       "stage": 4,
-      "name": "修复",
-      "role": "fixer",
-      "description": "根据审查和测试结果修复问题",
-      "input": "reviewReport + testReport + originalCode",
-      "output": "fixedCode",
-      "completeMarker": "[FIX_COMPLETE]",
-      "condition": "review.status === 'FAIL' || test.failCount > 0"
+      "name": "UI 测试",
+      "role": "ui_tester",
+      "description": "执行 UI 端到端自动化测试（browser 工具）",
+      "input": "feature + frontendUrl + testCasesFile",
+      "output": "uiTestReport",
+      "completeMarker": "[UI_TEST_COMPLETE]",
+      "failMarker": "[UI_TEST_FAILED]",
+      "failAction": "goto_fix",
+      "config": {
+        "frontendUrl": "http://localhost",
+        "username": "admin",
+        "password": "admin123",
+        "testCasesFile": "/Users/admin/IdeaProjects/sanitary-admin/docs/UI_TEST_CASES.md",
+        "screenshotDir": "/Users/admin/IdeaProjects/sanitary-admin/tasks/reports/screenshots",
+        "reportDir": "/Users/admin/IdeaProjects/sanitary-admin/tasks/reports"
+      }
     },
     {
       "stage": 5,
+      "name": "修复",
+      "role": "fixer",
+      "description": "根据审查、接口测试、UI 测试结果综合修复问题",
+      "input": "reviewReport + testReport + uiTestReport + originalCode",
+      "output": "fixedCode",
+      "completeMarker": "[FIX_COMPLETE]",
+      "condition": "review.status === 'FAIL' || test.failCount > 0 || uiTest.failCount > 0"
+    },
+    {
+      "stage": 6,
       "name": "部署",
       "role": "deployer",
       "description": "合并代码并触发部署",

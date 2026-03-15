@@ -20,11 +20,10 @@ public class ShipmentItem {
     private String spec;
     private Long processId;
     private String processName;
-    private String shipmentType;
-    private BigDecimal quantity;
+    private BigDecimal quantity;       // 良品数量（实际发货数量）
+    private BigDecimal defectiveQty;   // 废品数量
     private BigDecimal unitPrice;
     private BigDecimal amount;
-    private String customerOrderNo;
     private String detailRemark;
 
     @TableLogic

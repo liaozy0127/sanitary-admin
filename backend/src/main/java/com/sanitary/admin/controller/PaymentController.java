@@ -6,8 +6,10 @@ import com.sanitary.admin.entity.Payment;
 import com.sanitary.admin.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/payments")
@@ -47,5 +49,10 @@ public class PaymentController {
     public Result<Void> delete(@PathVariable Long id) {
         paymentService.removeById(id);
         return Result.success();
+    }
+
+    @PostMapping("/import")
+    public Result<Map<String, Object>> importExcel(@RequestParam("file") MultipartFile file) {
+        return Result.success(paymentService.importExcel(file));
     }
 }

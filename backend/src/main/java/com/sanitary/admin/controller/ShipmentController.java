@@ -7,8 +7,10 @@ import com.sanitary.admin.service.ShipmentItemService;
 import com.sanitary.admin.service.ShipmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/shipments")
@@ -61,5 +63,12 @@ public class ShipmentController {
         shipment.setStatus(0);
         shipmentService.updateById(shipment);
         return Result.success();
+    }
+
+    @PostMapping("/import")
+    public Result<Map<String, Object>> importExcel(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "mode", defaultValue = "history") String mode) {
+        return Result.success(shipmentService.importExcel(file, mode));
     }
 }

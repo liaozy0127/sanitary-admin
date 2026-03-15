@@ -166,12 +166,16 @@ const activeMenu = computed(() => route.path)
 
 const handleCommand = async (command) => {
   if (command === 'logout') {
-    await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }).catch(() => null)
-
+    try {
+      await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      })
+    } catch {
+      // 用户点取消，不执行退出
+      return
+    }
     userStore.logout()
     ElMessage.success('已退出登录')
     router.push('/login')

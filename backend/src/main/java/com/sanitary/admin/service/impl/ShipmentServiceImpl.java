@@ -3,20 +3,34 @@ package com.sanitary.admin.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.sanitary.admin.entity.Customer;
+import com.sanitary.admin.entity.Material;
+import com.sanitary.admin.entity.Process;
 import com.sanitary.admin.entity.Shipment;
 import com.sanitary.admin.entity.ShipmentItem;
+import com.sanitary.admin.mapper.CustomerMapper;
+import com.sanitary.admin.mapper.MaterialMapper;
+import com.sanitary.admin.mapper.ProcessMapper;
 import com.sanitary.admin.mapper.ShipmentMapper;
 import com.sanitary.admin.service.InventoryService;
 import com.sanitary.admin.service.ShipmentItemService;
 import com.sanitary.admin.service.ShipmentService;
 import com.sanitary.admin.util.GenerateNoUtil;
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.InputStream;
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +39,9 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
     private final GenerateNoUtil generateNoUtil;
     private final InventoryService inventoryService;
     private final ShipmentItemService shipmentItemService;
+    private final CustomerMapper customerMapper;
+    private final MaterialMapper materialMapper;
+    private final ProcessMapper processMapper;
 
     @Override
     public Page<Shipment> pageList(int page, int size, String keyword, Long customerId,
@@ -178,5 +195,224 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
         
         // 再删除主表记录
         return removeById(id);
+    }
+
+    @Override
+    public Map<String, Object> importExcel(MultipartFile file, String mode) {
+        int success = 0;
+        int fail = 0;
+        int skip = 0;
+        List<String> errors = new ArrayList<>();
+
+        Map<String, Shipment> shipmentMap = new LinkedHashMap<>();
+        Map<String, List<ShipmentItem>> itemsMap = new LinkedHashMap<>();
+
+        String lastShipmentNo = "";
+
+        try (InputStream is = file.getInputStream();
+             Workbook workbook = WorkbookFactory.create(is)) {
+            Sheet sheet = workbook.getSheetAt(0);
+            for (int i = 1; i <= sheet.getLastRowNum(); i++) {
+                Row row = sheet.getRow(i);
+                if (row == null) continue;
+
+                try {
+                    // 列0=发货单号, 1=发货子单号, 2=日期, 3=客户名称, 4=产品名称,
+                    // 5=型号规格, 6=工艺名称, 7=良品数量, 8=废品数量, 9=收货来源,
+                    // 10=良品单价, 11=良品金额, 12=合计数量, 13=制单人, 16=明细备注, 18=客户单号
+                    String shipmentNo = getCellString(row, 0);
+                    if (shipmentNo.isEmpty()) {
+                        shipmentNo = lastShipmentNo;
+                    } else {
+                        lastShipmentNo = shipmentNo;
+                    }
+
+                    if (shipmentNo.isEmpty()) {
+                        skip++;
+                        continue;
+                    }
+
+                    // 跳过 FG 前缀（返工单混入发货单文件中，数量均为0）
+                    if (shipmentNo.startsWith("FG")) {
+                        skip++;
+                        continue;
+                    }
+
+                    if (shipmentExists(shipmentNo)) {
+                        skip++;
+                        continue;
+                    }
+
+                    if (!shipmentMap.containsKey(shipmentNo)) {
+                        Shipment shipment = new Shipment();
+                        shipment.setShipmentNo(shipmentNo);
+                        shipment.setShipmentDate(parseExcelDate(getCellString(row, 2)));
+                        shipment.setCustomerName(getCellString(row, 3));
+                        shipment.setOperator(getCellString(row, 13)); // 列13=制单人
+                        shipment.setStatus(1);
+
+                        Long customerId = findOrCreateCustomerIdByName(shipment.getCustomerName());
+                        shipment.setCustomerId(customerId);
+
+                        shipmentMap.put(shipmentNo, shipment);
+                        itemsMap.put(shipmentNo, new ArrayList<>());
+                    }
+
+                    ShipmentItem item = new ShipmentItem();
+                    item.setShipmentNo(shipmentNo);
+                    item.setMaterialName(getCellString(row, 4));
+                    item.setSpec(getCellString(row, 5));
+                    item.setProcessName(getCellString(row, 6));
+                    item.setQuantity(parseBigDecimal(getCellString(row, 7)));    // 列7=良品数量（实际发货量）
+                    item.setDefectiveQty(parseBigDecimal(getCellString(row, 8))); // 列8=废品数量
+                    item.setUnitPrice(parseBigDecimal(getCellString(row, 10)));  // 列10=良品单价
+                    item.setAmount(parseBigDecimal(getCellString(row, 11)));     // 列11=良品金额（已算好）
+                    item.setDetailRemark(getCellString(row, 16));
+
+                    if (StringUtils.hasText(item.getMaterialName())) {
+                        Long customerId = shipmentMap.get(shipmentNo).getCustomerId();
+                        Long materialId = findOrCreateMaterialIdByName(item.getMaterialName(), item.getSpec(), customerId);
+                        item.setMaterialId(materialId);
+                        Material mat = materialMapper.selectById(materialId);
+                        if (mat != null) {
+                            item.setMaterialCode(mat.getMaterialCode());
+                        }
+                    }
+
+                    if (StringUtils.hasText(item.getProcessName())) {
+                        Long processId = findProcessIdByName(item.getProcessName());
+                        if (processId != null) {
+                            item.setProcessId(processId);
+                        }
+                    }
+
+                    itemsMap.get(shipmentNo).add(item);
+
+                } catch (Exception e) {
+                    fail++;
+                    errors.add("第" + (i + 1) + "行: " + e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Excel解析失败: " + e.getMessage());
+        }
+
+        for (Map.Entry<String, Shipment> entry : shipmentMap.entrySet()) {
+            String shipmentNo = entry.getKey();
+            Shipment shipment = entry.getValue();
+            try {
+                getBaseMapper().insert(shipment);
+                List<ShipmentItem> items = itemsMap.get(shipmentNo);
+                shipmentItemService.saveItems(shipment.getId(), shipment.getShipmentNo(), items);
+                success++;
+            } catch (Exception e) {
+                fail++;
+                errors.add("单号" + shipmentNo + ": " + e.getMessage());
+            }
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", success);
+        result.put("fail", fail);
+        result.put("skip", skip);
+        result.put("errors", errors);
+        return result;
+    }
+
+    private String getCellString(Row row, int col) {
+        Cell cell = row.getCell(col);
+        if (cell == null) return "";
+        return switch (cell.getCellType()) {
+            case STRING -> cell.getStringCellValue().trim();
+            case NUMERIC -> DateUtil.isCellDateFormatted(cell)
+                ? cell.getLocalDateTimeCellValue().toLocalDate().toString()
+                : String.valueOf((long) cell.getNumericCellValue());
+            case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
+            case FORMULA -> {
+                try { yield String.valueOf((long) cell.getNumericCellValue()); }
+                catch (Exception e) { yield cell.getStringCellValue().trim(); }
+            }
+            default -> "";
+        };
+    }
+
+    private LocalDate parseExcelDate(String value) {
+        if (value == null || value.trim().isEmpty()) return null;
+        value = value.trim();
+        try {
+            return LocalDate.parse(value.replace("/", "-").substring(0, 10));
+        } catch (Exception e) {
+            try {
+                double d = Double.parseDouble(value);
+                return LocalDate.of(1899, 12, 30).plusDays((long) d);
+            } catch (Exception e2) {
+                return null;
+            }
+        }
+    }
+
+    private BigDecimal parseBigDecimal(String s) {
+        if (s == null || s.trim().isEmpty()) return BigDecimal.ZERO;
+        try { return new BigDecimal(s.trim()); }
+        catch (Exception e) { return BigDecimal.ZERO; }
+    }
+
+    private Long findOrCreateCustomerIdByName(String customerName) {
+        if (!StringUtils.hasText(customerName)) return null;
+        LambdaQueryWrapper<Customer> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Customer::getCustomerName, customerName).last("LIMIT 1");
+        Customer customer = customerMapper.selectOne(wrapper);
+        if (customer != null) {
+            return customer.getId();
+        } else {
+            Customer newCustomer = new Customer();
+            newCustomer.setCustomerName(customerName);
+            newCustomer.setCustomerCode("AUTO_" + System.currentTimeMillis());
+            newCustomer.setStatus(1);
+            customerMapper.insert(newCustomer);
+            return newCustomer.getId();
+        }
+    }
+
+    private Long findOrCreateMaterialIdByName(String materialName, String spec, Long customerId) {
+        LambdaQueryWrapper<Material> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Material::getMaterialName, materialName);
+        if (customerId != null) {
+            wrapper.eq(Material::getCustomerId, customerId);
+        }
+        if (StringUtils.hasText(spec)) {
+            wrapper.eq(Material::getSpec, spec);
+        }
+        wrapper.last("LIMIT 1");
+        Material material = materialMapper.selectOne(wrapper);
+        if (material != null) {
+            return material.getId();
+        } else {
+            LambdaQueryWrapper<Material> fuzzy = new LambdaQueryWrapper<>();
+            fuzzy.eq(Material::getMaterialName, materialName).last("LIMIT 1");
+            Material fallback = materialMapper.selectOne(fuzzy);
+            if (fallback != null) return fallback.getId();
+
+            Material newMaterial = new Material();
+            newMaterial.setMaterialName(materialName);
+            newMaterial.setSpec(spec);
+            newMaterial.setCustomerId(customerId);
+            newMaterial.setMaterialCode("AUTO_" + System.currentTimeMillis());
+            newMaterial.setStatus(1);
+            materialMapper.insert(newMaterial);
+            return newMaterial.getId();
+        }
+    }
+
+    private Long findProcessIdByName(String processName) {
+        LambdaQueryWrapper<Process> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Process::getProcessName, processName).last("LIMIT 1");
+        Process process = processMapper.selectOne(wrapper);
+        return process != null ? process.getId() : null;
+    }
+
+    private boolean shipmentExists(String shipmentNo) {
+        if (shipmentNo == null || shipmentNo.trim().isEmpty()) return false;
+        return this.count(new LambdaQueryWrapper<Shipment>().eq(Shipment::getShipmentNo, shipmentNo.trim())) > 0;
     }
 }

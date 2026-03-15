@@ -2,6 +2,7 @@ package com.sanitary.admin.controller;
 
 import com.sanitary.admin.common.PageResult;
 import com.sanitary.admin.common.Result;
+import com.sanitary.admin.dto.UserUpdateDTO;
 import com.sanitary.admin.entity.SysUser;
 import com.sanitary.admin.service.SysUserService;
 import jakarta.validation.Valid;
@@ -44,14 +45,25 @@ public class UserController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','USER_EDIT')")
-    public Result<Void> update(@PathVariable Long id, @Valid @RequestBody SysUser user) {
-        user.setId(id);
-        if (user.getPassword() != null && !user.getPassword().isEmpty()) {
-            user.setPassword(passwordEncoder.encode(user.getPassword()));
-        } else {
-            user.setPassword(null);
+    public Result<Void> update(@PathVariable Long id, @Valid @RequestBody UserUpdateDTO userDto) {
+        // 获取现有用户信息
+        SysUser existingUser = sysUserService.getById(id);
+        if (existingUser == null) {
+            return Result.error(404, "用户不存在");
         }
-        sysUserService.updateById(user);
+        
+        // 只更新非空字段
+        if (userDto.getEmail() != null) existingUser.setEmail(userDto.getEmail());
+        if (userDto.getPhone() != null) existingUser.setPhone(userDto.getPhone());
+        if (userDto.getRole() != null) existingUser.setRole(userDto.getRole());
+        if (userDto.getStatus() != null) existingUser.setStatus(userDto.getStatus());
+        
+        // 如果提供了新密码，则加密存储
+        if (userDto.getPassword() != null && !userDto.getPassword().isEmpty()) {
+            existingUser.setPassword(passwordEncoder.encode(userDto.getPassword()));
+        }
+        
+        sysUserService.updateById(existingUser);
         return Result.success();
     }
 

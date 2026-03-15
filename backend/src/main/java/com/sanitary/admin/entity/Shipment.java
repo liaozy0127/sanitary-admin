@@ -28,6 +28,8 @@ public class Shipment {
     @NotBlank(message = "客户名称不能为空")
     private String customerName;
 
+    private String operator;  // 制单人
+
     private String remark;
 
     private Integer status;

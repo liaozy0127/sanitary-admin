@@ -126,107 +126,167 @@ CREATE TABLE IF NOT EXISTS `material` (
     `update_time` DATETIME
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='物料档案';
 
--- ===== Phase 2: 收发货核心模块 =====
+-- ===== Phase 2: 收发货核心模块（主从表设计）=====
 
--- 收货单表
+-- 收货单主表
 CREATE TABLE IF NOT EXISTS `receipt` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-    `receipt_no` VARCHAR(30) NOT NULL UNIQUE COMMENT '收货单号，如 RH202603070001',
+    `receipt_no` VARCHAR(30) NOT NULL UNIQUE COMMENT '收货单号',
     `receipt_date` DATE NOT NULL COMMENT '收货日期',
     `customer_id` BIGINT NOT NULL COMMENT '客户ID',
     `customer_name` VARCHAR(100) NOT NULL COMMENT '客户名称',
-    `material_id` BIGINT NOT NULL COMMENT '物料ID',
-    `material_name` VARCHAR(200) NOT NULL COMMENT '物料名称',
-    `material_code` VARCHAR(50) COMMENT '物料代码',
-    `spec` VARCHAR(200) COMMENT '规格型号',
-    `process_id` BIGINT COMMENT '工艺ID',
-    `process_name` VARCHAR(100) COMMENT '工艺名称',
-    `quantity` DECIMAL(12,2) NOT NULL COMMENT '收货数量',
-    `unit_price` DECIMAL(10,4) NOT NULL DEFAULT 0 COMMENT '单价',
-    `amount` DECIMAL(12,2) COMMENT '金额（数量×单价）',
     `remark` VARCHAR(500) COMMENT '备注',
     `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1正常 0作废',
     `deleted` TINYINT NOT NULL DEFAULT 0,
     `create_time` DATETIME,
     `update_time` DATETIME
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='收货单';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='收货单主表';
 
--- 排产单表
+-- 收货单明细表
+CREATE TABLE IF NOT EXISTS `receipt_item` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `receipt_id` BIGINT NOT NULL COMMENT '收货单ID',
+    `receipt_no` VARCHAR(30) NOT NULL COMMENT '收货单号',
+    `material_id` BIGINT COMMENT '物料ID',
+    `material_name` VARCHAR(200) COMMENT '物料名称',
+    `material_code` VARCHAR(50) COMMENT '物料代码',
+    `spec` VARCHAR(200) COMMENT '规格型号',
+    `process_id` BIGINT COMMENT '工艺ID',
+    `process_name` VARCHAR(100) COMMENT '工艺名称',
+    `receipt_source` VARCHAR(100) COMMENT '收货来源',
+    `quantity` DECIMAL(12,2) DEFAULT 0 COMMENT '收货数量',
+    `shipped_qty` DECIMAL(12,2) DEFAULT 0 COMMENT '已发数量',
+    `unshipped_qty` DECIMAL(12,2) DEFAULT 0 COMMENT '未发数量',
+    `planned_qty` DECIMAL(12,2) DEFAULT 0 COMMENT '排产数量',
+    `warehoused_qty` DECIMAL(12,2) DEFAULT 0 COMMENT '入库数量',
+    `unwarehoused_qty` DECIMAL(12,2) DEFAULT 0 COMMENT '未入库数量',
+    `unit_price` DECIMAL(10,4) DEFAULT 0 COMMENT '单价',
+    `amount` DECIMAL(12,2) DEFAULT 0 COMMENT '金额',
+    `customer_order_no` VARCHAR(100) COMMENT '客户订单号',
+    `detail_remark` TEXT COMMENT '明细备注',
+    `deleted` TINYINT NOT NULL DEFAULT 0,
+    `create_time` DATETIME,
+    `update_time` DATETIME
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='收货单明细';
+
+-- 排产单主表
 CREATE TABLE IF NOT EXISTS `production` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-    `production_no` VARCHAR(30) NOT NULL UNIQUE COMMENT '排产单号，如 PC202603070001',
+    `production_no` VARCHAR(30) NOT NULL UNIQUE COMMENT '排产单号',
     `production_date` DATE NOT NULL COMMENT '排产日期',
     `customer_id` BIGINT NOT NULL COMMENT '客户ID',
     `customer_name` VARCHAR(100) NOT NULL COMMENT '客户名称',
-    `material_id` BIGINT COMMENT '物料ID',
-    `material_name` VARCHAR(200) NOT NULL COMMENT '物料名称',
-    `material_code` VARCHAR(50) COMMENT '物料代码',
-    `spec` VARCHAR(200) COMMENT '规格型号',
-    `process_id` BIGINT COMMENT '工艺ID',
-    `process_name` VARCHAR(100) COMMENT '工艺名称',
-    `planned_qty` DECIMAL(12,2) NOT NULL COMMENT '计划数量',
-    `actual_qty` DECIMAL(12,2) DEFAULT 0 COMMENT '实际完成数量',
-    `unit_price` DECIMAL(10,4) DEFAULT 0 COMMENT '单价',
-    `amount` DECIMAL(12,2) DEFAULT 0 COMMENT '金额',
-    `prod_status` VARCHAR(20) DEFAULT '待生产' COMMENT '生产状态：待生产/生产中/已完成',
+    `dept_name` VARCHAR(100) COMMENT '部门名称',
     `remark` VARCHAR(500) COMMENT '备注',
     `deleted` TINYINT NOT NULL DEFAULT 0,
     `create_time` DATETIME,
     `update_time` DATETIME
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='排产单';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='排产单主表';
 
--- 发货单表
-CREATE TABLE IF NOT EXISTS `shipment` (
+-- 排产单明细表
+CREATE TABLE IF NOT EXISTS `production_item` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-    `shipment_no` VARCHAR(30) NOT NULL UNIQUE COMMENT '发货单号，如 FH202603070001',
-    `shipment_date` DATE NOT NULL COMMENT '发货日期',
-    `customer_id` BIGINT NOT NULL COMMENT '客户ID',
-    `customer_name` VARCHAR(100) NOT NULL COMMENT '客户名称',
-    `material_id` BIGINT NOT NULL COMMENT '物料ID',
-    `material_name` VARCHAR(200) NOT NULL COMMENT '物料名称',
+    `production_id` BIGINT NOT NULL COMMENT '排产单ID',
+    `production_no` VARCHAR(30) NOT NULL COMMENT '排产单号',
+    `material_id` BIGINT COMMENT '物料ID',
+    `material_name` VARCHAR(200) COMMENT '物料名称',
     `material_code` VARCHAR(50) COMMENT '物料代码',
     `spec` VARCHAR(200) COMMENT '规格型号',
     `process_id` BIGINT COMMENT '工艺ID',
     `process_name` VARCHAR(100) COMMENT '工艺名称',
-    `quantity` DECIMAL(12,2) NOT NULL COMMENT '发货数量',
-    `unit_price` DECIMAL(10,4) NOT NULL DEFAULT 0 COMMENT '单价',
-    `amount` DECIMAL(12,2) COMMENT '金额',
+    `receipt_type` VARCHAR(50) COMMENT '收货类型',
+    `unit` VARCHAR(50) COMMENT '计量单位',
+    `planned_qty` DECIMAL(12,2) DEFAULT 0 COMMENT '排产数量',
+    `actual_qty` DECIMAL(12,2) DEFAULT 0 COMMENT '入库数量',
+    `unwarehoused_qty` DECIMAL(12,2) DEFAULT 0 COMMENT '未入库数量',
+    `outsource_price` DECIMAL(10,4) DEFAULT 0 COMMENT '委外单价',
+    `plating_price` DECIMAL(10,4) DEFAULT 0 COMMENT '电镀单价',
+    `plating_amount` DECIMAL(12,2) DEFAULT 0 COMMENT '电镀金额',
+    `customer_order_no` VARCHAR(100) COMMENT '客户订单号',
+    `production_type` VARCHAR(50) COMMENT '排产方式',
+    `detail_remark` TEXT COMMENT '明细备注',
+    `deleted` TINYINT NOT NULL DEFAULT 0,
+    `create_time` DATETIME,
+    `update_time` DATETIME
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='排产单明细';
+
+-- 发货单主表
+CREATE TABLE IF NOT EXISTS `shipment` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `shipment_no` VARCHAR(30) NOT NULL UNIQUE COMMENT '发货单号',
+    `shipment_date` DATE NOT NULL COMMENT '发货日期',
+    `customer_id` BIGINT NOT NULL COMMENT '客户ID',
+    `customer_name` VARCHAR(100) NOT NULL COMMENT '客户名称',
+    `operator` VARCHAR(50) COMMENT '制单人',
     `remark` VARCHAR(500) COMMENT '备注',
     `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1正常 0作废',
     `deleted` TINYINT NOT NULL DEFAULT 0,
     `create_time` DATETIME,
     `update_time` DATETIME
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='发货单';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='发货单主表';
+
+-- 发货单明细表
+CREATE TABLE IF NOT EXISTS `shipment_item` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `shipment_id` BIGINT NOT NULL COMMENT '发货单ID',
+    `shipment_no` VARCHAR(30) NOT NULL COMMENT '发货单号',
+    `material_id` BIGINT COMMENT '物料ID',
+    `material_name` VARCHAR(200) COMMENT '物料名称',
+    `material_code` VARCHAR(50) COMMENT '物料代码',
+    `spec` VARCHAR(200) COMMENT '规格型号',
+    `process_id` BIGINT COMMENT '工艺ID',
+    `process_name` VARCHAR(100) COMMENT '工艺名称',
+    `quantity` DECIMAL(12,2) DEFAULT 0 COMMENT '良品数量（实际发货量）',
+    `defective_qty` DECIMAL(12,2) DEFAULT 0 COMMENT '废品数量',
+    `unit_price` DECIMAL(10,4) DEFAULT 0 COMMENT '单价',
+    `amount` DECIMAL(12,2) DEFAULT 0 COMMENT '金额（良品数量×单价）',
+    `detail_remark` TEXT COMMENT '明细备注',
+    `deleted` TINYINT NOT NULL DEFAULT 0,
+    `create_time` DATETIME,
+    `update_time` DATETIME
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='发货单明细';
 
 -- ===== Phase 3: 财务模块 =====
 
--- 返工单表
+-- 返工单主表
 CREATE TABLE IF NOT EXISTS `rework` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-    `rework_no` VARCHAR(30) NOT NULL UNIQUE COMMENT '返工单号，如 FG202603070001',
+    `rework_no` VARCHAR(30) NOT NULL UNIQUE COMMENT '返工单号',
     `rework_date` DATE NOT NULL COMMENT '返工日期',
     `customer_id` BIGINT NOT NULL,
     `customer_name` VARCHAR(100) NOT NULL,
+    `rework_status` VARCHAR(20) DEFAULT '待处理' COMMENT '待处理/处理中/已完成',
+    `remark` VARCHAR(500),
+    `deleted` TINYINT NOT NULL DEFAULT 0,
+    `create_time` DATETIME,
+    `update_time` DATETIME
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='返工单主表';
+
+-- 返工单明细表
+CREATE TABLE IF NOT EXISTS `rework_item` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `rework_id` BIGINT NOT NULL,
+    `rework_no` VARCHAR(30) NOT NULL,
     `material_id` BIGINT,
-    `material_name` VARCHAR(200) NOT NULL,
+    `material_name` VARCHAR(200),
     `material_code` VARCHAR(50),
     `spec` VARCHAR(200),
     `process_id` BIGINT,
     `process_name` VARCHAR(100),
-    `quantity` DECIMAL(12,2) NOT NULL COMMENT '返工数量',
+    `quantity` DECIMAL(12,2) DEFAULT 0,
     `unit_price` DECIMAL(10,4) DEFAULT 0,
     `amount` DECIMAL(12,2) DEFAULT 0,
-    `rework_reason` VARCHAR(500) COMMENT '返工原因',
-    `rework_status` VARCHAR(20) DEFAULT '待处理' COMMENT '待处理/处理中/已完成',
+    `rework_reason` VARCHAR(500),
+    `detail_remark` TEXT,
     `deleted` TINYINT NOT NULL DEFAULT 0,
     `create_time` DATETIME,
     `update_time` DATETIME
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='返工单';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='返工单明细';
 
 -- 收款记录表
 CREATE TABLE IF NOT EXISTS `payment` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-    `payment_no` VARCHAR(30) NOT NULL UNIQUE COMMENT '收款单号，如 SK202603070001',
+    `payment_no` VARCHAR(30) NOT NULL UNIQUE COMMENT '收款单号',
     `payment_date` DATE NOT NULL COMMENT '收款日期',
     `customer_id` BIGINT NOT NULL,
     `customer_name` VARCHAR(100) NOT NULL,
@@ -239,10 +299,10 @@ CREATE TABLE IF NOT EXISTS `payment` (
     `update_time` DATETIME
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='收款记录';
 
--- 对账单表
+-- 对账单主表
 CREATE TABLE IF NOT EXISTS `statement` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-    `statement_no` VARCHAR(30) NOT NULL UNIQUE COMMENT '对账单号，如 DZ2026030001',
+    `statement_no` VARCHAR(30) NOT NULL UNIQUE COMMENT '对账单号',
     `statement_month` VARCHAR(7) NOT NULL COMMENT '对账月份，如 2026-03',
     `customer_id` BIGINT NOT NULL,
     `customer_name` VARCHAR(100) NOT NULL,
@@ -255,7 +315,71 @@ CREATE TABLE IF NOT EXISTS `statement` (
     `deleted` TINYINT NOT NULL DEFAULT 0,
     `create_time` DATETIME,
     `update_time` DATETIME
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='对账单';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='对账单主表';
+
+-- 对账单明细表
+CREATE TABLE IF NOT EXISTS `statement_item` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `statement_id` BIGINT NOT NULL,
+    `statement_no` VARCHAR(30) NOT NULL,
+    `material_id` BIGINT,
+    `material_code` VARCHAR(50),
+    `material_name` VARCHAR(200),
+    `process_id` BIGINT,
+    `process_name` VARCHAR(100),
+    `prev_balance_qty` DECIMAL(12,2) DEFAULT 0,
+    `receipt_qty` DECIMAL(12,2) DEFAULT 0,
+    `shipment_qty` DECIMAL(12,2) DEFAULT 0,
+    `curr_balance_qty` DECIMAL(12,2) DEFAULT 0,
+    `unit_price` DECIMAL(10,4) DEFAULT 0,
+    `shipment_amount` DECIMAL(12,2) DEFAULT 0,
+    `remark` VARCHAR(500),
+    `deleted` TINYINT NOT NULL DEFAULT 0,
+    `create_time` DATETIME,
+    `update_time` DATETIME
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='对账单明细';
+
+-- 库存表
+CREATE TABLE IF NOT EXISTS `inventory` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `material_id` BIGINT NOT NULL,
+    `customer_id` BIGINT NOT NULL,
+    `process_id` BIGINT NOT NULL DEFAULT 0,
+    `material_code` VARCHAR(100),
+    `material_name` VARCHAR(200),
+    `customer_name` VARCHAR(200),
+    `spec` VARCHAR(200),
+    `process_name` VARCHAR(100),
+    `quantity` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    `last_receive_time` DATETIME,
+    `last_ship_time` DATETIME,
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `uk_material_customer_process` (`material_id`, `customer_id`, `process_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存表';
+
+-- 库存日志表
+CREATE TABLE IF NOT EXISTS `inventory_log` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `material_id` BIGINT NOT NULL,
+    `customer_id` BIGINT NOT NULL,
+    `process_id` BIGINT,
+    `material_code` VARCHAR(100),
+    `material_name` VARCHAR(200),
+    `customer_name` VARCHAR(200),
+    `spec` VARCHAR(200),
+    `process_name` VARCHAR(100),
+    `change_type` INT NOT NULL COMMENT '1=收货 2=发货 3=返工',
+    `change_qty` DECIMAL(12,2) NOT NULL,
+    `before_qty` DECIMAL(12,2) NOT NULL,
+    `after_qty` DECIMAL(12,2) NOT NULL,
+    `order_type` VARCHAR(50) NOT NULL,
+    `order_id` BIGINT NOT NULL,
+    `order_no` VARCHAR(100) NOT NULL,
+    `order_date` DATE,
+    `remark` VARCHAR(500),
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存日志表';
 
 -- ===== 菜单数据更新 =====
 INSERT INTO `sys_menu` (`id`, `menu_name`, `menu_path`, `menu_icon`, `parent_id`, `sort`, `menu_type`, `status`) VALUES

@@ -328,6 +328,105 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
         return result;
     }
 
+    @Override
+    @Transactional
+    public Map<String, Object> rebuildFromOrders() {
+        // 1. 清空现有库存和日志
+        this.baseMapper.delete(null);
+        inventoryLogMapper.delete(null);
+
+        // 2. 聚合收货数量
+        List<Map<String, Object>> receiptAggs = this.baseMapper.aggregateReceiptQty();
+        // key: "materialId_customerId_processId" -> Inventory
+        java.util.HashMap<String, Inventory> inventoryMap = new java.util.HashMap<>();
+
+        for (Map<String, Object> row : receiptAggs) {
+            Long materialId = toLong(row.get("material_id"));
+            Long customerId = toLong(row.get("customer_id"));
+            Long processId = toLong(row.get("process_id"));
+            String key = materialId + "_" + customerId + "_" + processId;
+
+            Inventory inv = new Inventory();
+            inv.setMaterialId(materialId);
+            inv.setCustomerId(customerId);
+            inv.setProcessId(processId);
+            inv.setMaterialCode(str(row.get("material_code")));
+            inv.setMaterialName(str(row.get("material_name")));
+            inv.setCustomerName(str(row.get("customer_name")));
+            inv.setSpec(str(row.get("spec")));
+            inv.setProcessName(str(row.get("process_name")));
+            inv.setQuantity(toBigDecimal(row.get("receipt_qty")));
+            inv.setCreateTime(LocalDateTime.now());
+            inv.setUpdateTime(LocalDateTime.now());
+
+            Object lastReceive = row.get("last_receive_date");
+            if (lastReceive != null) {
+                inv.setLastReceiveTime(LocalDateTime.now()); // 仅标记有收货
+            }
+
+            inventoryMap.put(key, inv);
+        }
+
+        // 3. 扣减发货数量
+        List<Map<String, Object>> shipAggs = this.baseMapper.aggregateShipmentQty();
+        for (Map<String, Object> row : shipAggs) {
+            Long materialId = toLong(row.get("material_id"));
+            Long customerId = toLong(row.get("customer_id"));
+            Long processId = toLong(row.get("process_id"));
+            String key = materialId + "_" + customerId + "_" + processId;
+
+            BigDecimal shipQty = toBigDecimal(row.get("ship_qty"));
+
+            if (inventoryMap.containsKey(key)) {
+                Inventory inv = inventoryMap.get(key);
+                inv.setQuantity(inv.getQuantity().subtract(shipQty));
+                inv.setLastShipTime(LocalDateTime.now());
+            } else {
+                // 有发货但无对应收货记录（异常数据），库存为负
+                Inventory inv = new Inventory();
+                inv.setMaterialId(materialId);
+                inv.setCustomerId(customerId);
+                inv.setProcessId(processId);
+                inv.setQuantity(shipQty.negate());
+                inv.setCreateTime(LocalDateTime.now());
+                inv.setUpdateTime(LocalDateTime.now());
+                inventoryMap.put(key, inv);
+            }
+        }
+
+        // 4. 批量保存
+        int saved = 0;
+        for (Inventory inv : inventoryMap.values()) {
+            this.save(inv);
+            saved++;
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("inventoryRecords", saved);
+        result.put("receiptGroups", receiptAggs.size());
+        result.put("shipmentGroups", shipAggs.size());
+        return result;
+    }
+
+    private Long toLong(Object v) {
+        if (v == null) return 0L;
+        if (v instanceof Long) return (Long) v;
+        if (v instanceof Number) return ((Number) v).longValue();
+        return Long.parseLong(v.toString());
+    }
+
+    private BigDecimal toBigDecimal(Object v) {
+        if (v == null) return BigDecimal.ZERO;
+        if (v instanceof BigDecimal) return (BigDecimal) v;
+        if (v instanceof Number) return new BigDecimal(v.toString());
+        try { return new BigDecimal(v.toString()); }
+        catch (Exception e) { return BigDecimal.ZERO; }
+    }
+
+    private String str(Object v) {
+        return v == null ? null : v.toString();
+    }
+
     private String getCellString(Row row, int col) {
         Cell cell = row.getCell(col);
         if (cell == null) return "";

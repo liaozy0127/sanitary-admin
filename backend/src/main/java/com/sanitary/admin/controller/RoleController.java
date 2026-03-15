@@ -7,7 +7,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/roles")
@@ -16,8 +18,12 @@ public class RoleController {
     private final SysRoleService sysRoleService;
 
     @GetMapping
-    public Result<List<SysRole>> list(@RequestParam(required = false) String roleName) {
-        return Result.success(sysRoleService.listRoles(roleName));
+    public Result<Map<String, Object>> list(@RequestParam(required = false) String roleName) {
+        List<SysRole> roles = sysRoleService.listRoles(roleName);
+        Map<String, Object> result = new HashMap<>();
+        result.put("records", roles);
+        result.put("total", roles.size());
+        return Result.success(result);
     }
 
     @GetMapping("/{id}")

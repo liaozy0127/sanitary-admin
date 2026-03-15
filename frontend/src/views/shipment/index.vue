@@ -42,15 +42,14 @@
                 <el-table-column prop="materialName" label="产品名称" min-width="150" />
                 <el-table-column prop="spec" label="型号规格" width="120" />
                 <el-table-column prop="processName" label="工艺" width="100" />
-                <el-table-column prop="shipmentType" label="发货类型" width="100" />
-                <el-table-column prop="quantity" label="发货数量" width="90" align="right" />
+                <el-table-column prop="quantity" label="良品数量" width="90" align="right" />
+                <el-table-column prop="defectiveQty" label="废品数量" width="90" align="right" />
                 <el-table-column prop="unitPrice" label="单价" width="80" align="right" />
                 <el-table-column prop="amount" label="金额" width="90" align="right">
                   <template #default="{ row: item }">
                     {{ item.amount ? Number(item.amount).toFixed(2) : '0.00' }}
                   </template>
                 </el-table-column>
-                <el-table-column prop="customerOrderNo" label="客户单号" width="120" />
                 <el-table-column prop="detailRemark" label="明细备注" min-width="120" />
               </el-table>
             </div>
@@ -60,6 +59,7 @@
         <el-table-column prop="shipmentNo" label="发货单号" width="160" />
         <el-table-column prop="shipmentDate" label="发货日期" width="110" />
         <el-table-column prop="customerName" label="客户名称" min-width="120" />
+        <el-table-column prop="operator" label="制单人" width="90" />
         <el-table-column prop="remark" label="备注" min-width="120" />
         <el-table-column prop="status" label="状态" width="90" align="center">
           <template #default="{ row }">
@@ -101,6 +101,13 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
+            <el-form-item label="制单人">
+              <el-input v-model="formData.operator" placeholder="制单人" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="24">
             <el-form-item label="备注">
               <el-input v-model="formData.remark" placeholder="备注" />
             </el-form-item>
@@ -137,18 +144,16 @@
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="发货类型" width="100">
-            <template #default="{ row }">
-              <el-select v-model="row.shipmentType" placeholder="发货类型" size="small">
-                <el-option label="良品" value="良品" />
-                <el-option label="不良品" value="不良品" />
-              </el-select>
-            </template>
-          </el-table-column>
-          <el-table-column label="发货数量" width="100">
+          <el-table-column label="良品数量" width="100">
             <template #default="{ row }">
               <el-input-number v-model="row.quantity" :min="0" :precision="2" size="small" style="width:100%"
                 @change="calcItemAmount(row)" controls-position="right" />
+            </template>
+          </el-table-column>
+          <el-table-column label="废品数量" width="100">
+            <template #default="{ row }">
+              <el-input-number v-model="row.defectiveQty" :min="0" :precision="2" size="small" style="width:100%"
+                controls-position="right" />
             </template>
           </el-table-column>
           <el-table-column label="单价" width="100">
@@ -160,11 +165,6 @@
           <el-table-column label="金额" width="90">
             <template #default="{ row }">
               <span>{{ row.amount ? Number(row.amount).toFixed(2) : '0.00' }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="客户单号" width="120">
-            <template #default="{ row }">
-              <el-input v-model="row.customerOrderNo" size="small" />
             </template>
           </el-table-column>
           <el-table-column label="明细备注" min-width="120">
@@ -211,7 +211,7 @@ const pagination = reactive({ page: 1, size: 20, total: 0 })
 
 const today = new Date().toISOString().split('T')[0]
 const formData = reactive({
-  shipmentDate: today, customerId: null, customerName: '', remark: '',
+  shipmentDate: today, customerId: null, customerName: '', operator: '', remark: '',
   items: []
 })
 
@@ -365,9 +365,9 @@ const calcItemAmount = (item) => {
 const addItem = () => {
   formData.items.push({
     materialId: null, materialName: '', materialCode: '', spec: '',
-    processId: null, processName: '', shipmentType: '良品', _matOptions: [...defaultMatOptions.value], _matLoading: false,
-    quantity: 0, unitPrice: 0, amount: '0.00',
-    customerOrderNo: '', detailRemark: ''
+    processId: null, processName: '', _matOptions: [...defaultMatOptions.value], _matLoading: false,
+    quantity: 0, defectiveQty: 0, unitPrice: 0, amount: '0.00',
+    detailRemark: ''
   })
 }
 
@@ -392,6 +392,7 @@ const openDialog = async (row) => {
       shipmentDate: row.shipmentDate,
       customerId: row.customerId,
       customerName: row.customerName,
+      operator: row.operator || '',
       remark: row.remark || '',
       items: []
     })
@@ -418,7 +419,7 @@ const openDialog = async (row) => {
 const resetForm = () => {
   formRef.value?.resetFields()
   Object.assign(formData, {
-    shipmentDate: today, customerId: null, customerName: '', remark: '',
+    shipmentDate: today, customerId: null, customerName: '', operator: '', remark: '',
     items: []
   })
   materialList.value = []

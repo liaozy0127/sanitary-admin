@@ -51,4 +51,9 @@ public class InventoryController {
     public Result<Map<String, Object>> initFromStatement(@RequestParam("file") MultipartFile file) {
         return Result.success(inventoryService.initFromStatement(file));
     }
+
+    @PostMapping("/rebuild")
+    public Result<Map<String, Object>> rebuild() {
+        return Result.success(inventoryService.rebuildFromOrders());
+    }
 }
