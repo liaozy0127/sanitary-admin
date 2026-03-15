@@ -19,8 +19,10 @@ public class StatementItem {
     private BigDecimal prevBalanceQty;
     private BigDecimal receiptQty;
     private BigDecimal shipmentQty;
+    private BigDecimal defectiveQty;  // 原件退回数量
     private BigDecimal currBalanceQty;
     private BigDecimal unitPrice;
+    private BigDecimal goodsAmount;   // 良品金额
     private BigDecimal shipmentAmount;
     private String remark;
     @TableLogic

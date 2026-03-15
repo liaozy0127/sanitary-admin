@@ -49,14 +49,20 @@
                 <el-table-column prop="receiptQty" label="本月收货" width="90" align="right">
                   <template #default="{ row: item }">{{ fmtQty(item.receiptQty) }}</template>
                 </el-table-column>
-                <el-table-column prop="shipmentQty" label="本月发货" width="90" align="right">
+                <el-table-column prop="shipmentQty" label="发货合计" width="90" align="right">
                   <template #default="{ row: item }">{{ fmtQty(item.shipmentQty) }}</template>
+                </el-table-column>
+                <el-table-column prop="defectiveQty" label="退回数量" width="90" align="right">
+                  <template #default="{ row: item }">{{ fmtQty(item.defectiveQty) }}</template>
                 </el-table-column>
                 <el-table-column prop="currBalanceQty" label="本月结余" width="90" align="right">
                   <template #default="{ row: item }">{{ fmtQty(item.currBalanceQty) }}</template>
                 </el-table-column>
                 <el-table-column prop="unitPrice" label="单价" width="80" align="right">
                   <template #default="{ row: item }">{{ fmtPrice(item.unitPrice) }}</template>
+                </el-table-column>
+                <el-table-column prop="goodsAmount" label="良品金额" width="100" align="right">
+                  <template #default="{ row: item }">{{ fmtAmt(item.goodsAmount) }}</template>
                 </el-table-column>
                 <el-table-column prop="shipmentAmount" label="发货金额" width="100" align="right">
                   <template #default="{ row: item }">{{ fmtAmt(item.shipmentAmount) }}</template>
@@ -65,8 +71,10 @@
               </el-table>
               <div v-if="row.items && row.items.length" class="items-summary">
                 合计：收货 <b>{{ sumField(row.items, 'receiptQty') }}</b> &nbsp;|&nbsp;
-                发货 <b>{{ sumField(row.items, 'shipmentQty') }}</b> &nbsp;|&nbsp;
-                金额 <b>¥{{ sumField(row.items, 'shipmentAmount') }}</b>
+                发货合计 <b>{{ sumField(row.items, 'shipmentQty') }}</b> &nbsp;|&nbsp;
+                退回 <b>{{ sumField(row.items, 'defectiveQty') }}</b> &nbsp;|&nbsp;
+                良品金额 <b>¥{{ sumField(row.items, 'goodsAmount') }}</b> &nbsp;|&nbsp;
+                发货金额 <b>¥{{ sumField(row.items, 'shipmentAmount') }}</b>
               </div>
             </div>
           </template>
@@ -197,7 +205,7 @@ const fmtPrice = (v) => (v == null ? '-' : Number(v).toFixed(4))
 const fmtAmt = (v) => (v == null ? '0.00' : Number(v).toFixed(2))
 const sumField = (items, field) => {
   const s = items.reduce((acc, it) => acc + (Number(it[field]) || 0), 0)
-  return field === 'shipmentAmount' ? s.toFixed(2) : s.toLocaleString()
+  return (field === 'shipmentAmount' || field === 'goodsAmount') ? s.toFixed(2) : s.toLocaleString()
 }
 
 // ---- 列表 ----

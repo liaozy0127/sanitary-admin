@@ -52,10 +52,10 @@ public class GenerateNoUtil {
         String yearMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
         // 查询全表最大值，确保全局唯一，而不是按月份LIKE查询
         String sql = "SELECT MAX(" + noColumn + ") FROM `" + tableName + "` WHERE " + noColumn + " LIKE ?";
-        String likePattern = prefix + "________%"; // 匹配 DZ + 8位数字以上的格式（年月+序号）
+        String likePattern = prefix + "______%"; // 匹配 DZ + 6位年月 + 序号，如 DZ202603xxxx
         String maxNo = jdbcTemplate.queryForObject(sql, String.class, likePattern);
         int seq = 1;
-        if (maxNo != null && maxNo.length() >= prefix.length() + 8 + 4) {
+        if (maxNo != null && maxNo.length() >= prefix.length() + 6 + 4) {
             try {
                 seq = Integer.parseInt(maxNo.substring(maxNo.length() - 4)) + 1;
             } catch (NumberFormatException e) {

@@ -37,7 +37,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -82,43 +86,43 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         LocalDate startDate = ym.atDay(1);
         LocalDate endDate = ym.atEndOfMonth();
 
-        // Calculate receipt totals for this customer in this month
+        // Query receipt items for this customer in this month
         LambdaQueryWrapper<Receipt> receiptWrapper = new LambdaQueryWrapper<Receipt>()
                 .eq(Receipt::getCustomerId, customerId)
                 .eq(Receipt::getStatus, 1)
                 .ge(Receipt::getReceiptDate, startDate)
                 .le(Receipt::getReceiptDate, endDate);
         List<Receipt> receipts = receiptMapper.selectList(receiptWrapper);
-        // Aggregate qty and amount from receipt_item
-        List<Long> receiptIds = receipts.stream().map(Receipt::getId).collect(java.util.stream.Collectors.toList());
+        List<Long> receiptIds = receipts.stream().map(Receipt::getId).collect(Collectors.toList());
+        List<ReceiptItem> allReceiptItems = new ArrayList<>();
         BigDecimal receiptQty = BigDecimal.ZERO;
         BigDecimal receiptAmount = BigDecimal.ZERO;
         if (!receiptIds.isEmpty()) {
-            List<ReceiptItem> receiptItems = receiptItemMapper.selectList(
+            allReceiptItems = receiptItemMapper.selectList(
                 new LambdaQueryWrapper<ReceiptItem>().in(ReceiptItem::getReceiptId, receiptIds));
-            receiptQty = receiptItems.stream()
+            receiptQty = allReceiptItems.stream()
                 .map(ReceiptItem::getQuantity).filter(q -> q != null).reduce(BigDecimal.ZERO, BigDecimal::add);
-            receiptAmount = receiptItems.stream()
+            receiptAmount = allReceiptItems.stream()
                 .map(i -> i.getAmount() != null ? i.getAmount() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
         }
 
-        // Calculate shipment totals
+        // Query shipment items for this customer in this month
         LambdaQueryWrapper<Shipment> shipmentWrapper = new LambdaQueryWrapper<Shipment>()
                 .eq(Shipment::getCustomerId, customerId)
                 .eq(Shipment::getStatus, 1)
                 .ge(Shipment::getShipmentDate, startDate)
                 .le(Shipment::getShipmentDate, endDate);
         List<Shipment> shipments = shipmentMapper.selectList(shipmentWrapper);
-        // Aggregate qty and amount from shipment_item
-        List<Long> shipmentIds = shipments.stream().map(Shipment::getId).collect(java.util.stream.Collectors.toList());
+        List<Long> shipmentIds = shipments.stream().map(Shipment::getId).collect(Collectors.toList());
+        List<ShipmentItem> allShipmentItems = new ArrayList<>();
         BigDecimal shipmentQty = BigDecimal.ZERO;
         BigDecimal shipmentAmount = BigDecimal.ZERO;
         if (!shipmentIds.isEmpty()) {
-            List<ShipmentItem> shipmentItems = shipmentItemMapper.selectList(
+            allShipmentItems = shipmentItemMapper.selectList(
                 new LambdaQueryWrapper<ShipmentItem>().in(ShipmentItem::getShipmentId, shipmentIds));
-            shipmentQty = shipmentItems.stream()
-                .map(ShipmentItem::getQuantity).filter(q -> q != null).reduce(BigDecimal.ZERO, BigDecimal::add);
-            shipmentAmount = shipmentItems.stream()
+            shipmentQty = allShipmentItems.stream()
+                .map(si -> safeAdd(si.getQuantity(), si.getDefectiveQty())).reduce(BigDecimal.ZERO, BigDecimal::add);
+            shipmentAmount = allShipmentItems.stream()
                 .map(i -> i.getAmount() != null ? i.getAmount() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
         }
 
@@ -128,12 +132,15 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                 .eq(Statement::getStatementMonth, statementMonth);
         Statement existing = getOne(existWrapper);
         if (existing != null) {
-            // Update existing
+            // Update existing header
             existing.setReceiptQty(receiptQty);
             existing.setShipmentQty(shipmentQty);
             existing.setReceiptAmount(receiptAmount);
             existing.setShipmentAmount(shipmentAmount);
             updateById(existing);
+            // Re-generate items
+            statementItemService.deleteByStatementId(existing.getId());
+            buildAndSaveItems(existing, customerId, ym, allReceiptItems, allShipmentItems);
             return existing;
         }
 
@@ -149,7 +156,153 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         statement.setShipmentAmount(shipmentAmount);
         statement.setStatus("未确认");
         save(statement);
+        buildAndSaveItems(statement, customerId, ym, allReceiptItems, allShipmentItems);
         return statement;
+    }
+
+    private BigDecimal safeAdd(BigDecimal a, BigDecimal b) {
+        return (a != null ? a : BigDecimal.ZERO).add(b != null ? b : BigDecimal.ZERO);
+    }
+
+    private void buildAndSaveItems(Statement stmt, Long customerId, YearMonth ym,
+                                   List<ReceiptItem> receiptItems, List<ShipmentItem> shipmentItems) {
+        // Group by materialId + "_" + processId
+        Map<String, StatementItem> itemMap = new LinkedHashMap<>();
+
+        for (ReceiptItem ri : receiptItems) {
+            Long mid = ri.getMaterialId() != null ? ri.getMaterialId() : 0L;
+            Long pid = ri.getProcessId() != null ? ri.getProcessId() : 0L;
+            String key = mid + "_" + pid;
+            StatementItem item = itemMap.computeIfAbsent(key, k -> {
+                StatementItem si = new StatementItem();
+                si.setMaterialId(mid != 0L ? mid : null);
+                si.setMaterialCode(ri.getMaterialCode());
+                si.setMaterialName(ri.getMaterialName());
+                si.setProcessId(pid != 0L ? pid : null);
+                si.setProcessName(ri.getProcessName());
+                si.setReceiptQty(BigDecimal.ZERO);
+                si.setShipmentQty(BigDecimal.ZERO);
+                si.setDefectiveQty(BigDecimal.ZERO);
+                si.setGoodsAmount(BigDecimal.ZERO);
+                si.setShipmentAmount(BigDecimal.ZERO);
+                si.setPrevBalanceQty(BigDecimal.ZERO);
+                si.setCurrBalanceQty(BigDecimal.ZERO);
+                si.setUnitPrice(BigDecimal.ZERO);
+                return si;
+            });
+            item.setReceiptQty(item.getReceiptQty().add(ri.getQuantity() != null ? ri.getQuantity() : BigDecimal.ZERO));
+            // Use unit_price from receipt item if not set yet
+            if (item.getUnitPrice().compareTo(BigDecimal.ZERO) == 0 && ri.getUnitPrice() != null
+                    && ri.getUnitPrice().compareTo(BigDecimal.ZERO) > 0) {
+                item.setUnitPrice(ri.getUnitPrice());
+            }
+        }
+
+        for (ShipmentItem si : shipmentItems) {
+            Long mid = si.getMaterialId() != null ? si.getMaterialId() : 0L;
+            Long pid = si.getProcessId() != null ? si.getProcessId() : 0L;
+            String key = mid + "_" + pid;
+            StatementItem item = itemMap.computeIfAbsent(key, k -> {
+                StatementItem newItem = new StatementItem();
+                newItem.setMaterialId(mid != 0L ? mid : null);
+                newItem.setMaterialCode(si.getMaterialCode());
+                newItem.setMaterialName(si.getMaterialName());
+                newItem.setProcessId(pid != 0L ? pid : null);
+                newItem.setProcessName(si.getProcessName());
+                newItem.setReceiptQty(BigDecimal.ZERO);
+                newItem.setShipmentQty(BigDecimal.ZERO);
+                newItem.setDefectiveQty(BigDecimal.ZERO);
+                newItem.setGoodsAmount(BigDecimal.ZERO);
+                newItem.setShipmentAmount(BigDecimal.ZERO);
+                newItem.setPrevBalanceQty(BigDecimal.ZERO);
+                newItem.setCurrBalanceQty(BigDecimal.ZERO);
+                newItem.setUnitPrice(BigDecimal.ZERO);
+                return newItem;
+            });
+            BigDecimal goodsQty = si.getQuantity() != null ? si.getQuantity() : BigDecimal.ZERO;
+            BigDecimal defQty = si.getDefectiveQty() != null ? si.getDefectiveQty() : BigDecimal.ZERO;
+            BigDecimal amt = si.getAmount() != null ? si.getAmount() : BigDecimal.ZERO;
+            item.setShipmentQty(item.getShipmentQty().add(goodsQty).add(defQty));
+            item.setDefectiveQty(item.getDefectiveQty().add(defQty));
+            item.setGoodsAmount(item.getGoodsAmount().add(amt));
+            item.setShipmentAmount(item.getShipmentAmount().add(amt));
+            if (item.getUnitPrice().compareTo(BigDecimal.ZERO) == 0 && si.getUnitPrice() != null
+                    && si.getUnitPrice().compareTo(BigDecimal.ZERO) > 0) {
+                item.setUnitPrice(si.getUnitPrice());
+            }
+        }
+
+        // Compute prevBalanceQty = sum(receipt_qty before monthStart) - sum(shipment_qty before monthStart)
+        // for this customer, grouped by materialId+processId. This is independent of whether prior
+        // statement records exist, making each month's generation idempotent.
+        LocalDate monthStart = ym.atDay(1);
+
+        // All receipts for this customer BEFORE the month start
+        LambdaQueryWrapper<Receipt> prevReceiptWrapper = new LambdaQueryWrapper<Receipt>()
+                .eq(Receipt::getCustomerId, customerId)
+                .eq(Receipt::getStatus, 1)
+                .lt(Receipt::getReceiptDate, monthStart);
+        List<Receipt> prevReceipts = receiptMapper.selectList(prevReceiptWrapper);
+        List<Long> prevReceiptIds = prevReceipts.stream().map(Receipt::getId).collect(Collectors.toList());
+
+        // All shipments for this customer BEFORE the month start
+        LambdaQueryWrapper<Shipment> prevShipmentWrapper = new LambdaQueryWrapper<Shipment>()
+                .eq(Shipment::getCustomerId, customerId)
+                .eq(Shipment::getStatus, 1)
+                .lt(Shipment::getShipmentDate, monthStart);
+        List<Shipment> prevShipments = shipmentMapper.selectList(prevShipmentWrapper);
+        List<Long> prevShipmentIds = prevShipments.stream().map(Shipment::getId).collect(Collectors.toList());
+
+        // key: materialId_processId -> net qty before this month
+        Map<String, BigDecimal> prevBalanceMap = new HashMap<>();
+
+        if (!prevReceiptIds.isEmpty()) {
+            List<ReceiptItem> prevRItems = receiptItemMapper.selectList(
+                new LambdaQueryWrapper<ReceiptItem>().in(ReceiptItem::getReceiptId, prevReceiptIds));
+            for (ReceiptItem ri : prevRItems) {
+                Long mid = ri.getMaterialId() != null ? ri.getMaterialId() : 0L;
+                Long pid = ri.getProcessId() != null ? ri.getProcessId() : 0L;
+                String key = mid + "_" + pid;
+                BigDecimal qty = ri.getQuantity() != null ? ri.getQuantity() : BigDecimal.ZERO;
+                prevBalanceMap.merge(key, qty, BigDecimal::add);
+            }
+        }
+
+        if (!prevShipmentIds.isEmpty()) {
+            List<ShipmentItem> prevSItems = shipmentItemMapper.selectList(
+                new LambdaQueryWrapper<ShipmentItem>().in(ShipmentItem::getShipmentId, prevShipmentIds));
+            for (ShipmentItem si : prevSItems) {
+                Long mid = si.getMaterialId() != null ? si.getMaterialId() : 0L;
+                Long pid = si.getProcessId() != null ? si.getProcessId() : 0L;
+                String key = mid + "_" + pid;
+                // shipmentQty = goodsQty + defectiveQty (same logic as current month)
+                BigDecimal goodsQty = si.getQuantity() != null ? si.getQuantity() : BigDecimal.ZERO;
+                BigDecimal defQty = si.getDefectiveQty() != null ? si.getDefectiveQty() : BigDecimal.ZERO;
+                prevBalanceMap.merge(key, goodsQty.add(defQty).negate(), BigDecimal::add);
+            }
+        }
+
+        List<StatementItem> itemsToSave = new ArrayList<>();
+        for (Map.Entry<String, StatementItem> entry : itemMap.entrySet()) {
+            StatementItem item = entry.getValue();
+            // Fallback unit price from material
+            if (item.getUnitPrice().compareTo(BigDecimal.ZERO) == 0 && item.getMaterialId() != null) {
+                Material mat = materialMapper.selectById(item.getMaterialId());
+                if (mat != null && mat.getDefaultPrice() != null && mat.getDefaultPrice().compareTo(BigDecimal.ZERO) > 0) {
+                    item.setUnitPrice(mat.getDefaultPrice());
+                }
+            }
+            // prevBalanceQty
+            BigDecimal prevBal = prevBalanceMap.getOrDefault(entry.getKey(), BigDecimal.ZERO);
+            item.setPrevBalanceQty(prevBal);
+            // currBalanceQty = prevBal + receiptQty - shipmentQty
+            item.setCurrBalanceQty(prevBal.add(item.getReceiptQty()).subtract(item.getShipmentQty()));
+            itemsToSave.add(item);
+        }
+
+        if (!itemsToSave.isEmpty()) {
+            statementItemService.saveItems(stmt.getId(), stmt.getStatementNo(), itemsToSave);
+        }
     }
 
     @Override
@@ -187,9 +340,11 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                 item.setProcessName(getCellString(row, 2));
                 item.setPrevBalanceQty(parseQty(getCellString(row, 3)));
                 item.setReceiptQty(parseQty(getCellString(row, 5)));
+                item.setDefectiveQty(parseQty(getCellString(row, 7)));      // col7 = 原件退回数量
                 item.setShipmentQty(parseQty(getCellString(row, 8)));
                 item.setCurrBalanceQty(parseQty(getCellString(row, 9)));
                 item.setUnitPrice(parsePrice(getCellString(row, 10)));
+                item.setGoodsAmount(parsePrice(getCellString(row, 11)));    // col11 = 良品金额
                 item.setShipmentAmount(parsePrice(getCellString(row, 12)));
                 item.setRemark(getCellString(row, 13));
 

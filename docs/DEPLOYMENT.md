@@ -92,8 +92,8 @@ docker compose up -d
 > macOS 上 Docker 命令完整路径：`/Applications/Docker.app/Contents/Resources/bin/docker`
 
 构建过程说明：
-- **backend**：在容器内执行 `mvn package`，约需 3~5 分钟（首次下载依赖较慢）
-- **frontend**：在容器内执行 `npm install && npm run build`，约需 2~3 分钟
+- **backend**：在容器内执行 `mvn package`，首次下载依赖较慢
+- **frontend**：在容器内执行 `npm install && npm run build`
 
 ### 4.2 等待服务就绪
 
@@ -114,8 +114,6 @@ done
 echo "后端已就绪"
 ```
 
-正常情况下 60~90 秒内所有服务启动完毕。
-
 ### 4.3 验证启动成功
 
 | 检查项 | 方法 |
@@ -129,6 +127,11 @@ echo "后端已就绪"
 ## 五、数据初始化导入
 
 数据导入严格按以下顺序执行，**顺序不可颠倒**。
+
+```
+客户/工艺/物料 → 收货单 → 排产单 → 发货单 → 收款单
+     → 期初库存补录 → 重建库存 → 批量生成对账单
+```
 
 ### 5.1 第一步：转换 Excel 格式
 
@@ -170,9 +173,9 @@ python3 scripts/import_data.py
 预期输出：
 ```
 ✅ 登录成功
-客户导入完成：成功 482，跳过 6，失败 0
-工艺导入完成：成功 155，跳过 0，失败 0
-物料导入完成：成功 23968，跳过 1，失败 0
+客户导入完成：成功 ~482，跳过 ~6，失败 0
+工艺导入完成：成功 ~155，跳过 0，失败 0
+物料导入完成：成功 ~23968，跳过 ~1，失败 0
 ```
 
 > 脚本内置幂等检查，重复执行不会产生重复数据。
@@ -198,7 +201,7 @@ if d['errors']: print('错误(前3):', d['errors'][:3])
 EOF
 ```
 
-预期：成功约 2260 张收货单。
+预期：成功约 2260 张收货单，失败 1 条（XLS 末行日期为空，可忽略）。
 
 ### 5.4 第四步：导入排产单（历史数据）
 
@@ -266,11 +269,38 @@ EOF
 
 预期：成功约 380 条收款记录。
 
-### 5.7 第七步：重建库存
+### 5.7 第七步：期初库存补录
 
-收货单和发货单导入时不触发库存更新（历史模式），需在所有单据导入完成后手动重建：
+**背景**：老系统仅迁移了 2025 年及以后的数据，但 2025 年初已有在途存量。
+若不补录，月度对账结余会出现负数。
 
-> **注意**：重建库存前须确保收货单和发货单全部导入完成，否则库存数量会偏少。
+本步骤通过计算每个（物料、客户、工艺）组合所有月份的最大累计缺口，
+在 2024-12-31 日期插入一张期初收货单（单号 `RH-INIT-{客户ID}`），
+保证所有月份结余 ≥ 0。
+
+```bash
+python3 scripts/init_opening_stock.py
+```
+
+预期输出：
+```
+Step 1: 计算期初库存需求（基于最大累计缺口）...
+  需补录物料组合: ~856 个
+Step 2: 加载物料 / 工艺 / 客户信息...
+Step 3: 插入期初收货单（日期 2024-12-31）...
+  已跳过（已存在）: 0 张
+  新增期初收货单:   ~35 张
+  新增明细条数:     ~852 条
+完成！请在此步骤后重新执行「重建库存」接口。
+```
+
+> 脚本幂等：已存在 `RH-INIT-{客户ID}` 的客户自动跳过，可安全重复执行。
+
+### 5.8 第八步：重建库存
+
+收货单（含期初）和发货单全部导入后，重建全量库存：
+
+> **注意**：必须在期初库存补录完成后再执行，否则期初数据不会计入。
 
 ```bash
 python3 << 'EOF'
@@ -288,9 +318,13 @@ print(f'收货分组: {d["receiptGroups"]}, 发货分组: {d["shipmentGroups"]},
 EOF
 ```
 
-预期：生成约 3667 条库存记录，其中正库存约 988 条。
+预期：
+- 收货分组 ~3650 个（含期初收货）
+- 发货分组 ~3522 个
+- 生成库存记录 ~3667 条
+- 负库存 ≤ 5 条（均为原始数据录入误差，非系统问题）
 
-### 5.8 第八步：批量初始化对账单
+### 5.9 第九步：批量生成对账单
 
 库存重建完成后，根据所有收发货数据批量生成历史对账单：
 
@@ -312,7 +346,8 @@ if d.get('errors'):
 EOF
 ```
 
-预期：生成约数百条对账单（按客户×月份汇总）。已存在的对账单自动跳过，接口幂等可重复执行。
+预期：生成约 412 张对账单（按客户×月份汇总），共约 10604 条明细行。
+已存在的对账单自动跳过，接口幂等可重复执行。
 
 ---
 
@@ -353,12 +388,12 @@ EOF
 | 客户 | ~482 |
 | 工艺 | ~155 |
 | 物料 | ~23,971 |
-| 收货单 | ~2,260 |
+| 收货单 | ~2,295（含 35 张期初收货单） |
 | 排产单 | ~1,232 |
 | 发货单 | ~2,536 |
 | 收款单 | ~380 |
-| 库存（quantity>0） | ~988 |
-| 对账单 | 按客户×月份自动汇总 |
+| 库存记录总数 | ~3,667 |
+| 对账单 | ~412 |
 
 ---
 
@@ -419,7 +454,7 @@ docker exec -it sanitary-mysql mysql -uroot -proot123 sanitary_admin
 mysql -h 127.0.0.1 -P 3307 -uroot -proot123 sanitary_admin
 ```
 
-### 7.5 重建库存（数据修复时使用）
+### 7.5 重建库存
 
 当收发货数据发生变化或数据导入出现问题时，可随时调用重建接口重算全量库存：
 
@@ -428,6 +463,16 @@ curl -s -X POST http://localhost:8080/api/inventory/rebuild \
   -H "Authorization: Bearer $(curl -s -X POST http://localhost:8080/api/auth/login \
     -H 'Content-Type: application/json' \
     -d '{"username":"admin","password":"admin123"}' | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"]["token"])')"
+```
+
+### 7.6 重新生成对账单
+
+当收发货数据变化后，可对指定月份重新生成对账单（幂等，已存在则重建明细）：
+
+```bash
+# 批量重新生成全部对账单
+curl -s -X POST http://localhost:8080/api/statements/generate-all \
+  -H "Authorization: Bearer <token>"
 ```
 
 ---
@@ -439,25 +484,32 @@ curl -s -X POST http://localhost:8080/api/inventory/rebuild \
 | 问题 | 原因 | 状态 |
 |------|------|------|
 | `init.sql` 缺少明细表 | 历史遗留，init.sql 未跟随代码更新 | ✅ 已修复 |
-| 发货单发货类型全为"返工" | 导入时将列9（收货来源：正常/返工）直接存入 shipmentType，而前端期望"良品/不良品" | ✅ 已修复 |
+| 发货单发货类型全为"返工" | 导入时列映射错误 | ✅ 已修复 |
 | 导入历史数据后库存为零 | 历史导入绕过业务层，不触发库存更新 | ✅ 已修复（增加 `/rebuild` 接口） |
-| 发货单数量/单价精度丢失 | `getCellString` 使用 `(long)` 强转截断小数，导致数量取整、单价精度丢失 | ✅ 已修复（改用 `BigDecimal` 读取） |
-| 发货单结构调整 | 移除 `shipmentType`/`customerOrderNo` 字段，新增 `defectiveQty`（不良品数量）/ `operator`（操作员）字段 | ✅ 已完成重设计 |
+| 发货单数量/单价精度丢失 | `getCellString` 强转截断小数 | ✅ 已修复（改用 BigDecimal 读取） |
+| 对账单流水号重复导致批量生成失败 | `generateMonthly` LIKE 模式多写了 2 个下划线（8位匹配 vs 6位年月） | ✅ 已修复 |
+| 对账单上月结余全为 0 | generate 依赖链式查上月对账单，批量时顺序不保证 | ✅ 已修复（改为直接聚合历史收发记录） |
+| 对账单结余出现负数 | 迁移仅含 2025 年数据，期初库存未补录 | ✅ 已修复（新增期初库存补录步骤） |
+| 库存重建结果错误（负数） | `aggregateReceiptQty` GROUP BY 含字符串字段，同 key 多行被覆盖；`aggregateShipmentQty` 未计 `defective_qty` 且缺 `status=1` 过滤 | ✅ 已修复 |
+| 对账单明细缺少退回数量/良品金额列 | `statement_item` 表缺字段，`generate()` 未生成明细行 | ✅ 已修复（新增 `defective_qty`、`goods_amount` 列及明细生成逻辑） |
 
 ### 8.2 导入说明
 
 - **幂等性**：所有导入接口均检查单号是否已存在，重复执行只会跳过，不会产生重复数据。
 - **最后一行失败**：收货单、发货单、收款单各有 1 条失败，原因是 XLS 最后一行日期为空，属正常现象，可忽略。
 - **发货单 FG- 前缀行跳过**：发货单 XLS 中 FG- 开头的行为物料存档行（非发货数据），导入时自动跳过，约 2704 行；实际导入约 2536 张发货单。
-- **负库存**：历史数据中有 742 条库存为负，原因是老系统部分收货记录不完整（发货量大于记录的收货量），属历史数据本身的问题。
-- **物料导入 `已加载 1 个客户映射`**：import_data.py 中客户映射接口返回分页数据，脚本只取了第一页，客户名称 → ID 映射不完整。实际不影响物料导入成功，因为物料自带 `customerName` 字段，系统在导入收货/发货时会按名称自动匹配客户 ID。
-- **对账单批量生成**：通过"对账单 → 批量初始化"按钮或调用 `POST /api/statements/generate-all` 接口，将自动遍历所有收发货数据聚合出客户×月份组合，逐一生成对账单汇总，已存在的月份自动跳过。
+- **期初库存幂等**：`scripts/init_opening_stock.py` 以 `RH-INIT-{customerId}` 为唯一键检查，已存在则跳过，可安全重复执行。
+- **对账单批量生成**：通过「对账单 → 批量初始化」按钮或调用 `POST /api/statements/generate-all` 接口，将自动遍历所有收发货数据聚合出客户×月份组合，逐一生成对账单汇总，已存在的月份自动跳过。
 
 ### 8.3 XLS 文件说明
 
 老系统导出的 `.xls` 文件存在文件头损坏问题（`WARNING *** file size not 512 + multiple of sector size`），`xlrd` 库仍能正常读取，无需处理。
 
 通过 API 上传导入前需用 `openpyxl` 转为 `.xlsx`，因为后端使用 Apache POI 读取，不支持损坏头的 `.xls`。
+
+### 8.4 负库存说明
+
+数据初始化完成后，可能存在 ≤ 5 条库存为负的记录，原因是老系统原始数据中该物料的发货量略超出收货量（1~3 件误差），属历史数据录入问题，非系统 Bug。
 
 ---
 
@@ -470,17 +522,17 @@ curl -s -X POST http://localhost:8080/api/inventory/rebuild \
 set -e
 cd "$(dirname "$0")"
 
-echo "=== [1/4] 构建并启动 Docker 服务 ==="
+echo "=== [1/5] 构建并启动 Docker 服务 ==="
 docker compose build --no-cache
 docker compose up -d
 
-echo "=== [2/4] 等待后端就绪 ==="
+echo "=== [2/5] 等待后端就绪 ==="
 until curl -sf http://localhost:8080/actuator/health > /dev/null; do
   echo "  等待中..."; sleep 5
 done
 echo "后端已就绪"
 
-echo "=== [3/4] 转换 Excel 格式 ==="
+echo "=== [3/5] 转换 Excel 格式 ==="
 python3 - << 'PYEOF'
 import xlrd, openpyxl, os, warnings
 warnings.filterwarnings('ignore')
@@ -497,7 +549,7 @@ for name in ['收货单', '排产单', '发货单', '收款单']:
     xls_to_xlsx(f'old-system-file/{name}.xls', f'/tmp/import-xlsx/{name}.xlsx')
 PYEOF
 
-echo "=== [4/4] 导入数据 ==="
+echo "=== [4/5] 导入基础数据及单据 ==="
 python3 scripts/import_data.py
 
 python3 - << 'PYEOF'
@@ -519,14 +571,26 @@ for name, path, param in [
         r = requests.post(f'{BASE}{path}{param}', headers=h,
             files={'file': (fname, f)}, timeout=600).json()['data']
     print(f'{name}: 成功 {r["success"]}, 跳过 {r["skip"]}, 失败 {r["fail"]}')
+PYEOF
+
+echo "=== [5/5] 期初库存 + 重建库存 + 生成对账单 ==="
+python3 scripts/init_opening_stock.py
+
+python3 - << 'PYEOF'
+import requests, warnings
+warnings.filterwarnings('ignore')
+BASE = 'http://localhost:8080'
+token = requests.post(f'{BASE}/api/auth/login',
+    json={'username':'admin','password':'admin123'}).json()['data']['token']
+h = {'Authorization': f'Bearer {token}'}
 
 print('重建库存...')
 r = requests.post(f'{BASE}/api/inventory/rebuild', headers=h, timeout=60).json()['data']
-print(f'库存记录: {r["inventoryRecords"]} 条')
+print(f'  库存记录: {r["inventoryRecords"]} 条')
 
 print('批量生成对账单...')
 r = requests.post(f'{BASE}/api/statements/generate-all', headers=h, timeout=300).json()['data']
-print(f'对账单: 生成 {r["success"]} 条，跳过 {r["skip"]} 条，失败 {r["fail"]} 条')
+print(f'  对账单: 生成 {r["success"]} 条，跳过 {r["skip"]} 条，失败 {r["fail"]} 条')
 print('=== 部署完成 ===')
 PYEOF
 ```
