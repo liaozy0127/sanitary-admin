@@ -26,6 +26,7 @@
           <span>对账单列表</span>
           <div>
             <el-button type="warning" :icon="Upload" @click="showImportDialog = true">历史导入</el-button>
+            <el-button type="success" :icon="Refresh" :loading="generateAllLoading" @click="handleGenerateAll">批量初始化</el-button>
             <el-button type="primary" :icon="Plus" @click="showGenerateDialog = true">生成对账单</el-button>
           </div>
         </div>
@@ -177,6 +178,7 @@ import request from '@/utils/request'
 const loading = ref(false)
 const generateLoading = ref(false)
 const importLoading = ref(false)
+const generateAllLoading = ref(false)
 const tableData = ref([])
 const customerList = ref([])
 const showGenerateDialog = ref(false)
@@ -299,6 +301,22 @@ const handleDelete = async (row) => {
   await deleteStatement(row.id)
   ElMessage.success('删除成功')
   fetchList()
+}
+
+const handleGenerateAll = async () => {
+  await ElMessageBox.confirm(
+    '将根据所有收发货数据批量生成对账单（已存在的月份自动跳过），确定继续？',
+    '批量初始化对账单', { type: 'warning' }
+  )
+  generateAllLoading.value = true
+  try {
+    const res = await request.post('/statements/generate-all')
+    const d = res.data || res
+    ElMessage.success(`初始化完成：生成 ${d.success} 条，跳过 ${d.skip} 条，失败 ${d.fail} 条`)
+    fetchList()
+  } finally {
+    generateAllLoading.value = false
+  }
 }
 
 onMounted(() => { fetchList(); loadCustomers() })

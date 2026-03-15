@@ -67,7 +67,7 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
         if (StringUtils.hasText(endDate)) {
             wrapper.le(Receipt::getReceiptDate, LocalDate.parse(endDate));
         }
-        wrapper.orderByDesc(Receipt::getCreateTime);
+        wrapper.orderByDesc(Receipt::getReceiptDate).orderByDesc(Receipt::getId);
         return page(new Page<>(page, size), wrapper);
     }
 

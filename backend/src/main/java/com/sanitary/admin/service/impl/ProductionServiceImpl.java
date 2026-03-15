@@ -50,7 +50,7 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
         if (customerId != null) {
             wrapper.eq(Production::getCustomerId, customerId);
         }
-        wrapper.orderByDesc(Production::getCreateTime);
+        wrapper.orderByDesc(Production::getProductionDate).orderByDesc(Production::getId);
         return page(new Page<>(page, size), wrapper);
     }
 

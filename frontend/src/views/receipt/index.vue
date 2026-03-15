@@ -46,8 +46,6 @@
                 <el-table-column prop="processName" label="工艺" width="100" />
                 <el-table-column prop="receiptSource" label="收货来源" width="100" />
                 <el-table-column prop="quantity" label="收货数量" width="90" align="right" />
-                <el-table-column prop="shippedQty" label="发货数量" width="90" align="right" />
-                <el-table-column prop="unshippedQty" label="未发货" width="80" align="right" />
                 <el-table-column prop="unitPrice" label="单价" width="80" align="right">
                   <template #default="{ row: item }">
                     <el-tooltip v-if="item.receiptSource === '正常' && (!item.unitPrice || Number(item.unitPrice) === 0)"

@@ -43,7 +43,7 @@ public class PaymentServiceImpl extends ServiceImpl<PaymentMapper, Payment> impl
         if (StringUtils.hasText(endDate)) {
             wrapper.le(Payment::getPaymentDate, LocalDate.parse(endDate));
         }
-        wrapper.orderByDesc(Payment::getCreateTime);
+        wrapper.orderByDesc(Payment::getPaymentDate).orderByDesc(Payment::getId);
         return page(new Page<>(page, size), wrapper);
     }
 

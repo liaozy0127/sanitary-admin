@@ -64,7 +64,7 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         if (StringUtils.hasText(statementMonth)) {
             wrapper.eq(Statement::getStatementMonth, statementMonth);
         }
-        wrapper.orderByDesc(Statement::getCreateTime);
+        wrapper.orderByDesc(Statement::getStatementMonth).orderByDesc(Statement::getId);
         return page(new Page<>(page, size), wrapper);
     }
 
@@ -335,5 +335,57 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
             s.setItems(statementItemService.getByStatementId(id));
         }
         return s;
+    }
+
+    @Override
+    @Transactional
+    public java.util.Map<String, Object> generateAll() {
+        int success = 0, skip = 0, fail = 0;
+        java.util.List<String> errors = new java.util.ArrayList<>();
+
+        // 从收货单聚合出所有 (customerId, yyyy-MM) 组合
+        java.util.Set<String> keys = new java.util.LinkedHashSet<>();
+        List<Receipt> allReceipts = receiptMapper.selectList(
+            new LambdaQueryWrapper<Receipt>().eq(Receipt::getStatus, 1).select(Receipt::getCustomerId, Receipt::getReceiptDate));
+        for (Receipt r : allReceipts) {
+            if (r.getReceiptDate() != null) {
+                keys.add(r.getCustomerId() + "_" + r.getReceiptDate().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM")));
+            }
+        }
+        // 再从发货单补充
+        List<Shipment> allShipments = shipmentMapper.selectList(
+            new LambdaQueryWrapper<Shipment>().eq(Shipment::getStatus, 1).select(Shipment::getCustomerId, Shipment::getShipmentDate));
+        for (Shipment s : allShipments) {
+            if (s.getShipmentDate() != null) {
+                keys.add(s.getCustomerId() + "_" + s.getShipmentDate().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM")));
+            }
+        }
+
+        for (String key : keys) {
+            String[] parts = key.split("_");
+            Long customerId = Long.valueOf(parts[0]);
+            String month = parts[1];
+            // 跳过已存在的
+            if (count(new LambdaQueryWrapper<Statement>()
+                    .eq(Statement::getCustomerId, customerId)
+                    .eq(Statement::getStatementMonth, month)) > 0) {
+                skip++;
+                continue;
+            }
+            try {
+                generate(customerId, month);
+                success++;
+            } catch (Exception e) {
+                fail++;
+                errors.add(key + ": " + e.getMessage());
+            }
+        }
+
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        result.put("success", success);
+        result.put("skip", skip);
+        result.put("fail", fail);
+        result.put("errors", errors);
+        return result;
     }
 }

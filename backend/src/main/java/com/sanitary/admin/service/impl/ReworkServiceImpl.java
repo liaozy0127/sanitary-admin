@@ -39,7 +39,7 @@ public class ReworkServiceImpl extends ServiceImpl<ReworkMapper, Rework> impleme
         if (StringUtils.hasText(reworkStatus)) {
             wrapper.eq(Rework::getReworkStatus, reworkStatus);
         }
-        wrapper.orderByDesc(Rework::getCreateTime);
+        wrapper.orderByDesc(Rework::getReworkDate).orderByDesc(Rework::getId);
         return page(new Page<>(page, size), wrapper);
     }
 

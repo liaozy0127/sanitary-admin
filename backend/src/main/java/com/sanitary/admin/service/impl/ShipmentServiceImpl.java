@@ -60,7 +60,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
         if (StringUtils.hasText(endDate)) {
             wrapper.le(Shipment::getShipmentDate, LocalDate.parse(endDate));
         }
-        wrapper.orderByDesc(Shipment::getCreateTime);
+        wrapper.orderByDesc(Shipment::getShipmentDate).orderByDesc(Shipment::getId);
         return page(new Page<>(page, size), wrapper);
     }
 

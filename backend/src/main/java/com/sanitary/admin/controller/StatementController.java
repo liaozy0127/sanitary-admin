@@ -38,6 +38,12 @@ public class StatementController {
         return Result.success(statementService.generate(customerId, statementMonth));
     }
 
+    /** 批量初始化：根据所有收发货数据生成对账单 */
+    @PostMapping("/generate-all")
+    public Result<Map<String, Object>> generateAll() {
+        return Result.success(statementService.generateAll());
+    }
+
     @PostMapping("/import")
     public Result<java.util.Map<String, Object>> importExcel(
             @RequestParam("file") org.springframework.web.multipart.MultipartFile file,

@@ -242,7 +242,7 @@ print(f'成功: {d["success"]}, 跳过: {d["skip"]}, 失败: {d["fail"]}')
 EOF
 ```
 
-预期：成功约 2955 张发货单。
+预期：成功约 2536 张发货单（FG- 前缀行为非发货数据，自动跳过约 2704 行）。
 
 ### 5.6 第六步：导入收款单
 
@@ -270,6 +270,8 @@ EOF
 
 收货单和发货单导入时不触发库存更新（历史模式），需在所有单据导入完成后手动重建：
 
+> **注意**：重建库存前须确保收货单和发货单全部导入完成，否则库存数量会偏少。
+
 ```bash
 python3 << 'EOF'
 import requests, warnings
@@ -287,6 +289,30 @@ EOF
 ```
 
 预期：生成约 3667 条库存记录，其中正库存约 988 条。
+
+### 5.8 第八步：批量初始化对账单
+
+库存重建完成后，根据所有收发货数据批量生成历史对账单：
+
+```bash
+python3 << 'EOF'
+import requests, warnings
+warnings.filterwarnings('ignore')
+
+token = requests.post('http://localhost:8080/api/auth/login',
+    json={'username':'admin','password':'admin123'}).json()['data']['token']
+headers = {'Authorization': f'Bearer {token}'}
+
+print('批量生成对账单...')
+r = requests.post('http://localhost:8080/api/statements/generate-all', headers=headers, timeout=300)
+d = r.json()['data']
+print(f'生成: {d["success"]} 条，跳过: {d["skip"]} 条（已存在），失败: {d["fail"]} 条')
+if d.get('errors'):
+    print('错误(前3):', d['errors'][:3])
+EOF
+```
+
+预期：生成约数百条对账单（按客户×月份汇总）。已存在的对账单自动跳过，接口幂等可重复执行。
 
 ---
 
@@ -310,6 +336,7 @@ checks = [
     ('发货单', 'http://localhost:8080/api/shipments?page=1&size=1'),
     ('收款单', 'http://localhost:8080/api/payments?page=1&size=1'),
     ('库存',   'http://localhost:8080/api/inventory?page=1&size=1'),
+    ('对账单', 'http://localhost:8080/api/statements?page=1&size=1'),
 ]
 
 print('=== 数据验证 ===')
@@ -328,9 +355,10 @@ EOF
 | 物料 | ~23,971 |
 | 收货单 | ~2,260 |
 | 排产单 | ~1,232 |
-| 发货单 | ~2,955 |
+| 发货单 | ~2,536 |
 | 收款单 | ~380 |
 | 库存（quantity>0） | ~988 |
+| 对账单 | 按客户×月份自动汇总 |
 
 ---
 
@@ -413,13 +441,17 @@ curl -s -X POST http://localhost:8080/api/inventory/rebuild \
 | `init.sql` 缺少明细表 | 历史遗留，init.sql 未跟随代码更新 | ✅ 已修复 |
 | 发货单发货类型全为"返工" | 导入时将列9（收货来源：正常/返工）直接存入 shipmentType，而前端期望"良品/不良品" | ✅ 已修复 |
 | 导入历史数据后库存为零 | 历史导入绕过业务层，不触发库存更新 | ✅ 已修复（增加 `/rebuild` 接口） |
+| 发货单数量/单价精度丢失 | `getCellString` 使用 `(long)` 强转截断小数，导致数量取整、单价精度丢失 | ✅ 已修复（改用 `BigDecimal` 读取） |
+| 发货单结构调整 | 移除 `shipmentType`/`customerOrderNo` 字段，新增 `defectiveQty`（不良品数量）/ `operator`（操作员）字段 | ✅ 已完成重设计 |
 
 ### 8.2 导入说明
 
 - **幂等性**：所有导入接口均检查单号是否已存在，重复执行只会跳过，不会产生重复数据。
 - **最后一行失败**：收货单、发货单、收款单各有 1 条失败，原因是 XLS 最后一行日期为空，属正常现象，可忽略。
+- **发货单 FG- 前缀行跳过**：发货单 XLS 中 FG- 开头的行为物料存档行（非发货数据），导入时自动跳过，约 2704 行；实际导入约 2536 张发货单。
 - **负库存**：历史数据中有 742 条库存为负，原因是老系统部分收货记录不完整（发货量大于记录的收货量），属历史数据本身的问题。
 - **物料导入 `已加载 1 个客户映射`**：import_data.py 中客户映射接口返回分页数据，脚本只取了第一页，客户名称 → ID 映射不完整。实际不影响物料导入成功，因为物料自带 `customerName` 字段，系统在导入收货/发货时会按名称自动匹配客户 ID。
+- **对账单批量生成**：通过"对账单 → 批量初始化"按钮或调用 `POST /api/statements/generate-all` 接口，将自动遍历所有收发货数据聚合出客户×月份组合，逐一生成对账单汇总，已存在的月份自动跳过。
 
 ### 8.3 XLS 文件说明
 
@@ -491,6 +523,10 @@ for name, path, param in [
 print('重建库存...')
 r = requests.post(f'{BASE}/api/inventory/rebuild', headers=h, timeout=60).json()['data']
 print(f'库存记录: {r["inventoryRecords"]} 条')
+
+print('批量生成对账单...')
+r = requests.post(f'{BASE}/api/statements/generate-all', headers=h, timeout=300).json()['data']
+print(f'对账单: 生成 {r["success"]} 条，跳过 {r["skip"]} 条，失败 {r["fail"]} 条')
 print('=== 部署完成 ===')
 PYEOF
 ```
