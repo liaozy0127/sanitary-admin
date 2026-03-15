@@ -339,7 +339,7 @@ sanitary-admin 是一个面向卫浴/五金电镀加工厂的**生产管理系�
 | 单据 | 触发动作 | 库存变化 |
 |------|---------|---------|
 | 收货单（正常模式）| 保存 | +quantity |
-| 发货单 | 保存 | -quantity |
+| 发货单 | 保存 | -quantity（含废品数量）|
 | 返工单完成 | 状态变更 | 视类型增减 |
 
 > ⚠️ **历史导入不触发库存**：导入时使用 `mode=history` 参数，跳过库存更新
@@ -347,14 +347,36 @@ sanitary-admin 是一个面向卫浴/五金电镀加工厂的**生产管理系�
 **接口**：
 - `GET /api/inventory` — 查询库存列表（支持 keyword、customerId 筛选）
 - `GET /api/inventory/log` — 查询库存流水
-- `POST /api/inventory/init-from-statement` — 从对账单导入初始化库存（**仅第一次执行**）
+- `POST /api/inventory/rebuild` — 全量重建库存（从所有收货单/发货单重新计算）
 
-**库存初始化规则（重要）**：
-- 接口 `POST /api/inventory/init-from-statement` 仅在系统**首次上线**时调用一次
-- 从对账单 Excel 读取「上月结余」（col3: 结余数量）作为初始库存写入 inventory 表
-- **若 inventory 表中已有数据，则拒绝执行**（防止重复初始化破坏现有库存）
-- 初始化后，收货单/排产单/对账单历史数据用 `mode=history` 导入，不再触发库存更新
-- 新增的收货/发货单正常触发库存更新
+**库存重建规则（`POST /api/inventory/rebuild`）**：
+- 清空 inventory 表，从收货单和发货单全量重新聚合计算
+- 聚合收货：按 `(material_id, customer_id, COALESCE(process_id,0))` 分组，`SUM(quantity)`，仅含 `status=1` 的已确认收货单
+- 聚合发货：按同维度分组，`SUM(quantity + COALESCE(defective_qty,0))`（良品+废品均扣库存），仅含 `status=1` 的已确认发货单
+- 最终库存 = 收货合计 - 发货合计
+- **每次重建结果应无负库存**（≤5条为历史数据录入误差，可接受）
+
+**期初库存补录（`scripts/init_opening_stock.py`）**：
+
+背景：老系统仅迁移了 2025 年及之后的收货/发货数据，但 2025 年初部分物料已有在途存量。若不补录期初库存，月度对账结余会出现负数。
+
+算法：对每个 `(material_id, customer_id, process_id)` 组合，按月累计计算累计缺口，取所有月份的最大值作为期初收货数量：
+```sql
+SELECT material_id, customer_id, process_id, CEIL(MAX(cum_deficit)) AS needed_init_qty
+FROM (
+  SELECT ..., SUM(ship_qty) OVER (... ORDER BY ym) - SUM(recv_qty) OVER (... ORDER BY ym) AS cum_deficit
+  ...
+) cumulative
+GROUP BY material_id, customer_id, process_id
+HAVING needed_init_qty > 0
+```
+
+执行结果：在 `receipt_date = 2024-12-31` 插入一批收货单，单号格式为 `RH-INIT-{customerId}`，共约 35 张，853 条明细。
+
+幂等性：
+- 收货单级别：已存在 `RH-INIT-{customerId}` 的收货单则直接复用其 id（不重复插入主单）
+- 明细级别：按 `(receipt_id, material_id, process_id)` 检查，已存在的明细行跳过
+- 可安全重复执行
 
 ---
 
@@ -373,21 +395,48 @@ sanitary-admin 是一个面向卫浴/五金电镀加工厂的**生产管理系�
 **明细表（statement_item）字段**：
 - 所属对账单 ID + 单号（冗余）
 - 物料（material_id/code/name）、工艺（process_id/name）
-- 上月结余数量（prev_balance_qty）—— **库存初始化来源**
+- 上月结余数量（prev_balance_qty）
 - 本月收货合计（receipt_qty）
-- 本月发货合计（shipment_qty）
+- 本月发货合计（shipment_qty）—— 良品 + 原件退回的总量
+- 原件退回数量（defective_qty）—— 发货中的废品/退回数量
 - 本月结余数量（curr_balance_qty）
-- 单价、发货合计金额
+- 单价（unit_price）
+- 良品金额（goods_amount）—— 良品数量 × 单价
+- 发货合计金额（shipment_amount）
 - 备注
 
 **接口**：
 - `GET /api/statements` — 分页查询
 - `GET /api/statements/{id}` — 获取详情（含 items 明细）
-- `POST /api/statements/generate` — 按月份+客户自动生成（汇总当月收货/发货，生成明细行）
+- `POST /api/statements/generate` — 按月份+客户自动生成（重新计算汇总和明细，**幂等：已存在则删旧明细重建**）
+- `POST /api/statements/generate-all` — 批量生成所有客户×月份的对账单（**跳过已存在的**，幂等可重复执行）
 - `PUT /api/statements/{id}/confirm` — 确认对账单
 - `DELETE /api/statements/{id}` — 删除（含明细）
 - `POST /api/statements/import` — **从老系统 Excel 导入历史对账单（含物料明细）**
 - `GET /api/statement-items?statementId=xxx` — 查询某单明细
+
+**对账单生成逻辑（`generate` 接口）**：
+
+1. 查询该客户该月所有 `status=1` 的收货单明细 `receipt_item`
+2. 查询该客户该月所有 `status=1` 的发货单明细 `shipment_item`
+3. 按 `(material_id, process_id)` 分组，为每组生成一行 `statement_item`：
+   - `receipt_qty` = `SUM(receipt_item.quantity)`
+   - `shipment_qty` = `SUM(shipment_item.quantity + defective_qty)`（良品+退回合计）
+   - `defective_qty` = `SUM(shipment_item.defective_qty)`
+   - `goods_amount` = `SUM(shipment_item.amount)`（良品金额）
+   - `shipment_amount` = `goods_amount`
+   - `unit_price` = 来自 receipt_item 或 shipment_item，fallback 到 material.default_price
+   - `prev_balance_qty` = 月初前（`< monthStart`）所有收货合计 − 所有发货合计（直接聚合历史数据，**不依赖上个月对账单的 curr_balance_qty**）
+   - `curr_balance_qty` = `prev_balance_qty + receipt_qty - shipment_qty`
+4. 主表汇总 = `SUM(明细行)`
+5. 若对账单已存在（customerId + statementMonth 唯一）：先软删除旧明细，再重建
+
+> ⚠️ **prevBalanceQty 计算方式**：直接聚合月初之前的全部历史收发数据，**不**依赖前月对账单链式传递，避免批量生成时因顺序问题导致结余出错。
+
+**业务约束（不可违背）**：
+- `curr_balance_qty` 必须 ≥ 0
+- `curr_balance_qty` = `prev_balance_qty + receipt_qty - shipment_qty`（等式必须成立）
+- 若出现负结余，说明期初库存未补录或数据录入有误
 
 **对账单 Excel 导入格式**（老系统，122行，前2行表头，单一客户）：
 | 列 | 含义 | 映射字段 |
@@ -395,15 +444,15 @@ sanitary-admin 是一个面向卫浴/五金电镀加工厂的**生产管理系�
 | A(0) | 产品代码 | material_code → 查 material_id |
 | B(1) | 产品名称 | material_name |
 | C(2) | 工艺要求 | process_name → 查 process_id |
-| D(3) | 上月结余数量 | prev_balance_qty（**库存初始化用**）|
+| D(3) | 上月结余数量 | prev_balance_qty |
 | E(4) | 本月收货（正常）| 忽略 |
 | F(5) | 本月收货合计 | receipt_qty |
 | G(6) | 本月发货（良品）| 忽略 |
-| H(7) | 本月发货（原件退回）| 忽略 |
+| H(7) | 本月发货（原件退回）| defective_qty |
 | I(8) | 本月发货合计 | shipment_qty |
 | J(9) | 本月结余数量 | curr_balance_qty |
 | K(10) | 单价 | unit_price |
-| L(11) | 良品金额 | 忽略 |
+| L(11) | 良品金额 | goods_amount |
 | M(12) | 合计金额 | shipment_amount |
 | N(13) | 备注 | remark |
 
@@ -411,7 +460,6 @@ sanitary-admin 是一个面向卫浴/五金电镀加工厂的**生产管理系�
 - `file`：Excel 文件
 - `customerId`：客户 ID（必填，因 Excel 无客户列）
 - `statementMonth`：对账月份 YYYY-MM（必填）
-- `initInventory`：是否初始化库存（默认 false，**仅在 inventory 表为空时生效，防重复**）
 
 > ⚠️ **导入幂等性**：按 customerId + statementMonth 去重，已存在则 skip 整单
 
@@ -473,10 +521,17 @@ sanitary-admin 是一个面向卫浴/五金电镀加工厂的**生产管理系�
 
 1. **物料与客户强关联**：同名物料属于不同客户时视为不同物料
 2. **库存三维唯一**：material_id + customer_id + process_id 组合唯一（processId=0 表示无工艺）
-3. **单号自动生成**：格式 `前缀+年月+4位流水号`，如 `SH202507-0001`
-4. **逻辑删除**：所有业务表均用 `deleted` 字段标记删除，不物理删除
+3. **单号自动生成**：格式 `前缀+年月(YYYYMM)+"-"+4位流水号`，如 `SH202507-0001`
+4. **逻辑删除**：所有业务表均用 `deleted` 字段标记删除，不物理删除；**查询时必须加 `deleted=0` 过滤**，否则会统计到已软删除的历史数据
 5. **时间字段**：create_time/update_time 由 MyBatis-Plus 自动填充
+6. **对账单结余约束**：
+   - `curr_balance_qty = prev_balance_qty + receipt_qty - shipment_qty`（等式必须成立）
+   - `curr_balance_qty ≥ 0`（本月结余不能为负）
+   - `shipment_qty ≤ prev_balance_qty + receipt_qty`（本月发货不超过可用库存）
+7. **发货含废品**：发货单中 `defective_qty` 代表原件退回数量，计入发货合计（扣库存），但不计入良品金额
+8. **期初库存必要性**：历史数据迁移时，若老系统 2025 年前已有在途库存，必须通过 `scripts/init_opening_stock.py` 补录期初收货（`RH-INIT-{customerId}`），否则对账单结余会出现负数
+9. **数据初始化顺序**：客户/工艺/物料 → 收货单(history) → 排产单(history) → 发货单(history) → 收款单 → **期初库存补录** → **重建库存** → **批量生成对账单**
 
 ---
 
-*文档版本：v1.2 | 最后更新：2026-03-08*
+*文档版本：v1.3 | 最后更新：2026-03-15*

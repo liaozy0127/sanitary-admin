@@ -216,8 +216,9 @@ shipment_item 明细表：
 | spec | VARCHAR(200) | 规格 |
 | process_id/name | | 工艺信息 |
 | shipment_type | VARCHAR(20) | 发货类型（良品/次品/返工品），默认"良品" |
-| quantity | DECIMAL(12,2) | 发货数量 |
-| unit_price/amount | | 单价/金额 |
+| quantity | DECIMAL(12,2) | 发货数量（良品）|
+| defective_qty | DECIMAL(12,2) | 废品/原件退回数量（计入发货合计扣库存，不计金额）|
+| unit_price/amount | | 单价/良品金额 |
 | customer_order_no | | 客户单号 |
 | detail_remark | | 明细备注 |
 
@@ -289,11 +290,13 @@ shipment_item 明细表：
 | material_name | VARCHAR(200) | 物料名称（冗余）|
 | process_id | BIGINT | 工艺 ID |
 | process_name | VARCHAR(100) | 工艺名称（冗余）|
-| prev_balance_qty | DECIMAL(12,2) | 上月结余数量（col3，库存初始化用）|
+| prev_balance_qty | DECIMAL(12,2) | 上月结余数量（col3）|
 | receipt_qty | DECIMAL(12,2) | 本月收货合计（col5）|
-| shipment_qty | DECIMAL(12,2) | 本月发货合计（col8）|
+| shipment_qty | DECIMAL(12,2) | 本月发货合计（col8，良品+退回）|
+| defective_qty | DECIMAL(12,2) | 原件退回数量（col7）|
 | curr_balance_qty | DECIMAL(12,2) | 本月结余数量（col9）|
 | unit_price | DECIMAL(10,4) | 单价（col10）|
+| goods_amount | DECIMAL(12,2) | 良品金额（col11）|
 | shipment_amount | DECIMAL(12,2) | 发货合计金额（col12）|
 | remark | VARCHAR(500) | 备注（col13）|
 | deleted | TINYINT | 逻辑删除 |
@@ -302,11 +305,13 @@ shipment_item 明细表：
 
 > **老系统 Excel 列映射**（用于 `POST /api/statements/import`）：
 > - col0: 产品代码，col1: 产品名称，col2: 工艺要求
-> - col3: 上月结余 → `prev_balance_qty`（库存初始化用）
+> - col3: 上月结余 → `prev_balance_qty`
 > - col5: 本月收货合计 → `receipt_qty`
+> - col7: 本月发货（原件退回）→ `defective_qty`
 > - col8: 本月发货合计 → `shipment_qty`
 > - col9: 本月结余 → `curr_balance_qty`
 > - col10: 单价 → `unit_price`
+> - col11: 良品金额 → `goods_amount`
 > - col12: 合计金额 → `shipment_amount`
 > - col13: 备注 → `remark`
 >
@@ -426,6 +431,10 @@ for (Receipt r : list) {
 | 发货单 | FH | FH202507-0001 |
 | 返工单 | FG | FG202507-0001 |
 | 收款单 | SK | SK202507-0001 |
+| 对账单 | DZ | DZ202507-0001 |
+| 期初收货单 | RH-INIT | RH-INIT-{customerId}（固定格式，非流水）|
+
+> ⚠️ **`GenerateNoUtil` LIKE 查询**：对账单流水号查询使用 `DZ + YYYYMM`（6位年月）构建 LIKE 模式，`LIKE 'DZ______%'`（6个下划线）。历史 Bug：曾错误使用 8 个下划线导致流水号重复冲突，已修复。
 
 ---
 
@@ -559,19 +568,78 @@ ReceiptServiceImpl.importExcel()
   9. mode=history：不触发库存更新
 ```
 
-### 5.3 库存初始化流程（上线一次性操作）
+### 5.3 期初库存补录流程（历史数据迁移时执行）
 
 ```
-1. 准备对账单 Excel（包含「上月结余」col3列）
-2. POST /api/inventory/init-from-statement（传入 Excel 文件）
-   ├── 若 inventory 表已有数据 → 拒绝执行，返回错误（防止重复初始化）
-   ├── 按物料代码(col0)+工艺(col2) 查找 material_id 和 process_id
-   └── 写入 inventory 表（quantity = 上月结余数量）
-3. 之后收货单/排产单/对账单历史数据用 mode=history 导入，不影响库存
-4. 新增的收货/发货单正常触发库存更新
+背景：老系统仅迁移 2025 年及之后数据，但 2025 年初已有在途库存。
+若不补录，月度对账结余会出现负数。
 
-注意：对账单导入（POST /api/statements/import）和库存初始化是两个独立接口，
-互不触发。历史对账单数据导入不影响库存。
+1. 确保收货单、发货单已全部导入（mode=history）
+2. python3 scripts/init_opening_stock.py
+   ├── SQL 窗口函数计算每个 (material_id, customer_id, process_id) 组合
+   │   在所有月份中的最大累计缺口：MAX(SUM(ship) - SUM(recv) OVER 月份累计)
+   ├── 向上取整后作为 2024-12-31 期初收货数量
+   ├── 按客户分组，插入收货单 receipt（单号 RH-INIT-{customerId}）
+   └── 插入收货明细 receipt_item，status=1，receipt_date='2024-12-31'
+   幂等：已存在 RH-INIT-{customerId} 则复用其 id；
+         已存在相同 (material_id, process_id) 明细行则跳过
+
+3. 执行后必须重建库存（见 5.4）
+```
+
+### 5.4 库存重建流程（`POST /api/inventory/rebuild`）
+
+```
+1. 清空 inventory 表（DELETE ALL）
+2. aggregateReceiptQty()：
+   SELECT material_id, customer_id, COALESCE(process_id,0), SUM(quantity)
+   FROM receipt_item JOIN receipt
+   WHERE deleted=0 AND status=1
+   GROUP BY (material_id, customer_id, COALESCE(process_id,0))
+   -- 字符串维度字段用 MAX() 取一个值（不参与 GROUP BY）
+
+3. aggregateShipmentQty()：
+   SELECT material_id, customer_id, COALESCE(process_id,0),
+          SUM(quantity + COALESCE(defective_qty,0))   -- 良品+退回均扣库存
+   FROM shipment_item JOIN shipment
+   WHERE deleted=0 AND status=1
+   GROUP BY (material_id, customer_id, COALESCE(process_id,0))
+
+4. 合并两个 Map：inventory.quantity = receipt_qty - ship_qty
+5. 批量 INSERT inventory（upsert）
+6. 返回统计：receiptGroups / shipmentGroups / inventoryRecords
+
+注意：重建后负库存 ≤ 5 条（历史数据录入误差，非系统问题）
+```
+
+### 5.5 对账单生成流程（`POST /api/statements/generate`）
+
+```
+入参：customerId, statementMonth (YYYY-MM)
+
+1. 查询该月 [monthStart, monthEnd] 内该客户所有 receipt_item（status=1, deleted=0）
+2. 查询该月内该客户所有 shipment_item（status=1, deleted=0）
+3. buildAndSaveItems(stmt, customerId, ym, receiptItems, shipmentItems):
+   a. 按 (materialId + "_" + processId) 分组
+   b. 计算 prevBalanceQty：
+      查 receipt_date < monthStart 的所有收货合计
+      减去 shipment_date < monthStart 的所有发货合计（含 defective_qty）
+      -- 注意：直接聚合历史数据，不依赖上月对账单的 curr_balance_qty
+   c. 每组生成 StatementItem：
+      receipt_qty   = SUM(receipt_item.quantity)
+      shipment_qty  = SUM(ship.quantity + ship.defective_qty)
+      defective_qty = SUM(ship.defective_qty)
+      goods_amount  = SUM(ship.amount)
+      shipment_amount = goods_amount
+      curr_balance_qty = prevBalance + receipt_qty - shipment_qty
+   d. 批量 INSERT statement_item
+
+4. 若对账单已存在：
+   ├── statementItemService.deleteByStatementId(existing.id)  -- 软删旧明细
+   └── 重新执行 buildAndSaveItems（保证等式成立、结余 ≥ 0）
+
+5. generate-all：遍历所有收发货记录聚合出客户×月份组合，
+   对每个组合调用 generate()；已存在的**跳过**（不重建）
 ```
 
 ---
@@ -583,12 +651,17 @@ ReceiptServiceImpl.importExcel()
 | 返工单改造为主从表（rework + rework_item）| 高 | ✅ 已完成（2026-03-08）|
 | 对账单历史数据导入接口（POST /api/statements/import）| 高 | ✅ 已完成（2026-03-08）|
 | 对账单改造为主从表（statement + statement_item）| 高 | ✅ 已完成（2026-03-08）|
-| 库存初始化防重复执行（已有数据时拒绝）| 高 | ✅ 已实现（initInventory 参数 + 数量判断）|
 | 对账单前端展示物料明细（展开行）| 高 | ✅ 已完成（2026-03-08）|
 | 物料下拉改为远程搜索（默认100条+关键词过滤）| 高 | ✅ 已完成（2026-03-08）|
 | 选物料自动带出单价+工艺（查最近收货单）| 高 | ✅ 已完成（2026-03-08）|
 | 收货单明细未设价标红提醒 | 中 | ✅ 已完成（2026-03-08）|
 | 收货单导入自动回填物料 default_price | 中 | ✅ 已完成（2026-03-08）|
+| 对账单流水号 LIKE 模式 8个下划线导致重复冲突 | 高 | ✅ 已修复（改为6个下划线，2026-03-15）|
+| 对账单 prevBalanceQty 依赖上月链式传递导致批量生成错误 | 高 | ✅ 已修复（改为直接聚合历史数据，2026-03-15）|
+| statement_item 缺少 defective_qty / goods_amount 字段 | 高 | ✅ 已修复（新增列并更新导入/生成逻辑，2026-03-15）|
+| 期初库存未补录导致对账单结余为负 | 高 | ✅ 已修复（新增 scripts/init_opening_stock.py，2026-03-15）|
+| inventory 重建 aggregateReceiptQty GROUP BY 含字符串字段导致同 key 多行覆盖 | 高 | ✅ 已修复（GROUP BY 只含3个 key 字段，字符串用 MAX()，2026-03-15）|
+| inventory 重建 aggregateShipmentQty 未计 defective_qty 且缺 status=1 过滤 | 高 | ✅ 已修复（SUM(qty+defective_qty) + status=1，2026-03-15）|
 | 收货单分批上传（前端按3000行拆分）| 中 | 待开发 |
 | inventory 查询接口带 keyword 参数时返回 400 | 中 | 待修复 |
 
@@ -611,7 +684,10 @@ ReceiptServiceImpl.importExcel()
 11. **el-select remote 模式**：模板引用 `materialList` 改为 `row._matOptions` 后，`onItemMaterialChange` 也要从 `row._matOptions` 里查，否则找不到选中的物料信息
 12. **驼峰命名与 DB 列名不一致**：字段名含连续大写（如 `wareHousedQty`）MyBatis-Plus 转下划线为 `ware_housed_qty`，与实际列名 `warehoused_qty` 不符，需显式 `@TableField("warehoused_qty")`
 13. **单价回填 Excel 日期污染**：导入 Excel 时日期值会被读为数字（如 43673），需加 `unitPrice ≤ 10000` 上限过滤
+14. **MySQL -N -B 空字符串列**：`docker exec ... mysql -N -B` 输出 tab 分隔行时，空字符串列不会输出 tab，导致 `split('\t')` 返回列数比预期少。Python 脚本中用 `IF(col IS NULL OR col='','',col)` 输出占位，并用 `len(row) >= N` 做防御性检查
+15. **逻辑删除查询**：MyBatis-Plus `@TableLogic` 会自动在 ORM 查询加 `deleted=0`，但**原生 SQL（@Select 注解或 mapper XML）必须手动加 `AND deleted=0`**，否则会统计到已软删除记录，导致统计值偏大或出现"负库存"假象
+16. **generate-all vs generate 幂等差异**：`generate-all` 遇到已存在的对账单会**跳过**；单个 `generate` 会**删旧明细重建**。需要强制更新某月对账单时，必须调用单个 `generate` 接口
 
 ---
 
-*文档版本：v1.2 | 最后更新：2026-03-08*
+*文档版本：v1.3 | 最后更新：2026-03-15*
