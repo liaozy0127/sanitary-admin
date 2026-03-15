@@ -263,10 +263,10 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                     item.setMaterialName(getCellString(row, 4));
                     item.setSpec(getCellString(row, 5));
                     item.setProcessName(getCellString(row, 6));
-                    item.setQuantity(parseBigDecimal(getCellString(row, 7)));    // 列7=良品数量（实际发货量）
-                    item.setDefectiveQty(parseBigDecimal(getCellString(row, 8))); // 列8=废品数量
-                    item.setUnitPrice(parseBigDecimal(getCellString(row, 10)));  // 列10=良品单价
-                    item.setAmount(parseBigDecimal(getCellString(row, 11)));     // 列11=良品金额（已算好）
+                    item.setQuantity(parseQty(getCellString(row, 7)));    // 列7=良品数量（实际发货量）
+                    item.setDefectiveQty(parseQty(getCellString(row, 8))); // 列8=废品数量
+                    item.setUnitPrice(parsePrice(getCellString(row, 10)));  // 列10=良品单价
+                    item.setAmount(parsePrice(getCellString(row, 11)));     // 列11=良品金额（已算好）
                     item.setDetailRemark(getCellString(row, 16));
 
                     if (StringUtils.hasText(item.getMaterialName())) {
@@ -326,14 +326,28 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
             case STRING -> cell.getStringCellValue().trim();
             case NUMERIC -> DateUtil.isCellDateFormatted(cell)
                 ? cell.getLocalDateTimeCellValue().toLocalDate().toString()
-                : String.valueOf((long) cell.getNumericCellValue());
+                : new BigDecimal(cell.getNumericCellValue()).stripTrailingZeros().toPlainString();
             case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
             case FORMULA -> {
-                try { yield String.valueOf((long) cell.getNumericCellValue()); }
+                try { yield new BigDecimal(cell.getNumericCellValue()).stripTrailingZeros().toPlainString(); }
                 catch (Exception e) { yield cell.getStringCellValue().trim(); }
             }
             default -> "";
         };
+    }
+
+    /** 解析整数数量（四舍五入取整） */
+    private BigDecimal parseQty(String s) {
+        if (s == null || s.trim().isEmpty()) return BigDecimal.ZERO;
+        try { return new BigDecimal(s.trim()).setScale(0, java.math.RoundingMode.HALF_UP); }
+        catch (Exception e) { return BigDecimal.ZERO; }
+    }
+
+    /** 解析单价/金额（保留2位小数） */
+    private BigDecimal parsePrice(String s) {
+        if (s == null || s.trim().isEmpty()) return BigDecimal.ZERO;
+        try { return new BigDecimal(s.trim()).setScale(2, java.math.RoundingMode.HALF_UP); }
+        catch (Exception e) { return BigDecimal.ZERO; }
     }
 
     private LocalDate parseExcelDate(String value) {

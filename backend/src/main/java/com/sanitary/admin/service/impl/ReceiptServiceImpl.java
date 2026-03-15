@@ -265,15 +265,15 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
                     item.setSpec(getCellString(row, 5));
                     item.setProcessName(getCellString(row, 6));
                     item.setReceiptSource(getCellString(row, 7));
-                    item.setQuantity(parseBigDecimal(getCellString(row, 8)));
-                    item.setShippedQty(parseBigDecimal(getCellString(row, 9)));
-                    item.setUnshippedQty(parseBigDecimal(getCellString(row, 10)));
-                    item.setUnitPrice(parseBigDecimal(getCellString(row, 11)));
+                    item.setQuantity(parseQty(getCellString(row, 8)));
+                    item.setShippedQty(parseQty(getCellString(row, 9)));
+                    item.setUnshippedQty(parseQty(getCellString(row, 10)));
+                    item.setUnitPrice(parsePrice(getCellString(row, 11)));
                     item.setCustomerOrderNo(getCellString(row, 12));
                     item.setDetailRemark(getCellString(row, 14));
-                    item.setPlannedQty(parseBigDecimal(getCellString(row, 15)));
-                    item.setWareHousedQty(parseBigDecimal(getCellString(row, 16)));
-                    item.setUnwareHousedQty(parseBigDecimal(getCellString(row, 18)));
+                    item.setPlannedQty(parseQty(getCellString(row, 15)));
+                    item.setWareHousedQty(parseQty(getCellString(row, 16)));
+                    item.setUnwareHousedQty(parseQty(getCellString(row, 18)));
 
                     if (item.getUnitPrice() != null && item.getQuantity() != null) {
                         item.setAmount(item.getQuantity().multiply(item.getUnitPrice()));
@@ -373,14 +373,28 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
             case STRING -> cell.getStringCellValue().trim();
             case NUMERIC -> DateUtil.isCellDateFormatted(cell)
                 ? cell.getLocalDateTimeCellValue().toLocalDate().toString()
-                : String.valueOf((long) cell.getNumericCellValue());
+                : new BigDecimal(cell.getNumericCellValue()).stripTrailingZeros().toPlainString();
             case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
             case FORMULA -> {
-                try { yield String.valueOf((long) cell.getNumericCellValue()); }
+                try { yield new BigDecimal(cell.getNumericCellValue()).stripTrailingZeros().toPlainString(); }
                 catch (Exception e) { yield cell.getStringCellValue().trim(); }
             }
             default -> "";
         };
+    }
+
+    /** 解析整数数量（四舍五入取整） */
+    private BigDecimal parseQty(String s) {
+        if (s == null || s.trim().isEmpty()) return BigDecimal.ZERO;
+        try { return new BigDecimal(s.trim()).setScale(0, java.math.RoundingMode.HALF_UP); }
+        catch (Exception e) { return BigDecimal.ZERO; }
+    }
+
+    /** 解析单价/金额（保留2位小数） */
+    private BigDecimal parsePrice(String s) {
+        if (s == null || s.trim().isEmpty()) return BigDecimal.ZERO;
+        try { return new BigDecimal(s.trim()).setScale(2, java.math.RoundingMode.HALF_UP); }
+        catch (Exception e) { return BigDecimal.ZERO; }
     }
 
     private LocalDate parseExcelDate(String value) {

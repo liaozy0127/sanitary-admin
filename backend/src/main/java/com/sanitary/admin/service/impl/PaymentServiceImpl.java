@@ -96,7 +96,7 @@ public class PaymentServiceImpl extends ServiceImpl<PaymentMapper, Payment> impl
                     payment.setPaymentDate(parseExcelDate(getCellString(row, 3)));
                     payment.setCustomerId(customerId);
                     payment.setCustomerName(customerName);
-                    payment.setAmount(parseBigDecimal(getCellString(row, 8)));
+                    payment.setAmount(parsePrice(getCellString(row, 8)));
                     payment.setPaymentMethod(getCellString(row, 2));
                     payment.setReferenceNo(getCellString(row, 9));
                     payment.setRemark(getCellString(row, 12));
@@ -127,14 +127,20 @@ public class PaymentServiceImpl extends ServiceImpl<PaymentMapper, Payment> impl
             case STRING -> cell.getStringCellValue().trim();
             case NUMERIC -> DateUtil.isCellDateFormatted(cell)
                 ? cell.getLocalDateTimeCellValue().toLocalDate().toString()
-                : String.valueOf((long) cell.getNumericCellValue());
+                : new BigDecimal(cell.getNumericCellValue()).stripTrailingZeros().toPlainString();
             case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
             case FORMULA -> {
-                try { yield String.valueOf((long) cell.getNumericCellValue()); }
+                try { yield new BigDecimal(cell.getNumericCellValue()).stripTrailingZeros().toPlainString(); }
                 catch (Exception e) { yield cell.getStringCellValue().trim(); }
             }
             default -> "";
         };
+    }
+
+    private BigDecimal parsePrice(String s) {
+        if (s == null || s.trim().isEmpty()) return BigDecimal.ZERO;
+        try { return new BigDecimal(s.trim()).setScale(2, java.math.RoundingMode.HALF_UP); }
+        catch (Exception e) { return BigDecimal.ZERO; }
     }
 
     private LocalDate parseExcelDate(String value) {

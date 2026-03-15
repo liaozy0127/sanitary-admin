@@ -140,31 +140,31 @@
           </el-table-column>
           <el-table-column label="排产数量" width="100">
             <template #default="{ row }">
-              <el-input-number v-model="row.plannedQty" :min="0" :precision="2" size="small" style="width:100%"
+              <el-input-number v-model="row.plannedQty" :min="0" :precision="0" size="small" style="width:100%"
                 controls-position="right" />
             </template>
           </el-table-column>
           <el-table-column label="入库数量" width="100">
             <template #default="{ row }">
-              <el-input-number v-model="row.actualQty" :min="0" :precision="2" size="small" style="width:100%"
+              <el-input-number v-model="row.actualQty" :min="0" :precision="0" size="small" style="width:100%"
                 controls-position="right" />
             </template>
           </el-table-column>
           <el-table-column label="未入库" width="80">
             <template #default="{ row }">
-              <el-input-number v-model="row.unwareHousedQty" :min="0" :precision="2" size="small" style="width:100%"
+              <el-input-number v-model="row.unwareHousedQty" :min="0" :precision="0" size="small" style="width:100%"
                 controls-position="right" />
             </template>
           </el-table-column>
           <el-table-column label="委外单价" width="90">
             <template #default="{ row }">
-              <el-input-number v-model="row.outsourcePrice" :min="0" :precision="4" size="small" style="width:100%"
+              <el-input-number v-model="row.outsourcePrice" :min="0" :precision="2" size="small" style="width:100%"
                 controls-position="right" />
             </template>
           </el-table-column>
           <el-table-column label="电镀单价" width="90">
             <template #default="{ row }">
-              <el-input-number v-model="row.platingPrice" :min="0" :precision="4" size="small" style="width:100%"
+              <el-input-number v-model="row.platingPrice" :min="0" :precision="2" size="small" style="width:100%"
                 controls-position="right" />
             </template>
           </el-table-column>

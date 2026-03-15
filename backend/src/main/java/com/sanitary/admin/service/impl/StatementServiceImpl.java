@@ -185,12 +185,12 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                 item.setMaterialCode(col0);
                 item.setMaterialName(getCellString(row, 1));
                 item.setProcessName(getCellString(row, 2));
-                item.setPrevBalanceQty(parseBigDecimal(getCellString(row, 3)));
-                item.setReceiptQty(parseBigDecimal(getCellString(row, 5)));
-                item.setShipmentQty(parseBigDecimal(getCellString(row, 8)));
-                item.setCurrBalanceQty(parseBigDecimal(getCellString(row, 9)));
-                item.setUnitPrice(parseBigDecimal(getCellString(row, 10)));
-                item.setShipmentAmount(parseBigDecimal(getCellString(row, 12)));
+                item.setPrevBalanceQty(parseQty(getCellString(row, 3)));
+                item.setReceiptQty(parseQty(getCellString(row, 5)));
+                item.setShipmentQty(parseQty(getCellString(row, 8)));
+                item.setCurrBalanceQty(parseQty(getCellString(row, 9)));
+                item.setUnitPrice(parsePrice(getCellString(row, 10)));
+                item.setShipmentAmount(parsePrice(getCellString(row, 12)));
                 item.setRemark(getCellString(row, 13));
 
                 // 查 material_id
@@ -301,14 +301,26 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
             case STRING -> cell.getStringCellValue().trim();
             case NUMERIC -> DateUtil.isCellDateFormatted(cell)
                 ? cell.getLocalDateTimeCellValue().toLocalDate().toString()
-                : String.valueOf((long) cell.getNumericCellValue());
+                : new java.math.BigDecimal(cell.getNumericCellValue()).stripTrailingZeros().toPlainString();
             case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
             case FORMULA -> {
-                try { yield String.valueOf((long) cell.getNumericCellValue()); }
+                try { yield new java.math.BigDecimal(cell.getNumericCellValue()).stripTrailingZeros().toPlainString(); }
                 catch (Exception e) { yield cell.getStringCellValue().trim(); }
             }
             default -> "";
         };
+    }
+
+    private java.math.BigDecimal parseQty(String s) {
+        if (s == null || s.trim().isEmpty()) return java.math.BigDecimal.ZERO;
+        try { return new java.math.BigDecimal(s.trim()).setScale(0, java.math.RoundingMode.HALF_UP); }
+        catch (Exception e) { return java.math.BigDecimal.ZERO; }
+    }
+
+    private java.math.BigDecimal parsePrice(String s) {
+        if (s == null || s.trim().isEmpty()) return java.math.BigDecimal.ZERO;
+        try { return new java.math.BigDecimal(s.trim()).setScale(2, java.math.RoundingMode.HALF_UP); }
+        catch (Exception e) { return java.math.BigDecimal.ZERO; }
     }
 
     private java.math.BigDecimal parseBigDecimal(String s) {
