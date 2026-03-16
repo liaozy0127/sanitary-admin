@@ -413,6 +413,16 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
             dimMap.put(materialId + "_" + customerId + "_" + processId, row);
         }
 
+        // 加载发货聚合，用于取最后发货时间
+        List<Map<String, Object>> shipmentAggs = this.baseMapper.aggregateShipmentQty();
+        java.util.HashMap<String, Map<String, Object>> shipDimMap = new java.util.HashMap<>();
+        for (Map<String, Object> row : shipmentAggs) {
+            Long materialId = toLong(row.get("material_id"));
+            Long customerId = toLong(row.get("customer_id"));
+            Long processId = toLong(row.get("process_id"));
+            shipDimMap.put(materialId + "_" + customerId + "_" + processId, row);
+        }
+
         int saved = 0;
         for (Map.Entry<String, BigDecimal> entry : runningQty.entrySet()) {
             String key = entry.getKey();
@@ -437,7 +447,20 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
                 inv.setCustomerName(str(dim.get("customer_name")));
                 inv.setSpec(str(dim.get("spec")));
                 inv.setProcessName(str(dim.get("process_name")));
-                inv.setLastReceiveTime(LocalDateTime.now());
+                // 使用实际最后收货日期而非今日
+                LocalDate lastRecvDate = toLocalDate(dim.get("last_receive_date"));
+                if (lastRecvDate != null) {
+                    inv.setLastReceiveTime(lastRecvDate.atStartOfDay());
+                }
+            }
+
+            // 设置最后发货时间
+            Map<String, Object> shipDim = shipDimMap.get(key);
+            if (shipDim != null) {
+                LocalDate lastShipDate = toLocalDate(shipDim.get("last_ship_date"));
+                if (lastShipDate != null) {
+                    inv.setLastShipTime(lastShipDate.atStartOfDay());
+                }
             }
 
             this.save(inv);
