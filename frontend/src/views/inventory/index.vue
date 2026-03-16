@@ -24,7 +24,7 @@
           <span>库存查询</span>
           <div>
             <el-tag type="success" style="margin-right:8px">持久化库存，收发货实时更新</el-tag>
-            <el-button size="small" :icon="Document" @click="showLog = !showLog">
+            <el-button size="small" :icon="Document" @click="toggleLog">
               {{ showLog ? '隐藏流水' : '查看流水' }}
             </el-button>
           </div>
@@ -164,6 +164,14 @@ const fetchLog = async () => {
 const loadCustomers = async () => {
   const res = await getCustomerAll()
   customerList.value = res.data || []
+}
+
+const toggleLog = () => {
+  showLog.value = !showLog.value
+  if (showLog.value) {
+    logPagination.page = 1
+    fetchLog()
+  }
 }
 
 const resetSearch = () => {
