@@ -73,6 +73,10 @@
             <el-icon><Upload /></el-icon>
             <template #title>发货管理</template>
           </el-menu-item>
+          <el-menu-item index="/inventory">
+            <el-icon><Box /></el-icon>
+            <template #title>库存查询</template>
+          </el-menu-item>
         </el-sub-menu>
 
         <!-- 财务管理 -->
@@ -88,22 +92,6 @@
           <el-menu-item index="/statement">
             <el-icon><Document /></el-icon>
             <template #title>对账单</template>
-          </el-menu-item>
-        </el-sub-menu>
-
-        <!-- 库存报表 -->
-        <el-sub-menu index="stock">
-          <template #title>
-            <el-icon><DataAnalysis /></el-icon>
-            <span>库存报表</span>
-          </template>
-          <el-menu-item index="/inventory">
-            <el-icon><Box /></el-icon>
-            <template #title>库存查询</template>
-          </el-menu-item>
-          <el-menu-item index="/report">
-            <el-icon><TrendCharts /></el-icon>
-            <template #title>月度报表</template>
           </el-menu-item>
         </el-sub-menu>
       </el-menu>
@@ -149,7 +137,7 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import {
   User, Fold, Expand, ArrowDown, OfficeBuilding, UserFilled, Menu,
   Setting, Files, Operation, Box, SetUp, Download, Upload,
-  Money, Wallet, Document, DataAnalysis, TrendCharts, Calendar
+  Money, Wallet, Document, Calendar
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 

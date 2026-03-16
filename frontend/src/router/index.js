@@ -69,6 +69,12 @@ const routes = [
         component: () => import('@/views/shipment/index.vue'),
         meta: { title: '发货管理', requiresAuth: true }
       },
+      {
+        path: 'inventory',
+        name: 'Inventory',
+        component: () => import('@/views/inventory/index.vue'),
+        meta: { title: '库存查询', requiresAuth: true }
+      },
       // Phase 3: 财务管理
       {
         path: 'payment',
@@ -81,19 +87,6 @@ const routes = [
         name: 'Statement',
         component: () => import('@/views/statement/index.vue'),
         meta: { title: '对账单', requiresAuth: true }
-      },
-      // Phase 4: 库存报表
-      {
-        path: 'inventory',
-        name: 'Inventory',
-        component: () => import('@/views/inventory/index.vue'),
-        meta: { title: '库存查询', requiresAuth: true }
-      },
-      {
-        path: 'report',
-        name: 'Report',
-        component: () => import('@/views/report/index.vue'),
-        meta: { title: '月度报表', requiresAuth: true }
       }
     ]
   },
