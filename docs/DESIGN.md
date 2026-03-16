@@ -451,11 +451,9 @@ layout/index.vue          — 主布局（左侧菜单 + 右侧内容）
 ├── views/receipt/        — 收货单管理（主从表）
 ├── views/production/     — 排产单管理（主从表）
 ├── views/shipment/       — 发货单管理（主从表）
-├── views/rework/         — 返工单管理
 ├── views/payment/        — 收款管理
 ├── views/statement/      — 对账单管理
-├── views/inventory/      — 库存管理
-├── views/report/         — 报表
+├── views/inventory/      — 库存管理（位于生产管理菜单下）
 └── views/system/         — 系统管理（用户/角色/菜单）
 ```
 

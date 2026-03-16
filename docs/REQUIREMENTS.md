@@ -467,10 +467,6 @@ HAVING needed_init_qty > 0
 
 ---
 
-### 3.5 报表（/api/reports）
-
-- `GET /api/reports/monthly` — 月度汇总报表（按客户/物料统计收发数量金额）
-
 ---
 
 ### 3.6 系统管理
