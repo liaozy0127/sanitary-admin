@@ -335,77 +335,112 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
         this.baseMapper.delete(null);
         inventoryLogMapper.delete(null);
 
-        // 2. 聚合收货数量
-        List<Map<String, Object>> receiptAggs = this.baseMapper.aggregateReceiptQty();
-        // key: "materialId_customerId_processId" -> Inventory
-        java.util.HashMap<String, Inventory> inventoryMap = new java.util.HashMap<>();
+        // key: "materialId_customerId_processId" -> 运行中库存数量（用于流水 beforeQty/afterQty）
+        java.util.HashMap<String, BigDecimal> runningQty = new java.util.HashMap<>();
 
-        for (Map<String, Object> row : receiptAggs) {
+        // 2. 按时间顺序处理收货明细，生成收货流水
+        List<Map<String, Object>> receiptItems = this.baseMapper.listAllReceiptItems();
+        int receiptLogs = 0;
+        for (Map<String, Object> row : receiptItems) {
             Long materialId = toLong(row.get("material_id"));
             Long customerId = toLong(row.get("customer_id"));
             Long processId = toLong(row.get("process_id"));
             String key = materialId + "_" + customerId + "_" + processId;
+
+            BigDecimal changeQty = toBigDecimal(row.get("quantity"));
+            BigDecimal beforeQty = runningQty.getOrDefault(key, BigDecimal.ZERO);
+            BigDecimal afterQty = beforeQty.add(changeQty);
+            runningQty.put(key, afterQty);
+
+            LocalDate orderDate = toLocalDate(row.get("order_date"));
+            insertLog(materialId, customerId, processId,
+                    str(row.get("material_code")), str(row.get("material_name")),
+                    str(row.get("customer_name")), str(row.get("spec")), str(row.get("process_name")),
+                    1, changeQty, beforeQty, afterQty,
+                    "receipt", toLong(row.get("order_id")), str(row.get("order_no")), orderDate, null);
+            receiptLogs++;
+        }
+
+        // 3. 按时间顺序处理发货明细，生成发货流水
+        List<Map<String, Object>> shipmentItems = this.baseMapper.listAllShipmentItems();
+        int shipmentLogs = 0;
+        for (Map<String, Object> row : shipmentItems) {
+            Long materialId = toLong(row.get("material_id"));
+            Long customerId = toLong(row.get("customer_id"));
+            Long processId = toLong(row.get("process_id"));
+            String key = materialId + "_" + customerId + "_" + processId;
+
+            BigDecimal totalQty = toBigDecimal(row.get("total_qty"));
+            if (totalQty.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            BigDecimal beforeQty = runningQty.getOrDefault(key, BigDecimal.ZERO);
+            BigDecimal afterQty = beforeQty.subtract(totalQty);
+            runningQty.put(key, afterQty);
+
+            LocalDate orderDate = toLocalDate(row.get("order_date"));
+            insertLog(materialId, customerId, processId,
+                    str(row.get("material_code")), str(row.get("material_name")),
+                    str(row.get("customer_name")), str(row.get("spec")), str(row.get("process_name")),
+                    2, totalQty.negate(), beforeQty, afterQty,
+                    "shipment", toLong(row.get("order_id")), str(row.get("order_no")), orderDate, null);
+            shipmentLogs++;
+        }
+
+        // 4. 将 runningQty 中的最终值保存为库存快照
+        // 同时补充物料/客户名称等维度信息（从收货明细聚合获取）
+        List<Map<String, Object>> receiptAggs = this.baseMapper.aggregateReceiptQty();
+        java.util.HashMap<String, Map<String, Object>> dimMap = new java.util.HashMap<>();
+        for (Map<String, Object> row : receiptAggs) {
+            Long materialId = toLong(row.get("material_id"));
+            Long customerId = toLong(row.get("customer_id"));
+            Long processId = toLong(row.get("process_id"));
+            dimMap.put(materialId + "_" + customerId + "_" + processId, row);
+        }
+
+        int saved = 0;
+        for (Map.Entry<String, BigDecimal> entry : runningQty.entrySet()) {
+            String key = entry.getKey();
+            BigDecimal qty = entry.getValue();
+            String[] parts = key.split("_");
+            Long materialId = Long.parseLong(parts[0]);
+            Long customerId = Long.parseLong(parts[1]);
+            Long processId = Long.parseLong(parts[2]);
 
             Inventory inv = new Inventory();
             inv.setMaterialId(materialId);
             inv.setCustomerId(customerId);
             inv.setProcessId(processId);
-            inv.setMaterialCode(str(row.get("material_code")));
-            inv.setMaterialName(str(row.get("material_name")));
-            inv.setCustomerName(str(row.get("customer_name")));
-            inv.setSpec(str(row.get("spec")));
-            inv.setProcessName(str(row.get("process_name")));
-            inv.setQuantity(toBigDecimal(row.get("receipt_qty")));
+            inv.setQuantity(qty);
             inv.setCreateTime(LocalDateTime.now());
             inv.setUpdateTime(LocalDateTime.now());
 
-            Object lastReceive = row.get("last_receive_date");
-            if (lastReceive != null) {
-                inv.setLastReceiveTime(LocalDateTime.now()); // 仅标记有收货
+            Map<String, Object> dim = dimMap.get(key);
+            if (dim != null) {
+                inv.setMaterialCode(str(dim.get("material_code")));
+                inv.setMaterialName(str(dim.get("material_name")));
+                inv.setCustomerName(str(dim.get("customer_name")));
+                inv.setSpec(str(dim.get("spec")));
+                inv.setProcessName(str(dim.get("process_name")));
+                inv.setLastReceiveTime(LocalDateTime.now());
             }
 
-            inventoryMap.put(key, inv);
-        }
-
-        // 3. 扣减发货数量
-        List<Map<String, Object>> shipAggs = this.baseMapper.aggregateShipmentQty();
-        for (Map<String, Object> row : shipAggs) {
-            Long materialId = toLong(row.get("material_id"));
-            Long customerId = toLong(row.get("customer_id"));
-            Long processId = toLong(row.get("process_id"));
-            String key = materialId + "_" + customerId + "_" + processId;
-
-            BigDecimal shipQty = toBigDecimal(row.get("ship_qty"));
-
-            if (inventoryMap.containsKey(key)) {
-                Inventory inv = inventoryMap.get(key);
-                inv.setQuantity(inv.getQuantity().subtract(shipQty));
-                inv.setLastShipTime(LocalDateTime.now());
-            } else {
-                // 有发货但无对应收货记录（异常数据），库存为负
-                Inventory inv = new Inventory();
-                inv.setMaterialId(materialId);
-                inv.setCustomerId(customerId);
-                inv.setProcessId(processId);
-                inv.setQuantity(shipQty.negate());
-                inv.setCreateTime(LocalDateTime.now());
-                inv.setUpdateTime(LocalDateTime.now());
-                inventoryMap.put(key, inv);
-            }
-        }
-
-        // 4. 批量保存
-        int saved = 0;
-        for (Inventory inv : inventoryMap.values()) {
             this.save(inv);
             saved++;
         }
 
         Map<String, Object> result = new HashMap<>();
         result.put("inventoryRecords", saved);
-        result.put("receiptGroups", receiptAggs.size());
-        result.put("shipmentGroups", shipAggs.size());
+        result.put("receiptLogs", receiptLogs);
+        result.put("shipmentLogs", shipmentLogs);
         return result;
+    }
+
+    private LocalDate toLocalDate(Object v) {
+        if (v == null) return null;
+        if (v instanceof LocalDate) return (LocalDate) v;
+        if (v instanceof java.sql.Date) return ((java.sql.Date) v).toLocalDate();
+        try { return LocalDate.parse(v.toString().substring(0, 10)); }
+        catch (Exception e) { return null; }
     }
 
     private Long toLong(Object v) {

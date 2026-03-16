@@ -51,4 +51,31 @@ public interface InventoryMapper extends BaseMapper<Inventory> {
             "WHERE si.deleted = 0 AND s.deleted = 0 AND s.status = 1 AND si.material_id IS NOT NULL " +
             "GROUP BY si.material_id, s.customer_id, COALESCE(si.process_id, 0)")
     List<Map<String, Object>> aggregateShipmentQty();
+
+    /**
+     * 查询所有收货明细（用于重建流水）
+     */
+    @Select("SELECT " +
+            "  ri.id, ri.material_id, r.customer_id, COALESCE(ri.process_id, 0) AS process_id, " +
+            "  ri.material_code, ri.material_name, r.customer_name, ri.spec, ri.process_name, " +
+            "  ri.quantity, r.id AS order_id, r.receipt_no AS order_no, r.receipt_date AS order_date " +
+            "FROM receipt_item ri " +
+            "JOIN receipt r ON r.id = ri.receipt_id " +
+            "WHERE ri.deleted = 0 AND r.deleted = 0 AND r.status = 1 AND ri.material_id IS NOT NULL " +
+            "ORDER BY r.receipt_date, r.id, ri.id")
+    List<Map<String, Object>> listAllReceiptItems();
+
+    /**
+     * 查询所有发货明细（用于重建流水）
+     */
+    @Select("SELECT " +
+            "  si.id, si.material_id, s.customer_id, COALESCE(si.process_id, 0) AS process_id, " +
+            "  si.material_code, si.material_name, s.customer_name, si.spec, si.process_name, " +
+            "  (si.quantity + COALESCE(si.defective_qty, 0)) AS total_qty, " +
+            "  s.id AS order_id, s.shipment_no AS order_no, s.shipment_date AS order_date " +
+            "FROM shipment_item si " +
+            "JOIN shipment s ON s.id = si.shipment_id " +
+            "WHERE si.deleted = 0 AND s.deleted = 0 AND s.status = 1 AND si.material_id IS NOT NULL " +
+            "ORDER BY s.shipment_date, s.id, si.id")
+    List<Map<String, Object>> listAllShipmentItems();
 }
