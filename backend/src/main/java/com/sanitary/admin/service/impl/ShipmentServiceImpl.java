@@ -76,8 +76,12 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
         if (shipment.getItems() != null && !shipment.getItems().isEmpty()) {
             shipmentItemService.saveItems(shipment.getId(), shipment.getShipmentNo(), shipment.getItems());
             
-            // 更新库存 - 发货出库
+            // 更新库存 - 发货出库（良品+废品均扣减库存）
             for (ShipmentItem item : shipment.getItems()) {
+                BigDecimal totalQty = item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO;
+                BigDecimal defQty = item.getDefectiveQty() != null ? item.getDefectiveQty() : BigDecimal.ZERO;
+                BigDecimal shipTotal = totalQty.add(defQty);
+                if (shipTotal.compareTo(BigDecimal.ZERO) <= 0) continue;
                 inventoryService.updateInventory(
                     item.getMaterialId(),
                     shipment.getCustomerId(),
@@ -87,7 +91,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                     shipment.getCustomerName(),
                     item.getSpec(),
                     item.getProcessName(),
-                    item.getQuantity(),
+                    shipTotal,
                     2,  // changeType: 2=发货(出库)
                     "shipment",  // orderType
                     shipment.getId(),
@@ -119,6 +123,10 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
         
         // 冲销旧库存（反向操作）
         for (ShipmentItem oldItem : oldItems) {
+            BigDecimal totalQty = oldItem.getQuantity() != null ? oldItem.getQuantity() : BigDecimal.ZERO;
+            BigDecimal defQty = oldItem.getDefectiveQty() != null ? oldItem.getDefectiveQty() : BigDecimal.ZERO;
+            BigDecimal shipTotal = totalQty.add(defQty);
+            if (shipTotal.compareTo(BigDecimal.ZERO) <= 0) continue;
             inventoryService.updateInventory(
                 oldItem.getMaterialId(),
                 shipment.getCustomerId(),
@@ -128,7 +136,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                 shipment.getCustomerName(),
                 oldItem.getSpec(),
                 oldItem.getProcessName(),
-                oldItem.getQuantity().negate(), // 反向冲销，数量取负
+                shipTotal.negate(), // 反向冲销，数量取负
                 2,  // changeType: 2=发货(出库)
                 "shipment",  // orderType
                 shipment.getId(),
@@ -136,10 +144,14 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                 shipment.getShipmentDate()
             );
         }
-        
+
         // 更新新库存
         if (shipment.getItems() != null && !shipment.getItems().isEmpty()) {
             for (ShipmentItem item : shipment.getItems()) {
+                BigDecimal totalQty = item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO;
+                BigDecimal defQty = item.getDefectiveQty() != null ? item.getDefectiveQty() : BigDecimal.ZERO;
+                BigDecimal shipTotal = totalQty.add(defQty);
+                if (shipTotal.compareTo(BigDecimal.ZERO) <= 0) continue;
                 inventoryService.updateInventory(
                     item.getMaterialId(),
                     shipment.getCustomerId(),
@@ -149,7 +161,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                     shipment.getCustomerName(),
                     item.getSpec(),
                     item.getProcessName(),
-                    item.getQuantity(),
+                    shipTotal,
                     2,  // changeType: 2=发货(出库)
                     "shipment",  // orderType
                     shipment.getId(),
@@ -175,6 +187,10 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
         
         // 冲销库存（反向操作）
         for (ShipmentItem item : items) {
+            BigDecimal totalQty = item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO;
+            BigDecimal defQty = item.getDefectiveQty() != null ? item.getDefectiveQty() : BigDecimal.ZERO;
+            BigDecimal shipTotal = totalQty.add(defQty);
+            if (shipTotal.compareTo(BigDecimal.ZERO) <= 0) continue;
             inventoryService.updateInventory(
                 item.getMaterialId(),
                 shipment.getCustomerId(),
@@ -184,7 +200,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                 shipment.getCustomerName(),
                 item.getSpec(),
                 item.getProcessName(),
-                item.getQuantity().negate(), // 反向冲销，数量取负
+                shipTotal.negate(), // 反向冲销，数量取负
                 2,  // changeType: 2=发货(出库)
                 "shipment",  // orderType
                 shipment.getId(),

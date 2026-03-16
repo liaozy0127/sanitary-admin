@@ -66,7 +66,7 @@
             <el-select v-model="logFilter.changeType" placeholder="全部类型" clearable style="width:120px;margin-right:8px" @change="fetchLog">
               <el-option label="收货入库" :value="1" />
               <el-option label="发货出库" :value="2" />
-              <el-option label="返工入库" :value="3" />
+              <el-option label="库存初始化" :value="4" />
             </el-select>
             <el-button type="primary" size="small" :icon="Search" @click="fetchLog">查询</el-button>
           </div>
@@ -78,10 +78,10 @@
         <el-table-column prop="customerName" label="客户" width="130" />
         <el-table-column prop="materialName" label="物料" min-width="140" />
         <el-table-column prop="processName" label="工艺" width="100" />
-        <el-table-column prop="changeType" label="类型" width="90" align="center">
+        <el-table-column prop="changeType" label="类型" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.changeType === 1 ? 'success' : row.changeType === 2 ? 'danger' : 'warning'" size="small">
-              {{ row.changeType === 1 ? '收货入库' : row.changeType === 2 ? '发货出库' : '返工入库' }}
+            <el-tag :type="row.changeType === 1 ? 'success' : row.changeType === 2 ? 'danger' : 'info'" size="small">
+              {{ row.changeType === 1 ? '收货入库' : row.changeType === 2 ? '发货出库' : '库存初始化' }}
             </el-tag>
           </template>
         </el-table-column>
