@@ -41,7 +41,7 @@ def mysql(sql):
     """执行查询，返回行列表，每行为字符串列表。"""
     r = subprocess.run(
         [DOCKER, 'exec', CONTAINER,
-         'mysql', f'-u{MYSQL_USER}', f'-p{MYSQL_PASS}', '-N', '-B', DB, '-e', sql],
+         'mysql', f'-u{MYSQL_USER}', f'-p{MYSQL_PASS}', '--default-character-set=utf8mb4', '-N', '-B', DB, '-e', sql],
         capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(r.stderr)
@@ -56,7 +56,7 @@ def mysql_exec(sql):
     """执行写操作（INSERT / UPDATE）。"""
     r = subprocess.run(
         [DOCKER, 'exec', CONTAINER,
-         'mysql', f'-u{MYSQL_USER}', f'-p{MYSQL_PASS}', DB, '-e', sql],
+         'mysql', f'-u{MYSQL_USER}', f'-p{MYSQL_PASS}', '--default-character-set=utf8mb4', DB, '-e', sql],
         capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(f"SQL error: {r.stderr}\nSQL: {sql[:300]}")

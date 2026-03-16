@@ -117,6 +117,17 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
                            String customerName, String spec, String processName, int changeType, BigDecimal changeQty,
                            BigDecimal beforeQty, BigDecimal afterQty, String orderType, Long orderId, String orderNo,
                            LocalDate orderDate, String remark) {
+        insertLog(materialId, customerId, processId, materialCode, materialName, customerName, spec, processName,
+                changeType, changeQty, beforeQty, afterQty, orderType, orderId, orderNo, orderDate, remark, null);
+    }
+
+    /**
+     * 插入库存变动日志（支持指定 createTime，用于历史数据重建）
+     */
+    private void insertLog(Long materialId, Long customerId, Long processId, String materialCode, String materialName,
+                           String customerName, String spec, String processName, int changeType, BigDecimal changeQty,
+                           BigDecimal beforeQty, BigDecimal afterQty, String orderType, Long orderId, String orderNo,
+                           LocalDate orderDate, String remark, LocalDateTime createTime) {
         InventoryLog log = new InventoryLog();
         log.setMaterialId(materialId);
         log.setCustomerId(customerId);
@@ -135,6 +146,9 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
         log.setOrderNo(orderNo);
         log.setOrderDate(orderDate);
         log.setRemark(remark);
+        if (createTime != null) {
+            log.setCreateTime(createTime);
+        }
 
         inventoryLogMapper.insert(log);
     }
@@ -353,11 +367,12 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
             runningQty.put(key, afterQty);
 
             LocalDate orderDate = toLocalDate(row.get("order_date"));
+            LocalDateTime createTime = orderDate != null ? orderDate.atStartOfDay() : LocalDateTime.now();
             insertLog(materialId, customerId, processId,
                     str(row.get("material_code")), str(row.get("material_name")),
                     str(row.get("customer_name")), str(row.get("spec")), str(row.get("process_name")),
                     1, changeQty, beforeQty, afterQty,
-                    "receipt", toLong(row.get("order_id")), str(row.get("order_no")), orderDate, null);
+                    "receipt", toLong(row.get("order_id")), str(row.get("order_no")), orderDate, null, createTime);
             receiptLogs++;
         }
 
@@ -378,11 +393,12 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
             runningQty.put(key, afterQty);
 
             LocalDate orderDate = toLocalDate(row.get("order_date"));
+            LocalDateTime createTime = orderDate != null ? orderDate.atStartOfDay() : LocalDateTime.now();
             insertLog(materialId, customerId, processId,
                     str(row.get("material_code")), str(row.get("material_name")),
                     str(row.get("customer_name")), str(row.get("spec")), str(row.get("process_name")),
                     2, totalQty.negate(), beforeQty, afterQty,
-                    "shipment", toLong(row.get("order_id")), str(row.get("order_no")), orderDate, null);
+                    "shipment", toLong(row.get("order_id")), str(row.get("order_no")), orderDate, null, createTime);
             shipmentLogs++;
         }
 
