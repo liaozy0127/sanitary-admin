@@ -152,7 +152,6 @@
               <el-select v-model="row.receiptSource" size="small" style="width:100%" @change="onSourceChange(row)">
                 <el-option value="正常" label="正常" />
                 <el-option value="返工" label="返工" />
-                <el-option value="样品" label="样品" />
               </el-select>
             </template>
           </el-table-column>
