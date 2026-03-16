@@ -73,10 +73,6 @@
             <el-icon><Upload /></el-icon>
             <template #title>发货管理</template>
           </el-menu-item>
-          <el-menu-item index="/rework">
-            <el-icon><RefreshRight /></el-icon>
-            <template #title>返工管理</template>
-          </el-menu-item>
         </el-sub-menu>
 
         <!-- 财务管理 -->
@@ -152,7 +148,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import {
   User, Fold, Expand, ArrowDown, OfficeBuilding, UserFilled, Menu,
-  Setting, Files, Operation, Box, SetUp, Download, Upload, RefreshRight,
+  Setting, Files, Operation, Box, SetUp, Download, Upload,
   Money, Wallet, Document, DataAnalysis, TrendCharts, Calendar
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'

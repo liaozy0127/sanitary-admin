@@ -69,12 +69,6 @@ const routes = [
         component: () => import('@/views/shipment/index.vue'),
         meta: { title: '发货管理', requiresAuth: true }
       },
-      {
-        path: 'rework',
-        name: 'Rework',
-        component: () => import('@/views/rework/index.vue'),
-        meta: { title: '返工管理', requiresAuth: true }
-      },
       // Phase 3: 财务管理
       {
         path: 'payment',

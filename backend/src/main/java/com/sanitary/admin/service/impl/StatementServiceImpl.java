@@ -103,6 +103,7 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
             receiptQty = allReceiptItems.stream()
                 .map(ReceiptItem::getQuantity).filter(q -> q != null).reduce(BigDecimal.ZERO, BigDecimal::add);
             receiptAmount = allReceiptItems.stream()
+                .filter(i -> !"返工".equals(i.getReceiptSource()))
                 .map(i -> i.getAmount() != null ? i.getAmount() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
         }
 
@@ -191,9 +192,9 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                 return si;
             });
             item.setReceiptQty(item.getReceiptQty().add(ri.getQuantity() != null ? ri.getQuantity() : BigDecimal.ZERO));
-            // Use unit_price from receipt item if not set yet
-            if (item.getUnitPrice().compareTo(BigDecimal.ZERO) == 0 && ri.getUnitPrice() != null
-                    && ri.getUnitPrice().compareTo(BigDecimal.ZERO) > 0) {
+            // Use unit_price from receipt item if not set yet; skip rework rows (their price should be 0)
+            if (!"返工".equals(ri.getReceiptSource()) && item.getUnitPrice().compareTo(BigDecimal.ZERO) == 0
+                    && ri.getUnitPrice() != null && ri.getUnitPrice().compareTo(BigDecimal.ZERO) > 0) {
                 item.setUnitPrice(ri.getUnitPrice());
             }
         }

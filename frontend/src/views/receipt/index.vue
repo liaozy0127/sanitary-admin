@@ -147,9 +147,13 @@
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="收货来源" width="100">
+          <el-table-column label="收货来源" width="110">
             <template #default="{ row }">
-              <el-input v-model="row.receiptSource" size="small" />
+              <el-select v-model="row.receiptSource" size="small" style="width:100%" @change="onSourceChange(row)">
+                <el-option value="正常" label="正常" />
+                <el-option value="返工" label="返工" />
+                <el-option value="样品" label="样品" />
+              </el-select>
             </template>
           </el-table-column>
           <el-table-column label="收货数量" width="100">
@@ -161,6 +165,7 @@
           <el-table-column label="单价" width="100">
             <template #default="{ row }">
               <el-input-number v-model="row.unitPrice" :min="0" :precision="2" size="small" style="width:100%"
+                :disabled="row.receiptSource === '返工'"
                 @change="calcItemAmount(row)" controls-position="right" />
             </template>
           </el-table-column>
@@ -395,10 +400,17 @@ const calcItemAmount = (item) => {
   item.amount = (qty * price).toFixed(2)
 }
 
+const onSourceChange = (row) => {
+  if (row.receiptSource === '返工') {
+    row.unitPrice = 0
+    row.amount = '0.00'
+  }
+}
+
 const addItem = () => {
   formData.items.push({
     materialId: null, materialName: '', materialCode: '', spec: '',
-    processId: null, processName: '', receiptSource: '', _matOptions: [...defaultMatOptions.value], _matLoading: false,
+    processId: null, processName: '', receiptSource: '正常', _matOptions: [...defaultMatOptions.value], _matLoading: false,
     quantity: 0, unitPrice: 0, amount: '0.00',
     customerOrderNo: '', detailRemark: ''
   })

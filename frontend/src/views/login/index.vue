@@ -92,8 +92,8 @@ const handleLogin = async () => {
     userStore.setUserInfo(userInfo)
     ElMessage.success('登录成功')
     router.push('/')
-  } catch (err) {
-    ElMessage.error(err.message || '登录失败，请检查用户名和密码')
+  } catch {
+    // 错误提示已由 request 拦截器统一处理
   } finally {
     loading.value = false
   }

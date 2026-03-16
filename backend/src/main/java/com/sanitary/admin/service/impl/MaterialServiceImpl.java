@@ -71,6 +71,9 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
 
     @Override
     public Map<String, Object> importFromExcel(MultipartFile file) {
+        // 老系统物料档案列映射:
+        // col 0: 物料代码, col 1: 物料名称, col 2: 规格型号,
+        // col 3: 客户名称, col 4: 更新时间, col 5: 创建时间, col 6: 单价
         int success = 0;
         int fail = 0;
         int skip = 0;
@@ -84,37 +87,47 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
                 if (row == null) continue;
 
                 try {
-                    String materialCode = getCellString(row, 0); // 物料代码
-                    if (materialCode.isEmpty()) {
-                        fail++;
-                        errors.add("第" + (i + 1) + "行: 物料代码不能为空");
+                    String materialCode = getCellString(row, 0); // col 0: 物料代码
+                    String materialName = getCellString(row, 1); // col 1: 物料名称
+                    if (materialCode.isEmpty() && materialName.isEmpty()) {
+                        skip++;
                         continue;
                     }
+                    // 物料代码为空时跳过（无法去重）
+                    if (materialCode.isEmpty()) {
+                        fail++;
+                        errors.add("第" + (i + 1) + "行[" + materialName + "]: 物料代码为空，跳过");
+                        continue;
+                    }
+                    // 物料名称为空时用物料代码作为名称
+                    if (materialName.isEmpty()) {
+                        materialName = materialCode;
+                    }
 
-                    String customerName = getCellString(row, 3); // 客户名称
+                    String customerName = getCellString(row, 3); // col 3: 客户名称
                     Long customerId = null;
                     if (!customerName.isEmpty()) {
                         Customer customer = customerMapper.selectOne(
                             new LambdaQueryWrapper<Customer>()
                                 .eq(Customer::getCustomerName, customerName.trim())
+                                .last("LIMIT 1")
                         );
                         if (customer != null) {
                             customerId = customer.getId();
                         } else {
-                            fail++;
-                            errors.add("第" + (i + 1) + "行: 客户「" + customerName + "」不存在");
-                            continue;
+                            // 客户不存在时记录警告，但仍导入物料（customer_id=null）
+                            errors.add("警告 第" + (i + 1) + "行: 客户「" + customerName + "」在客户表中不存在，物料已导入但未关联客户");
                         }
                     }
 
                     Material material = new Material();
                     material.setMaterialCode(materialCode);
-                    material.setMaterialName(getCellString(row, 1)); // 物料名称
-                    material.setSpec(getCellString(row, 2)); // 规格型号
+                    material.setMaterialName(materialName);
+                    material.setSpec(getCellString(row, 2)); // col 2: 规格型号
                     material.setCustomerId(customerId);
                     material.setCustomerName(customerName);
 
-                    String priceStr = getCellString(row, 4); // 单价
+                    String priceStr = getPriceCellString(row, 6); // col 6: 单价
                     if (!priceStr.isEmpty()) {
                         try {
                             material.setDefaultPrice(new BigDecimal(priceStr));
@@ -123,20 +136,19 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
                         }
                     }
 
-                    // Check for duplicates (idempotency) - if exists, update instead of skipping
+                    // 去重：按 material_code 查找（物料代码全局唯一），存在则更新，不存在则新增
                     Material existingMaterial = this.getOne(
                         new LambdaQueryWrapper<Material>()
                             .eq(Material::getMaterialCode, materialCode)
+                            .last("LIMIT 1")
                     );
 
                     if (existingMaterial != null) {
-                        // Update existing material (not skip)
                         material.setId(existingMaterial.getId());
-                        material.setCreateTime(existingMaterial.getCreateTime()); // Preserve creation time
+                        material.setCreateTime(existingMaterial.getCreateTime());
                         updateById(material);
-                        success++; // Count as success for updating
+                        success++;
                     } else {
-                        // Create new material
                         material.setStatus(1);
                         material.setCreateTime(LocalDateTime.now());
                         material.setUpdateTime(LocalDateTime.now());
@@ -171,6 +183,24 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
             case FORMULA -> {
                 try { yield String.valueOf((long) cell.getNumericCellValue()); }
                 catch (Exception e) { yield cell.getStringCellValue().trim(); }
+            }
+            default -> "";
+        };
+    }
+
+    // 专用于读取单价列（保留小数，不强转 long）
+    private String getPriceCellString(Row row, int col) {
+        Cell cell = row.getCell(col);
+        if (cell == null) return "";
+        return switch (cell.getCellType()) {
+            case STRING -> cell.getStringCellValue().trim();
+            case NUMERIC -> new java.math.BigDecimal(cell.getNumericCellValue())
+                .setScale(4, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
+            case FORMULA -> {
+                try {
+                    yield new java.math.BigDecimal(cell.getNumericCellValue())
+                        .setScale(4, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
+                } catch (Exception e) { yield cell.getStringCellValue().trim(); }
             }
             default -> "";
         };

@@ -26,8 +26,9 @@ request.interceptors.response.use(
     const res = response.data
     // If backend returns a custom error code
     if (res.code !== undefined && res.code !== 200 && res.code !== 0) {
-      ElMessage.error(res.message || '请求失败')
-      return Promise.reject(new Error(res.message || '请求失败'))
+      const msg = res.message || res.msg || '请求失败'
+      ElMessage.error(msg)
+      return Promise.reject(new Error(msg))
     }
     return res
   },
