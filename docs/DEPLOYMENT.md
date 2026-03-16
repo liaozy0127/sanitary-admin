@@ -345,11 +345,13 @@ Step 3: 插入期初收货单（日期 2024-12-31）...
 
 > 脚本幂等：已存在 `RH-INIT-{客户ID}` 的客户自动跳过，可安全重复执行。
 
-### 5.9 第九步：重建库存
+### 5.9 第九步：重建库存与流水
 
-收货单（含期初）和发货单全部导入后，重建全量库存：
+收货单（含期初）和发货单全部导入后，重建全量库存及历史库存流水：
 
 > **注意**：必须在期初库存补录完成后再执行，否则期初数据不会计入。
+>
+> 重建操作会**清空并重建** inventory 表和 inventory_log 表，按收货/发货单据时间顺序逐条生成流水，前台"查看流水"功能依赖此步骤。
 
 ```bash
 python3 << 'EOF'
@@ -360,17 +362,17 @@ token = requests.post('http://localhost:8080/api/auth/login',
     json={'username':'admin','password':'admin123'}).json()['data']['token']
 headers = {'Authorization': f'Bearer {token}'}
 
-print('重建库存...')
-r = requests.post('http://localhost:8080/api/inventory/rebuild', headers=headers, timeout=60)
+print('重建库存与流水...')
+r = requests.post('http://localhost:8080/api/inventory/rebuild', headers=headers, timeout=120)
 d = r.json()['data']
-print(f'收货分组: {d["receiptGroups"]}, 发货分组: {d["shipmentGroups"]}, 库存记录: {d["inventoryRecords"]}')
+print(f'库存记录: {d["inventoryRecords"]} 条，收货流水: {d["receiptLogs"]} 条，发货流水: {d["shipmentLogs"]} 条')
 EOF
 ```
 
 预期：
-- 收货分组 ~3650 个（含期初收货）
-- 发货分组 ~3522 个
-- 生成库存记录 ~3667 条
+- 库存记录 ~3651 条
+- 收货流水 ~15600 条
+- 发货流水 ~16500 条
 - 负库存 ≤ 5 条（均为原始数据录入误差，非系统问题）
 
 ### 5.10 第十步：批量生成对账单
@@ -503,9 +505,11 @@ docker exec -it sanitary-mysql mysql -uroot -proot123 sanitary_admin
 mysql -h 127.0.0.1 -P 3307 -uroot -proot123 sanitary_admin
 ```
 
-### 7.5 重建库存
+### 7.5 重建库存与流水
 
-当收发货数据发生变化或数据导入出现问题时，可随时调用重建接口重算全量库存：
+当收发货数据发生变化或数据导入出现问题时，可随时调用重建接口重算全量库存并重建历史流水。
+
+> 重建操作会**清空并重建** inventory 表和 inventory_log 表，操作不可撤销，请确认数据已完整导入后再执行。
 
 ```bash
 curl -s -X POST http://localhost:8080/api/inventory/rebuild \
@@ -638,9 +642,9 @@ token = requests.post(f'{BASE}/api/auth/login',
     json={'username':'admin','password':'admin123'}).json()['data']['token']
 h = {'Authorization': f'Bearer {token}'}
 
-print('重建库存...')
-r = requests.post(f'{BASE}/api/inventory/rebuild', headers=h, timeout=60).json()['data']
-print(f'  库存记录: {r["inventoryRecords"]} 条')
+print('重建库存与流水...')
+r = requests.post(f'{BASE}/api/inventory/rebuild', headers=h, timeout=120).json()['data']
+print(f'  库存记录: {r["inventoryRecords"]} 条，收货流水: {r["receiptLogs"]} 条，发货流水: {r["shipmentLogs"]} 条')
 
 print('批量生成对账单...')
 r = requests.post(f'{BASE}/api/statements/generate-all', headers=h, timeout=300).json()['data']
