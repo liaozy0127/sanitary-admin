@@ -91,7 +91,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                     shipment.getCustomerName(),
                     item.getSpec(),
                     item.getProcessName(),
-                    shipTotal,
+                    shipTotal.negate(),  // 发货出库，数量取负
                     2,  // changeType: 2=发货(出库)
                     "shipment",  // orderType
                     shipment.getId(),
@@ -107,15 +107,23 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
     @Override
     @Transactional
     public Shipment updateShipment(Shipment shipment) {
+        // 若请求未传 shipmentNo，从数据库补充（避免明细插入时 NOT NULL 约束报错）
+        if (shipment.getShipmentNo() == null) {
+            Shipment existing = getById(shipment.getId());
+            if (existing != null) {
+                shipment.setShipmentNo(existing.getShipmentNo());
+            }
+        }
+
         // 先查询旧的明细，用于冲销库存
         List<ShipmentItem> oldItems = shipmentItemService.listByShipmentId(shipment.getId());
-        
+
         // 先删除旧的明细
         shipmentItemService.deleteByShipmentId(shipment.getId());
-        
+
         // 更新主表
         updateById(shipment);
-        
+
         // 保存新的明细
         if (shipment.getItems() != null && !shipment.getItems().isEmpty()) {
             shipmentItemService.saveItems(shipment.getId(), shipment.getShipmentNo(), shipment.getItems());
@@ -161,7 +169,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                     shipment.getCustomerName(),
                     item.getSpec(),
                     item.getProcessName(),
-                    shipTotal,
+                    shipTotal.negate(),  // 发货出库，数量取负
                     2,  // changeType: 2=发货(出库)
                     "shipment",  // orderType
                     shipment.getId(),

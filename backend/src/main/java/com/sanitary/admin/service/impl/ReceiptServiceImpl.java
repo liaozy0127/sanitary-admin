@@ -112,15 +112,23 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
     @Override
     @Transactional
     public Receipt updateReceipt(Receipt receipt) {
+        // 若请求未传 receiptNo，从数据库补充（避免明细插入时 NOT NULL 约束报错）
+        if (receipt.getReceiptNo() == null) {
+            Receipt existing = getById(receipt.getId());
+            if (existing != null) {
+                receipt.setReceiptNo(existing.getReceiptNo());
+            }
+        }
+
         // 先查询旧的明细，用于冲销库存
         List<ReceiptItem> oldItems = receiptItemService.listByReceiptId(receipt.getId());
-        
+
         // 先删除旧的明细
         receiptItemService.deleteByReceiptId(receipt.getId());
-        
+
         // 更新主表
         updateById(receipt);
-        
+
         // 保存新的明细
         if (receipt.getItems() != null && !receipt.getItems().isEmpty()) {
             receiptItemService.saveItems(receipt.getId(), receipt.getReceiptNo(), receipt.getItems());

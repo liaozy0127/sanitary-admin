@@ -48,6 +48,13 @@ public class ShipmentController {
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody Shipment shipment) {
         shipment.setId(id);
+        // 若请求未传 shipmentNo，从数据库补充（避免明细插入时 NOT NULL 约束报错）
+        if (shipment.getShipmentNo() == null) {
+            Shipment existing = shipmentService.getById(id);
+            if (existing != null) {
+                shipment.setShipmentNo(existing.getShipmentNo());
+            }
+        }
         shipmentService.updateById(shipment);
         if (shipment.getItems() != null) {
             shipmentItemService.deleteByShipmentId(id);

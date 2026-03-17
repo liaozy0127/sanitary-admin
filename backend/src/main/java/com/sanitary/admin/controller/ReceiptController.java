@@ -49,6 +49,13 @@ public class ReceiptController {
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody Receipt receipt) {
         receipt.setId(id);
+        // 若请求未传 receiptNo，从数据库补充（避免明细插入时 NOT NULL 约束报错）
+        if (receipt.getReceiptNo() == null) {
+            Receipt existing = receiptService.getById(id);
+            if (existing != null) {
+                receipt.setReceiptNo(existing.getReceiptNo());
+            }
+        }
         receiptService.updateById(receipt);
         if (receipt.getItems() != null) {
             receiptItemService.deleteByReceiptId(id);

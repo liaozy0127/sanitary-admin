@@ -71,6 +71,14 @@ public class ReworkServiceImpl extends ServiceImpl<ReworkMapper, Rework> impleme
     @Override
     @Transactional
     public Rework updateRework(Rework rework) {
+        // 若请求未传 reworkNo，从数据库补充（避免明细插入时 NOT NULL 约束报错）
+        if (rework.getReworkNo() == null) {
+            Rework existing = getById(rework.getId());
+            if (existing != null) {
+                rework.setReworkNo(existing.getReworkNo());
+            }
+        }
+
         // 先删除原有的明细项
         reworkItemService.deleteByReworkId(rework.getId());
 
