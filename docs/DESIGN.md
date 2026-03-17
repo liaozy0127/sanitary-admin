@@ -685,7 +685,21 @@ ReceiptServiceImpl.importExcel()
 14. **MySQL -N -B 空字符串列**：`docker exec ... mysql -N -B` 输出 tab 分隔行时，空字符串列不会输出 tab，导致 `split('\t')` 返回列数比预期少。Python 脚本中用 `IF(col IS NULL OR col='','',col)` 输出占位，并用 `len(row) >= N` 做防御性检查
 15. **逻辑删除查询**：MyBatis-Plus `@TableLogic` 会自动在 ORM 查询加 `deleted=0`，但**原生 SQL（@Select 注解或 mapper XML）必须手动加 `AND deleted=0`**，否则会统计到已软删除记录，导致统计值偏大或出现"负库存"假象
 16. **generate-all vs generate 幂等差异**：`generate-all` 遇到已存在的对账单会**跳过**；单个 `generate` 会**删旧明细重建**。需要强制更新某月对账单时，必须调用单个 `generate` 接口
+17. **老系统客户档案 Excel 列映射**：`客户档案.xls` 共 22 列（col0 到 col21），正确映射如下：
+    - col0=客户代码, col1=客户名称, col2=区域名称, col3=客户类型, col4=所属行业
+    - col5=地址, col6=邮编, col7=开户银行, col8=税号, col9=银行帐号
+    - col10=业务员, col11=电子邮箱, col12=联系人, col13=联系电话, col14=传真
+    - col15=停用（True→status=0，False→status=1）
+    - **历史版本错误**：原代码用 col2=customerType、col3=salesperson 等，导致字段全部错位（客户类型为空、业务员乱写等）
+18. **老系统工艺数据 Excel 列映射**：`工艺数据.xls` 共 9 列（col0 到 col8），正确映射如下：
+    - col0=工艺代码, col1=工艺名称, col2=厚度要求, col3=备注, col4=优先编号
+    - col5=缺省报价（布尔，**不是禁用字段**）, col6=禁用（True→status=0，False→status=1）
+    - col7=工艺类别, col8=工艺性质
+    - **历史版本错误**：原代码用 col5 作为禁用字段，但 col5 是"缺省报价"，导致 145/155 条工艺被错误设为 status=0（禁用），前端工艺下拉列表几乎为空，选产品后工艺显示数字 ID 而非名称
+19. **MySQL 字符集导致 mojibake**：通过 Python subprocess 执行 mysql CLI 时，若不加 `--default-character-set=utf8mb4`，中文会以 latin1 编码存入，导致 `SHOW HEX(col)` 显示 `C3A7...` 等，页面显示乱码。**修复 SQL**：`UPDATE customer SET customer_type = CASE WHEN HEX(customer_type) LIKE 'C3A7%' THEN '现金' WHEN HEX(customer_type) LIKE 'C3A6%' THEN '月结' ELSE customer_type END`
+20. **前端 API 响应格式不统一**：部分后端接口（如 `GET /api/processes/all`）直接返回数组，不包在 `{code,msg,data}` 结构里。Axios 拦截器遇到 `res.code !== 200` 时直接返回 `res`（即原始数组）。前端取数据时必须用 `Array.isArray(res) ? res : (res.data || [])` 做兼容，否则 `processList` 为空、下拉显示数字 ID。
+21. **老系统客户数据源质量问题**：部分老系统客户 `客户代码 == 客户名称`（如"轩沣卫浴"），这是老系统原始数据问题，非导入 bug。前端客户类型展示需做 `v-if="row.customerType"` 防御，避免空类型渲染空白 Tag。
 
 ---
 
-*文档版本：v1.3 | 最后更新：2026-03-15*
+*文档版本：v1.4 | 最后更新：2026-03-17*

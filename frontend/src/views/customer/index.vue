@@ -40,9 +40,10 @@
         <el-table-column prop="customerName" label="客户名称" min-width="150" />
         <el-table-column prop="customerType" label="客户类型" width="80" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.customerType === '现金' ? 'success' : 'warning'" size="small">
+            <el-tag v-if="row.customerType" :type="row.customerType === '现金' ? 'success' : 'warning'" size="small">
               {{ row.customerType }}
             </el-tag>
+            <span v-else style="color:#999;font-size:12px">—</span>
           </template>
         </el-table-column>
         <el-table-column prop="contactPerson" label="联系人" width="90" />

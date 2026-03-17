@@ -79,6 +79,9 @@ $DOCKER compose up -d backend
 4. **文件上传大小**：application.yml 已配置 `spring.servlet.multipart.max-file-size: 100MB`
 5. **xls 文件头损坏**：老系统 xls 文件头有问题，需先用 Python xlrd/openpyxl 转成 xlsx 再导入
 6. **禁止执行** `openclaw gateway stop`（会导致网关崩溃）
+7. **Excel 列映射务必核对原始文件**：老系统 Excel 列顺序与直觉不符，必须用 `xlrd/openpyxl` 打印 header 确认后再写映射，见 DESIGN.md 条目 17-18
+8. **Python subprocess 执行 mysql 命令必须加 `--default-character-set=utf8mb4`**：否则中文字段存入 latin1 mojibake
+9. **前端取工艺/客户等下拉列表数据，API 可能直接返回数组**：用 `Array.isArray(res) ? res : (res.data || [])` 兼容，见 DESIGN.md 条目 20
 
 ---
 
@@ -87,7 +90,9 @@ $DOCKER compose up -d backend
 老系统文件目录：`/Users/admin/IdeaProjects/sanitary-admin/old-system-file/`
 xlsx 转换缓存：`/tmp/import-xlsx/`（含收货单22批分割文件 receipts-split/）
 
-导入顺序：客户 → 工艺 → 物料 → 初始库存（对账单）→ 收货单（mode=history）→ 排产单（mode=history）
+导入顺序：客户 → 工艺 → 物料 → 收货单（mode=history）→ 排产单（mode=history）→ 发货单（mode=history）→ 收款单 → 对账单（对账单/mode=history）→ 执行 init_opening_stock.py → 重建库存（POST /api/inventory/rebuild）→ 批量生成对账单（POST /api/statements/generate-all）
+
+⚠️ **重新初始化时必须按此顺序，且每步验证数据再进行下一步**
 
 ---
 

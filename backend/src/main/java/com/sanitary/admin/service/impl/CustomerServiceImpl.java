@@ -107,19 +107,19 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
                     Customer customer = new Customer();
                     customer.setCustomerCode(customerCode);
-                    customer.setCustomerName(getCellString(row, 1)); // 客户名称
-                    customer.setCustomerType(getCellString(row, 2)); // 客户类型
-                    customer.setSalesperson(getCellString(row, 3)); // 业务员
-                    customer.setContactPerson(getCellString(row, 4)); // 联系人
-                    customer.setContactPhone(getCellString(row, 5)); // 联系电话
-                    customer.setAddress(getCellString(row, 6)); // 地址
-                    customer.setBankName(getCellString(row, 7)); // 开户银行
-                    customer.setBankAccount(getCellString(row, 8)); // 银行帐号
-                    customer.setTaxNo(getCellString(row, 9)); // 税号
-                    customer.setRemark(getCellString(row, 11)); // 备注
+                    customer.setCustomerName(getCellString(row, 1));  // 客户名称
+                    customer.setCustomerType(getCellString(row, 3));  // 客户类型（col3）
+                    customer.setAddress(getCellString(row, 5));       // 地址（col5）
+                    customer.setBankName(getCellString(row, 7));      // 开户银行（col7）
+                    customer.setTaxNo(getCellString(row, 8));         // 税号（col8）
+                    customer.setBankAccount(getCellString(row, 9));   // 银行帐号（col9）
+                    customer.setSalesperson(getCellString(row, 10));  // 业务员（col10）
+                    customer.setContactPerson(getCellString(row, 12)); // 联系人（col12）
+                    customer.setContactPhone(getCellString(row, 13)); // 联系电话（col13）
+                    customer.setRemark(getCellString(row, 19));       // 备注（col19）
 
-                    // 处理停用字段：True→0(停用)，False→1(启用)
-                    String statusStr = getCellString(row, 10);
+                    // 处理停用字段：True→0(停用)，False→1(启用)（col15）
+                    String statusStr = getCellString(row, 15);
                     if ("True".equalsIgnoreCase(statusStr) || "是".equalsIgnoreCase(statusStr) || "1".equals(statusStr)) {
                         customer.setStatus(0); // 停用
                     } else {

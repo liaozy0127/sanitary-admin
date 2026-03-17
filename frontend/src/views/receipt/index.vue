@@ -275,7 +275,7 @@ const loadCustomers = async () => {
 
 const loadProcesses = async () => {
   const res = await getProcessAll()
-  processList.value = res.data
+  processList.value = Array.isArray(res) ? res : (res.data || [])
 }
 
 const loadMaterials = async (customerId) => {

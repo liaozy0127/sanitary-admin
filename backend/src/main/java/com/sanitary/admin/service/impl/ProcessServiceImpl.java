@@ -82,13 +82,13 @@ public class ProcessServiceImpl extends ServiceImpl<ProcessMapper, Process> impl
 
                     Process process = new Process();
                     process.setProcessCode(processCode);
-                    process.setProcessName(getCellString(row, 1)); // 工艺名称
-                    process.setProcessCategory(getCellString(row, 2)); // 工艺类别
-                    process.setProcessNature(getCellString(row, 3)); // 工艺性质
-                    process.setRemark(getCellString(row, 4)); // 备注
+                    process.setProcessName(getCellString(row, 1));      // 工艺名称
+                    process.setProcessCategory(getCellString(row, 7));  // 工艺类别（col7）
+                    process.setProcessNature(getCellString(row, 8));    // 工艺性质（col8）
+                    process.setRemark(getCellString(row, 3));            // 备注（col3）
 
-                    // 处理禁用字段：True→0(停用)，False→1(启用)
-                    String statusStr = getCellString(row, 5);
+                    // 处理禁用字段（col6）：True→0(停用)，False→1(启用)
+                    String statusStr = getCellString(row, 6);
                     if ("True".equalsIgnoreCase(statusStr) || "是".equalsIgnoreCase(statusStr) || "1".equals(statusStr)) {
                         process.setStatus(0); // 停用
                     } else {
