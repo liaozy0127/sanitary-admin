@@ -328,7 +328,7 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
         XSSFWorkbook wb = new XSSFWorkbook();
         Sheet sheet = wb.createSheet("排产单");
         String[] headers = {"排产单号","排产日期","客户名称","备注","物料编码","物料名称","型号规格","工艺名称",
-            "收货类型","单位","计划数量","实际数量","未入库数量","外协单价","电镀金额","电镀单价","客户单号","生产类型","明细备注"};
+            "收货类型","单位","排产数量","入库数量","未入库","委外单价","电镀金额","电镀单价","客户单号","排产方式","明细备注"};
         ExcelExportUtil.writeTitleRow(sheet, wb, "排产单", headers.length);
         ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
 

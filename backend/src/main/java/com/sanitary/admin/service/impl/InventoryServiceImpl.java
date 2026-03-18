@@ -543,7 +543,7 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
 
         XSSFWorkbook wb = new XSSFWorkbook();
         Sheet sheet = wb.createSheet("库存明细");
-        String[] headers = {"物料编码","物料名称","型号规格","客户名称","工艺名称","库存数量","最后收货时间","最后发货时间"};
+        String[] headers = {"物料代码","物料名称","规格","客户名称","工艺","当前库存","最后收货","最后发货"};
         ExcelExportUtil.writeTitleRow(sheet, wb, "库存明细", headers.length);
         ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
 

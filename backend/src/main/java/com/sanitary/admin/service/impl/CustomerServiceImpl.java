@@ -182,7 +182,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         XSSFWorkbook wb = new XSSFWorkbook();
         Sheet sheet = wb.createSheet("客户档案");
 
-        String[] headers = {"客户编码","客户名称","客户类型","联系人","联系电话","地址","业务员","开户银行","银行账号","税号","状态","创建时间","备注"};
+        String[] headers = {"客户代码","客户名称","客户类型","联系人","联系电话","地址","业务员","开户银行","银行账号","税号","状态","创建时间","备注"};
         ExcelExportUtil.writeTitleRow(sheet, wb, "客户档案", headers.length);
         ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
 

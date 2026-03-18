@@ -223,7 +223,7 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
 
         XSSFWorkbook wb = new XSSFWorkbook();
         Sheet sheet = wb.createSheet("物料档案");
-        String[] headers = {"物料编码","物料名称","型号规格","所属客户","默认单价","计量单位","状态"};
+        String[] headers = {"物料代码","物料名称","规格型号","所属客户","默认单价","单位","状态"};
         ExcelExportUtil.writeTitleRow(sheet, wb, "物料档案", headers.length);
         ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
 

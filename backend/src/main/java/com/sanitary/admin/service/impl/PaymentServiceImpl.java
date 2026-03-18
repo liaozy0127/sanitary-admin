@@ -196,7 +196,7 @@ public class PaymentServiceImpl extends ServiceImpl<PaymentMapper, Payment> impl
 
         XSSFWorkbook wb = new XSSFWorkbook();
         Sheet sheet = wb.createSheet("收款记录");
-        String[] headers = {"收款单号","收款日期","客户名称","金额","收款方式","参考单号","备注"};
+        String[] headers = {"收款单号","收款日期","客户名称","收款金额","收款方式","参考单号","备注"};
         ExcelExportUtil.writeTitleRow(sheet, wb, "收款记录", headers.length);
         ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
 

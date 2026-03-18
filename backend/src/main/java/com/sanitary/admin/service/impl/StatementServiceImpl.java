@@ -503,8 +503,8 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
 
         XSSFWorkbook wb = new XSSFWorkbook();
         Sheet sheet = wb.createSheet("对账单");
-        String[] headers = {"对账单号","对账月份","客户名称","物料编码","物料名称","工艺名称",
-            "期初数量","本期收货","本期发货","废品数量","期末数量","单价","良品金额","发货金额","备注"};
+        String[] headers = {"对账单号","对账月份","客户名称","产品编码","产品名称","工艺要求",
+            "上月结余","本月收货","发货合计","退回数量","本月结余","单价","良品金额","发货金额","备注"};
         ExcelExportUtil.writeTitleRow(sheet, wb, "对账单", headers.length);
         ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
 

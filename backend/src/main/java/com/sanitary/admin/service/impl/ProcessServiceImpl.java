@@ -152,7 +152,7 @@ public class ProcessServiceImpl extends ServiceImpl<ProcessMapper, Process> impl
 
         XSSFWorkbook wb = new XSSFWorkbook();
         Sheet sheet = wb.createSheet("工艺档案");
-        String[] headers = {"工艺编码","工艺名称","工艺类别","工艺性质","厚度要求","是否默认报价","优先级","状态"};
+        String[] headers = {"工艺代码","工艺名称","工艺类别","工艺性质","优先编号","状态"};
         ExcelExportUtil.writeTitleRow(sheet, wb, "工艺档案", headers.length);
         ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
 
@@ -168,10 +168,8 @@ public class ProcessServiceImpl extends ServiceImpl<ProcessMapper, Process> impl
             ExcelExportUtil.setCell(row, 1, p.getProcessName(), s);
             ExcelExportUtil.setCell(row, 2, p.getProcessCategory(), s);
             ExcelExportUtil.setCell(row, 3, p.getProcessNature(), s);
-            ExcelExportUtil.setCell(row, 4, p.getThicknessReq(), s);
-            ExcelExportUtil.setCell(row, 5, p.getDefaultQuote() != null && p.getDefaultQuote() == 1 ? "是" : "否", s);
-            ExcelExportUtil.setCell(row, 6, p.getPriorityNo(), s);
-            ExcelExportUtil.setCell(row, 7, p.getStatus() != null && p.getStatus() == 1 ? "启用" : "禁用", s);
+            ExcelExportUtil.setCell(row, 4, p.getPriorityNo(), s);
+            ExcelExportUtil.setCell(row, 5, p.getStatus() != null && p.getStatus() == 1 ? "启用" : "禁用", s);
         }
 
         sheet.createFreezePane(0, 2);
