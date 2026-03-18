@@ -30,7 +30,6 @@ public class Statement {
     private BigDecimal receiptAmount;
     private BigDecimal shipmentAmount;
     private String remark;
-    private String status;
 
     @TableLogic
     private Integer deleted;

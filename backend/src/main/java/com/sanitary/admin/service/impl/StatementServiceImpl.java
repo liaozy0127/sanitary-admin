@@ -155,7 +155,6 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         statement.setShipmentQty(shipmentQty);
         statement.setReceiptAmount(receiptAmount);
         statement.setShipmentAmount(shipmentAmount);
-        statement.setStatus("未确认");
         save(statement);
         buildAndSaveItems(statement, customerId, ym, allReceiptItems, allShipmentItems);
         return statement;
@@ -393,7 +392,6 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         statement.setReceiptQty(totalReceiptQty);
         statement.setShipmentQty(totalShipmentQty);
         statement.setShipmentAmount(totalShipmentAmount);
-        statement.setStatus("草稿");
         getBaseMapper().insert(statement);
         statementItemService.saveItems(statement.getId(), statement.getStatementNo(), items);
 
@@ -437,17 +435,6 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         if (inventorySkipped != null) result.put("inventorySkipped", inventorySkipped);
         result.put("errors", errors);
         return result;
-    }
-
-    @Override
-    @Transactional
-    public void confirm(Long id) {
-        Statement statement = getById(id);
-        if (statement == null) {
-            throw new RuntimeException("对账单不存在");
-        }
-        statement.setStatus("已确认");
-        updateById(statement);
     }
 
     private String getCellString(Row row, int col) {

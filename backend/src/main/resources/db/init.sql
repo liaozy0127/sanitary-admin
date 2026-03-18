@@ -311,7 +311,6 @@ CREATE TABLE IF NOT EXISTS `statement` (
     `receipt_amount` DECIMAL(12,2) DEFAULT 0 COMMENT '本月收货金额',
     `shipment_amount` DECIMAL(12,2) DEFAULT 0 COMMENT '本月发货金额',
     `remark` VARCHAR(500),
-    `status` VARCHAR(20) DEFAULT '未确认' COMMENT '未确认/已确认',
     `deleted` TINYINT NOT NULL DEFAULT 0,
     `create_time` DATETIME,
     `update_time` DATETIME

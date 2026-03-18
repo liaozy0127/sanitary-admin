@@ -53,12 +53,6 @@ public class StatementController {
         return Result.success(statementService.importExcel(file, customerId, statementMonth, initInventory));
     }
 
-    @PutMapping("/{id}/confirm")
-    public Result<Void> confirm(@PathVariable Long id) {
-        statementService.confirm(id);
-        return Result.success();
-    }
-
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         statementService.removeById(id);

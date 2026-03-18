@@ -93,15 +93,8 @@
         <el-table-column label="发货金额" width="110" align="right">
           <template #default="{ row }">¥{{ fmtAmt(row.shipmentAmount) }}</template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="90" align="center">
+        <el-table-column label="操作" width="90" align="center" fixed="right">
           <template #default="{ row }">
-            <el-tag :type="row.status === '已确认' ? 'success' : 'warning'" size="small">{{ row.status }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="170" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" type="success" @click="handleConfirm(row)"
-              :disabled="row.status === '已确认'">确认</el-button>
             <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -179,7 +172,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Delete, Upload } from '@element-plus/icons-vue'
-import { getStatementList, generateStatement, confirmStatement, deleteStatement } from '@/api/statement'
+import { getStatementList, generateStatement, deleteStatement } from '@/api/statement'
 import { getCustomerAll } from '@/api/customer'
 import request from '@/utils/request'
 
@@ -296,14 +289,7 @@ const handleImport = async () => {
   } finally { importLoading.value = false }
 }
 
-// ---- 确认 / 删除 ----
-const handleConfirm = async (row) => {
-  await ElMessageBox.confirm(`确定确认对账单「${row.statementNo}」？`, '确认', { type: 'warning' })
-  await confirmStatement(row.id)
-  ElMessage.success('对账单已确认')
-  fetchList()
-}
-
+// ---- 删除 ----
 const handleDelete = async (row) => {
   await ElMessageBox.confirm(`确定删除对账单「${row.statementNo}」？`, '确认', { type: 'warning' })
   await deleteStatement(row.id)
