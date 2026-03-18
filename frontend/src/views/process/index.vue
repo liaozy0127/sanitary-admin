@@ -24,7 +24,10 @@
       <template #header>
         <div class="table-header">
           <span>工艺列表</span>
-          <el-button type="primary" :icon="Plus" @click="openDialog()">新增工艺</el-button>
+          <div>
+            <el-button type="success" :loading="exporting" @click="handleExport">导出 Excel</el-button>
+            <el-button type="primary" :icon="Plus" @click="openDialog()">新增工艺</el-button>
+          </div>
         </div>
       </template>
 
@@ -125,7 +128,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Edit, Delete } from '@element-plus/icons-vue'
-import { getProcessList, createProcess, updateProcess, deleteProcess, updateProcessStatus } from '@/api/process'
+import { getProcessList, createProcess, updateProcess, deleteProcess, updateProcessStatus, exportProcesses } from '@/api/process'
 
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -222,6 +225,27 @@ const toggleStatus = async (row) => {
 }
 
 onMounted(fetchList)
+
+const exporting = ref(false)
+const handleExport = async () => {
+  exporting.value = true
+  try {
+    const res = await exportProcesses({ keyword: searchForm.keyword })
+    const url = URL.createObjectURL(new Blob([res]))
+    const link = document.createElement('a')
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    link.href = url
+    link.download = `工艺档案_${today}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error('导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <style scoped>

@@ -19,6 +19,14 @@ public class ReworkItemServiceImpl extends ServiceImpl<ReworkItemMapper, ReworkI
     }
 
     @Override
+    public List<ReworkItem> listByReworkIds(List<Long> reworkIds) {
+        if (reworkIds == null || reworkIds.isEmpty()) return new java.util.ArrayList<>();
+        LambdaQueryWrapper<ReworkItem> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(ReworkItem::getReworkId, reworkIds);
+        return this.list(wrapper);
+    }
+
+    @Override
     public boolean saveItems(Long reworkId, String reworkNo, List<ReworkItem> items) {
         // 先删除原有明细
         this.deleteByReworkId(reworkId);

@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 
 @RestController
@@ -57,5 +58,12 @@ public class StatementController {
     public Result<Void> delete(@PathVariable Long id) {
         statementService.removeById(id);
         return Result.success();
+    }
+
+    @GetMapping("/export")
+    public void export(HttpServletResponse response,
+                       @RequestParam(required = false) Long customerId,
+                       @RequestParam(required = false) String statementMonth) {
+        statementService.exportExcel(response, customerId, statementMonth);
     }
 }

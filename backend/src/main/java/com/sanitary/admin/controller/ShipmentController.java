@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.Map;
 
@@ -77,5 +78,14 @@ public class ShipmentController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "mode", defaultValue = "history") String mode) {
         return Result.success(shipmentService.importExcel(file, mode));
+    }
+
+    @GetMapping("/export")
+    public void export(HttpServletResponse response,
+                       @RequestParam(required = false) String keyword,
+                       @RequestParam(required = false) Long customerId,
+                       @RequestParam(required = false) String startDate,
+                       @RequestParam(required = false) String endDate) {
+        shipmentService.exportExcel(response, keyword, customerId, startDate, endDate);
     }
 }

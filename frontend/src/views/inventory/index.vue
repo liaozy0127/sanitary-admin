@@ -24,6 +24,7 @@
           <span>库存查询</span>
           <div>
             <el-tag type="success" style="margin-right:8px">持久化库存，收发货实时更新</el-tag>
+            <el-button type="success" :loading="exporting" @click="handleExport" style="margin-right:8px">导出 Excel</el-button>
             <el-button size="small" :icon="Document" @click="toggleLog">
               {{ showLog ? '隐藏流水' : '查看流水' }}
             </el-button>
@@ -113,8 +114,9 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import { Search, Refresh, Document } from '@element-plus/icons-vue'
-import { getInventoryList, getInventoryLog } from '@/api/inventory'
+import { getInventoryList, getInventoryLog, exportInventory } from '@/api/inventory'
 import { getCustomerAll } from '@/api/customer'
 
 const loading = ref(false)
@@ -184,6 +186,27 @@ onMounted(() => {
   fetchList()
   loadCustomers()
 })
+
+const exporting = ref(false)
+const handleExport = async () => {
+  exporting.value = true
+  try {
+    const res = await exportInventory({ keyword: searchForm.keyword, customerId: searchForm.customerId })
+    const url = URL.createObjectURL(new Blob([res]))
+    const link = document.createElement('a')
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    link.href = url
+    link.download = `库存明细_${today}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error('导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <style scoped>

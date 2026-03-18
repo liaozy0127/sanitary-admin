@@ -78,6 +78,15 @@ public class ReceiptController {
         receiptService.exportTemplate(response);
     }
 
+    @GetMapping("/export")
+    public void export(HttpServletResponse response,
+                       @RequestParam(required = false) String keyword,
+                       @RequestParam(required = false) Long customerId,
+                       @RequestParam(required = false) String startDate,
+                       @RequestParam(required = false) String endDate) {
+        receiptService.exportExcel(response, keyword, customerId, startDate, endDate);
+    }
+
     @PostMapping("/import")
     public Result<Map<String, Object>> importExcel(
             @RequestParam("file") MultipartFile file,

@@ -5,3 +5,5 @@ export const getPaymentById = (id) => request.get(`/payments/${id}`)
 export const createPayment = (data) => request.post('/payments', data)
 export const updatePayment = (id, data) => request.put(`/payments/${id}`, data)
 export const deletePayment = (id) => request.delete(`/payments/${id}`)
+export const exportPayments = (params) =>
+  request.get('/payments/export', { params, responseType: 'blob' })

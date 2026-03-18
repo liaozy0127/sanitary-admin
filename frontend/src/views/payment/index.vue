@@ -22,7 +22,10 @@
       <template #header>
         <div class="table-header">
           <span>收款记录</span>
-          <el-button type="primary" :icon="Plus" @click="openDialog()">新增收款</el-button>
+          <div>
+            <el-button type="success" :loading="exporting" @click="handleExport">导出 Excel</el-button>
+            <el-button type="primary" :icon="Plus" @click="openDialog()">新增收款</el-button>
+          </div>
         </div>
       </template>
 
@@ -109,7 +112,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Edit, Delete } from '@element-plus/icons-vue'
-import { getPaymentList, createPayment, updatePayment, deletePayment } from '@/api/payment'
+import { getPaymentList, createPayment, updatePayment, deletePayment, exportPayments } from '@/api/payment'
 import { getCustomerAll } from '@/api/customer'
 
 const loading = ref(false)
@@ -184,6 +187,31 @@ const handleDelete = async (row) => {
 }
 
 onMounted(() => { fetchList(); loadCustomers() })
+
+const exporting = ref(false)
+const handleExport = async () => {
+  exporting.value = true
+  try {
+    const res = await exportPayments({
+      customerId: searchForm.customerId,
+      startDate: searchForm.dateRange?.[0],
+      endDate: searchForm.dateRange?.[1]
+    })
+    const url = URL.createObjectURL(new Blob([res]))
+    const link = document.createElement('a')
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    link.href = url
+    link.download = `收款记录_${today}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error('导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <style scoped>

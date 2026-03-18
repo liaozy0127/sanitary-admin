@@ -9,3 +9,5 @@ export const downloadTemplate = () => request.get('/receipts/template', { respon
 export const importReceipts = (formData) => request.post('/receipts/import', formData, {
   headers: { 'Content-Type': 'multipart/form-data' }
 })
+export const exportReceipts = (params) =>
+  request.get('/receipts/export', { params, responseType: 'blob' })

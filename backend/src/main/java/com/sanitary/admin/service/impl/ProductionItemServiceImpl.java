@@ -22,6 +22,14 @@ public class ProductionItemServiceImpl extends ServiceImpl<ProductionItemMapper,
     }
 
     @Override
+    public List<ProductionItem> listByProductionIds(List<Long> productionIds) {
+        if (productionIds == null || productionIds.isEmpty()) return new java.util.ArrayList<>();
+        return this.list(new LambdaQueryWrapper<ProductionItem>()
+            .in(ProductionItem::getProductionId, productionIds)
+            .orderByAsc(ProductionItem::getId));
+    }
+
+    @Override
     @Transactional
     public void saveItems(Long productionId, String productionNo, List<ProductionItem> items) {
         if (items == null || items.isEmpty()) return;

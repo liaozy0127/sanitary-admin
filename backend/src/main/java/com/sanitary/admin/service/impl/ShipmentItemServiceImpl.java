@@ -22,6 +22,14 @@ public class ShipmentItemServiceImpl extends ServiceImpl<ShipmentItemMapper, Shi
     }
 
     @Override
+    public List<ShipmentItem> listByShipmentIds(List<Long> shipmentIds) {
+        if (shipmentIds == null || shipmentIds.isEmpty()) return new java.util.ArrayList<>();
+        return this.list(new LambdaQueryWrapper<ShipmentItem>()
+            .in(ShipmentItem::getShipmentId, shipmentIds)
+            .orderByAsc(ShipmentItem::getId));
+    }
+
+    @Override
     @Transactional
     public void saveItems(Long shipmentId, String shipmentNo, List<ShipmentItem> items) {
         if (items == null || items.isEmpty()) return;

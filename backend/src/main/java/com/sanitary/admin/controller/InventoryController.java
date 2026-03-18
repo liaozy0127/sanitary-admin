@@ -10,6 +10,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -55,5 +56,12 @@ public class InventoryController {
     @PostMapping("/rebuild")
     public Result<Map<String, Object>> rebuild() {
         return Result.success(inventoryService.rebuildFromOrders());
+    }
+
+    @GetMapping("/export")
+    public void export(HttpServletResponse response,
+                       @RequestParam(required = false) String keyword,
+                       @RequestParam(required = false) Long customerId) {
+        inventoryService.exportExcel(response, keyword, customerId);
     }
 }

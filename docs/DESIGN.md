@@ -662,6 +662,7 @@ ReceiptServiceImpl.importExcel()
 | inventory 重建 aggregateShipmentQty 未计 defective_qty 且缺 status=1 过滤 | 高 | ✅ 已修复（SUM(qty+defective_qty) + status=1，2026-03-15）|
 | 收货单分批上传（前端按3000行拆分）| 中 | 待开发 |
 | inventory 查询接口带 keyword 参数时返回 400 | 中 | 待修复 |
+| **全模块 Excel 导出功能**（基础档案/生产/财务所有列表页）| 高 | 🚧 开发中 |
 
 ---
 
@@ -702,4 +703,190 @@ ReceiptServiceImpl.importExcel()
 
 ---
 
-*文档版本：v1.4 | 最后更新：2026-03-17*
+---
+
+## 八、Excel 导出功能设计
+
+> 适用于：基础档案（客户/工艺/物料）、生产管理（收货单/排产单/发货单/返工单/库存）、财务管理（收款记录/对账单）共 10 个模块。
+
+### 8.1 后端实现方案
+
+**复用现有 Apache POI 5.2.5 依赖（无需新增依赖）。**
+
+每个模块新增一个导出 Service 方法 + Controller 端点：
+
+```java
+// Controller 层：通用模式
+@GetMapping("/export")
+public void export(HttpServletResponse response,
+                   @RequestParam(required = false) String keyword,
+                   @RequestParam(required = false) Long customerId,
+                   @RequestParam(required = false) String startDate,
+                   @RequestParam(required = false) String endDate) {
+    xxxService.exportExcel(response, keyword, customerId, startDate, endDate);
+}
+
+// Service 层：通用模式
+public void exportExcel(HttpServletResponse response, ...) {
+    // 1. 按筛选条件查全量数据（不分页，limit 50000行）
+    // 2. 创建 XSSFWorkbook，配置样式
+    // 3. 写标题行、列标题、数据行
+    // 4. 主从表：先写主单行（蓝底），再循环写明细行（交替白/浅蓝）
+    // 5. 最后写合计行（黄底）
+    // 6. 设置 response header，写入 OutputStream
+}
+```
+
+**通用 ExcelExportUtil 工具类**（新建，避免各模块重复代码）：
+
+```java
+// 路径：util/ExcelExportUtil.java
+public class ExcelExportUtil {
+    // 创建工作簿和通用样式
+    public static XSSFWorkbook createWorkbook() { ... }
+
+    // 创建标题行样式（蓝色背景、白字、加粗16号）
+    public static CellStyle createTitleStyle(XSSFWorkbook wb) { ... }
+
+    // 创建列标题样式（浅蓝背景、深蓝字、加粗11号）
+    public static CellStyle createHeaderStyle(XSSFWorkbook wb) { ... }
+
+    // 创建主单行样式（#BDD7EE 背景、加粗）
+    public static CellStyle createMasterRowStyle(XSSFWorkbook wb) { ... }
+
+    // 创建数据行样式（奇行白色/偶行#F5F9FF，带细边框）
+    public static CellStyle createDataRowStyle(XSSFWorkbook wb, boolean even) { ... }
+
+    // 创建合计行样式（#FFF2CC 黄色背景、加粗）
+    public static CellStyle createSummaryRowStyle(XSSFWorkbook wb) { ... }
+
+    // 设置 response header 并写出
+    public static void writeResponse(XSSFWorkbook wb, HttpServletResponse response, String filename) { ... }
+
+    // 自适应列宽（遍历前300行估算最大内容宽度）
+    public static void autoSizeColumns(Sheet sheet, int colCount) { ... }
+
+    // 创建单元格并设置值（支持 String/Number/LocalDate）
+    public static Cell createCell(Row row, int col, Object value, CellStyle style) { ... }
+}
+```
+
+### 8.2 主从表导出结构
+
+以收货单为例，Sheet 布局：
+
+```
+行 0 ：[收货单导出报表                                                    ]  ← 合并A~S列，蓝底白字
+行 1 ：[收货单号][日期][客户][备注][物料码][物料名][规格][工艺]...[明细备注]  ← 列标题行
+行 2 ：[SH2025-0001][2025-01-01][客户A][...][   ][   ][...][...][...][...] ← 主单行（蓝底）
+行 3 ：[           ][         ][     ][   ][M001][产品A][..][..][10][0.5]   ← 明细行（白底）
+行 4 ：[           ][         ][     ][   ][M002][产品B][..][..][20][0.8]   ← 明细行（浅蓝）
+行 5 ：[SH2025-0002][2025-01-02][客户B][...][   ][   ][...][...][...][...] ← 主单行（蓝底）
+行 6 ：[           ][         ][     ][   ][M003][产品C][..][..][15][0.6]   ← 明细行（白底）
+...
+最后行：[合计       ][         ][     ][   ][   ][   ][  ][  ][45][   ]     ← 合计行（黄底）
+```
+
+**主从表列顺序**（以收货单为例，共19列）：
+
+| 列 | 归属 | 字段 | 说明 |
+|----|------|------|------|
+| A | 主单 | receipt_no | 主单才填，明细行空白 |
+| B | 主单 | receipt_date | 主单才填 |
+| C | 主单 | customer_name | 主单才填 |
+| D | 主单 | remark | 主单才填 |
+| E | 明细 | material_code | |
+| F | 明细 | material_name | |
+| G | 明细 | spec | |
+| H | 明细 | process_name | |
+| I | 明细 | receipt_source | |
+| J | 明细 | quantity | 右对齐 |
+| K | 明细 | shipped_qty | 右对齐 |
+| L | 明细 | unshipped_qty | 右对齐 |
+| M | 明细 | planned_qty | 右对齐 |
+| N | 明细 | ware_housed_qty | 右对齐 |
+| O | 明细 | unware_housed_qty | 右对齐 |
+| P | 明细 | unit_price | 右对齐 |
+| Q | 明细 | amount | 右对齐 |
+| R | 明细 | customer_order_no | |
+| S | 明细 | detail_remark | |
+
+### 8.3 后端查询优化
+
+主从表导出时，明细数据通过一次 JOIN 查询获取（避免 N+1 问题）：
+
+```java
+// 方案：先查主表（带筛选条件），再一次性批量查全部明细
+// 1. 查主表列表（按条件过滤，不分页，limit 50000）
+List<Receipt> receipts = receiptMapper.selectList(wrapper);
+if (receipts.isEmpty()) { writeEmptyExcel(); return; }
+
+// 2. 提取所有主表 ID
+List<Long> receiptIds = receipts.stream().map(Receipt::getId).collect(toList());
+
+// 3. 一次查所有明细（IN 查询）
+List<ReceiptItem> allItems = receiptItemMapper.selectList(
+    new LambdaQueryWrapper<ReceiptItem>()
+        .in(ReceiptItem::getReceiptId, receiptIds)
+        .eq(ReceiptItem::getDeleted, 0)
+        .orderByAsc(ReceiptItem::getId)
+);
+
+// 4. 按 receiptId 分组
+Map<Long, List<ReceiptItem>> itemsByReceiptId = allItems.stream()
+    .collect(Collectors.groupingBy(ReceiptItem::getReceiptId));
+
+// 5. 写 Excel（主单行 + 明细行）
+```
+
+### 8.4 前端实现方案
+
+在各模块 API 文件中新增 `exportXxx` 函数：
+
+```js
+// 以 receipt.js 为例
+export const exportReceipts = (params) =>
+  request.get('/receipts/export', { params, responseType: 'blob' })
+```
+
+在 view 中处理 blob 下载：
+
+```js
+const handleExport = async () => {
+  exporting.value = true
+  try {
+    const res = await exportReceipts({ keyword: keyword.value, customerId: customerId.value, ... })
+    // 从 Content-Disposition header 取文件名（或使用默认名）
+    const url = URL.createObjectURL(new Blob([res]))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `收货单_${dayjs().format('YYYYMMDD')}.xlsx`
+    link.click()
+    URL.revokeObjectURL(url)
+  } finally {
+    exporting.value = false
+  }
+}
+```
+
+> ⚠️ **注意**：axios 拦截器默认处理 JSON 响应，blob 下载需要设置 `responseType: 'blob'` 并**绕过**拦截器的 `res.code !== 200` 检查。需确认现有 `request.js` 拦截器对 blob 响应的处理方式，必要时在拦截器中加入 `if (response.config.responseType === 'blob') return response.data` 判断。
+
+### 8.5 开发顺序建议
+
+1. **先建工具类** `ExcelExportUtil.java`，包含所有公共样式和辅助方法
+2. **单表模块先开发**（客户、工艺、物料、收款记录、库存）—— 结构简单，验证样式效果
+3. **主从表模块后开发**（收货单、排产单、发货单、返工单、对账单）—— 结构复杂，有了工具类后开发较快
+4. **前端统一模式**：每个模块的导出按钮和 blob 下载逻辑相同，可复制粘贴后改参数
+
+### 8.6 注意事项
+
+- **大数据量**：超过 50000 行明细时截断，表格末尾最后一行写"注：数据已截断，请缩小查询范围后重试"
+- **列宽自适应**：调用 `autoSizeColumns` 前必须先写完所有数据行，否则估算不准
+- **字体**：使用"宋体"（SimSun），所有中文环境可用
+- **合计行**：单表直接对数字列 SUM；主从表对所有明细行的数字列求和（不对主单行求和）
+- **筛选条件透传**：导出接口参数与列表查询参数完全一致，前端传什么筛选条件后端就导出什么数据
+- **文件名编码**：使用 `URLEncoder.encode(filename, StandardCharsets.UTF_8)` 处理中文，避免浏览器下载时乱码
+
+---
+
+*文档版本：v1.5 | 最后更新：2026-03-18*

@@ -7,6 +7,7 @@ import com.sanitary.admin.service.ReworkService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 
 @RestController
@@ -47,5 +48,14 @@ public class ReworkController {
     public Result<Void> delete(@PathVariable Long id) {
         reworkService.deleteRework(id);
         return Result.success();
+    }
+
+    @GetMapping("/export")
+    public void export(HttpServletResponse response,
+                       @RequestParam(required = false) String keyword,
+                       @RequestParam(required = false) Long customerId,
+                       @RequestParam(required = false) String startDate,
+                       @RequestParam(required = false) String endDate) {
+        reworkService.exportExcel(response, keyword, customerId, startDate, endDate);
     }
 }

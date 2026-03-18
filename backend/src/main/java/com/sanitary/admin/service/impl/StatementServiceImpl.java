@@ -25,6 +25,7 @@ import com.sanitary.admin.mapper.StatementItemMapper;
 import com.sanitary.admin.mapper.StatementMapper;
 import com.sanitary.admin.service.StatementItemService;
 import com.sanitary.admin.service.StatementService;
+import com.sanitary.admin.util.ExcelExportUtil;
 import com.sanitary.admin.util.GenerateNoUtil;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
@@ -33,6 +34,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -478,6 +481,103 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
             s.setItems(statementItemService.getByStatementId(id));
         }
         return s;
+    }
+
+    @Override
+    public void exportExcel(HttpServletResponse response, Long customerId, String statementMonth) {
+        LambdaQueryWrapper<Statement> wrapper = new LambdaQueryWrapper<>();
+        if (customerId != null) wrapper.eq(Statement::getCustomerId, customerId);
+        if (StringUtils.hasText(statementMonth)) wrapper.eq(Statement::getStatementMonth, statementMonth);
+        wrapper.orderByDesc(Statement::getStatementMonth).orderByDesc(Statement::getId).last("LIMIT 5000");
+        List<Statement> statements = this.list(wrapper);
+
+        List<Long> ids = statements.stream().map(Statement::getId).collect(Collectors.toList());
+        List<StatementItem> allItems = new ArrayList<>();
+        if (!ids.isEmpty()) {
+            for (Long stId : ids) {
+                allItems.addAll(statementItemService.getByStatementId(stId));
+            }
+        }
+        java.util.Map<Long, List<StatementItem>> itemMap = allItems.stream()
+            .collect(Collectors.groupingBy(StatementItem::getStatementId));
+
+        XSSFWorkbook wb = new XSSFWorkbook();
+        Sheet sheet = wb.createSheet("对账单");
+        String[] headers = {"对账单号","对账月份","客户名称","物料编码","物料名称","工艺名称",
+            "期初数量","本期收货","本期发货","废品数量","期末数量","单价","良品金额","发货金额","备注"};
+        ExcelExportUtil.writeTitleRow(sheet, wb, "对账单", headers.length);
+        ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
+
+        CellStyle masterS = ExcelExportUtil.masterRowStyle(wb);
+        CellStyle s0 = ExcelExportUtil.dataStyle(wb, false);
+        CellStyle s1 = ExcelExportUtil.dataStyle(wb, true);
+        CellStyle n0 = ExcelExportUtil.numStyle(wb, false);
+        CellStyle n1 = ExcelExportUtil.numStyle(wb, true);
+
+        BigDecimal totalReceiptQty = BigDecimal.ZERO, totalShipmentQty = BigDecimal.ZERO,
+            totalGoodsAmount = BigDecimal.ZERO, totalShipmentAmount = BigDecimal.ZERO;
+
+        int rowIdx = 2;
+        int detailCount = 0;
+        for (Statement st : statements) {
+            List<StatementItem> items = itemMap.getOrDefault(st.getId(), new ArrayList<>());
+            Row masterRow = sheet.createRow(rowIdx++);
+            ExcelExportUtil.setCell(masterRow, 0, st.getStatementNo(), masterS);
+            ExcelExportUtil.setCell(masterRow, 1, st.getStatementMonth(), masterS);
+            ExcelExportUtil.setCell(masterRow, 2, st.getCustomerName(), masterS);
+            for (int i = 3; i < headers.length; i++) ExcelExportUtil.setCell(masterRow, i, "", masterS);
+
+            for (StatementItem item : items) {
+                if (detailCount >= 50000) break;
+                boolean even = (detailCount % 2 == 0);
+                CellStyle cs = even ? s0 : s1;
+                CellStyle ns = even ? n0 : n1;
+                Row row = sheet.createRow(rowIdx++);
+                ExcelExportUtil.setCell(row, 0, "", cs);
+                ExcelExportUtil.setCell(row, 1, "", cs);
+                ExcelExportUtil.setCell(row, 2, "", cs);
+                ExcelExportUtil.setCell(row, 3, item.getMaterialCode(), cs);
+                ExcelExportUtil.setCell(row, 4, item.getMaterialName(), cs);
+                ExcelExportUtil.setCell(row, 5, item.getProcessName(), cs);
+                ExcelExportUtil.setCell(row, 6, item.getPrevBalanceQty(), ns);
+                ExcelExportUtil.setCell(row, 7, item.getReceiptQty(), ns);
+                ExcelExportUtil.setCell(row, 8, item.getShipmentQty(), ns);
+                ExcelExportUtil.setCell(row, 9, item.getDefectiveQty(), ns);
+                ExcelExportUtil.setCell(row, 10, item.getCurrBalanceQty(), ns);
+                ExcelExportUtil.setCell(row, 11, item.getUnitPrice(), ns);
+                ExcelExportUtil.setCell(row, 12, item.getGoodsAmount(), ns);
+                ExcelExportUtil.setCell(row, 13, item.getShipmentAmount(), ns);
+                ExcelExportUtil.setCell(row, 14, item.getRemark(), cs);
+                if (item.getReceiptQty() != null) totalReceiptQty = totalReceiptQty.add(item.getReceiptQty());
+                if (item.getShipmentQty() != null) totalShipmentQty = totalShipmentQty.add(item.getShipmentQty());
+                if (item.getGoodsAmount() != null) totalGoodsAmount = totalGoodsAmount.add(item.getGoodsAmount());
+                if (item.getShipmentAmount() != null) totalShipmentAmount = totalShipmentAmount.add(item.getShipmentAmount());
+                detailCount++;
+            }
+        }
+
+        CellStyle sumS = ExcelExportUtil.summaryStyle(wb);
+        CellStyle sumN = ExcelExportUtil.summaryNumStyle(wb);
+        Row sumRow = sheet.createRow(rowIdx);
+        ExcelExportUtil.setCell(sumRow, 0, "合计", sumS);
+        for (int i = 1; i <= 6; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 7, totalReceiptQty, sumN);
+        ExcelExportUtil.setCell(sumRow, 8, totalShipmentQty, sumN);
+        ExcelExportUtil.setCell(sumRow, 9, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 10, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 11, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 12, totalGoodsAmount, sumN);
+        ExcelExportUtil.setCell(sumRow, 13, totalShipmentAmount, sumN);
+        ExcelExportUtil.setCell(sumRow, 14, "", sumS);
+
+        sheet.createFreezePane(0, 2);
+        ExcelExportUtil.autoSize(sheet, headers.length);
+        try {
+            String today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+            ExcelExportUtil.writeResponse(wb, response, "对账单_" + today + ".xlsx");
+        } catch (IOException e) {
+            throw new RuntimeException("导出失败: " + e.getMessage());
+        }
     }
 
     @Override

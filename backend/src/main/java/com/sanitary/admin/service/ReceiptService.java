@@ -16,4 +16,5 @@ public interface ReceiptService extends IService<Receipt> {
     boolean deleteReceipt(Long id);
     Map<String, Object> importExcel(MultipartFile file, String mode);
     void exportTemplate(HttpServletResponse response);
+    void exportExcel(HttpServletResponse response, String keyword, Long customerId, String startDate, String endDate);
 }

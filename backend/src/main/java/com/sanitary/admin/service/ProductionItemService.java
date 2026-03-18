@@ -7,6 +7,7 @@ import java.util.List;
 
 public interface ProductionItemService extends IService<ProductionItem> {
     List<ProductionItem> listByProductionId(Long productionId);
+    List<ProductionItem> listByProductionIds(List<Long> productionIds);
     void saveItems(Long productionId, String productionNo, List<ProductionItem> items);
     void deleteByProductionId(Long productionId);
 }

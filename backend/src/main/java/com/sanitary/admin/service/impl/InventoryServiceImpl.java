@@ -13,12 +13,16 @@ import com.sanitary.admin.mapper.InventoryMapper;
 import com.sanitary.admin.mapper.MaterialMapper;
 import com.sanitary.admin.mapper.ProcessMapper;
 import com.sanitary.admin.service.InventoryService;
+import com.sanitary.admin.util.ExcelExportUtil;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -522,5 +526,69 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
         if (s == null || s.trim().isEmpty()) return BigDecimal.ZERO;
         try { return new BigDecimal(s.trim()); }
         catch (Exception e) { return BigDecimal.ZERO; }
+    }
+
+    @Override
+    public void exportExcel(HttpServletResponse response, String keyword, Long customerId) {
+        LambdaQueryWrapper<Inventory> wrapper = new LambdaQueryWrapper<>();
+        if (org.springframework.util.StringUtils.hasText(keyword)) {
+            wrapper.and(w -> w.like(Inventory::getMaterialName, keyword)
+                .or().like(Inventory::getMaterialCode, keyword));
+        }
+        if (customerId != null) wrapper.eq(Inventory::getCustomerId, customerId);
+        wrapper.gt(Inventory::getQuantity, 0)
+               .orderByDesc(Inventory::getQuantity)
+               .last("LIMIT 50000");
+        List<Inventory> list = this.list(wrapper);
+
+        XSSFWorkbook wb = new XSSFWorkbook();
+        Sheet sheet = wb.createSheet("库存明细");
+        String[] headers = {"物料编码","物料名称","型号规格","客户名称","工艺名称","库存数量","最后收货时间","最后发货时间"};
+        ExcelExportUtil.writeTitleRow(sheet, wb, "库存明细", headers.length);
+        ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
+
+        CellStyle s0 = ExcelExportUtil.dataStyle(wb, false);
+        CellStyle s1 = ExcelExportUtil.dataStyle(wb, true);
+        CellStyle n0 = ExcelExportUtil.numStyle(wb, false);
+        CellStyle n1 = ExcelExportUtil.numStyle(wb, true);
+        CellStyle d0 = ExcelExportUtil.dateStyle(wb, false);
+        CellStyle d1 = ExcelExportUtil.dateStyle(wb, true);
+
+        BigDecimal totalQty = BigDecimal.ZERO;
+        int rowIdx = 2;
+        for (Inventory inv : list) {
+            boolean even = (rowIdx % 2 == 0);
+            CellStyle s = even ? s1 : s0;
+            CellStyle ns = even ? n1 : n0;
+            CellStyle ds = even ? d1 : d0;
+            Row row = sheet.createRow(rowIdx++);
+            ExcelExportUtil.setCell(row, 0, inv.getMaterialCode(), s);
+            ExcelExportUtil.setCell(row, 1, inv.getMaterialName(), s);
+            ExcelExportUtil.setCell(row, 2, inv.getSpec(), s);
+            ExcelExportUtil.setCell(row, 3, inv.getCustomerName(), s);
+            ExcelExportUtil.setCell(row, 4, inv.getProcessName(), s);
+            ExcelExportUtil.setCell(row, 5, inv.getQuantity(), ns);
+            ExcelExportUtil.setCell(row, 6, ExcelExportUtil.fmtDateTime(inv.getLastReceiveTime()), ds);
+            ExcelExportUtil.setCell(row, 7, ExcelExportUtil.fmtDateTime(inv.getLastShipTime()), ds);
+            if (inv.getQuantity() != null) totalQty = totalQty.add(inv.getQuantity());
+        }
+
+        CellStyle sumS = ExcelExportUtil.summaryStyle(wb);
+        CellStyle sumN = ExcelExportUtil.summaryNumStyle(wb);
+        Row sumRow = sheet.createRow(rowIdx);
+        ExcelExportUtil.setCell(sumRow, 0, "合计", sumS);
+        for (int i = 1; i <= 4; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 5, totalQty, sumN);
+        ExcelExportUtil.setCell(sumRow, 6, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 7, "", sumS);
+
+        sheet.createFreezePane(0, 2);
+        ExcelExportUtil.autoSize(sheet, headers.length);
+        try {
+            String today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+            ExcelExportUtil.writeResponse(wb, response, "库存明细_" + today + ".xlsx");
+        } catch (IOException e) {
+            throw new RuntimeException("导出失败: " + e.getMessage());
+        }
     }
 }

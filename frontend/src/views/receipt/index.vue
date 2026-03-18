@@ -30,6 +30,7 @@
           <div>
             <el-button type="success" :icon="Download" @click="handleDownloadTemplate">下载模板</el-button>
             <el-button type="warning" :icon="Upload" @click="showImportDialog = true">批量导入</el-button>
+            <el-button type="success" :loading="exporting" @click="handleExport">导出 Excel</el-button>
             <el-button type="primary" :icon="Plus" @click="openDialog()">新增收货</el-button>
           </div>
         </div>
@@ -216,7 +217,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Edit, Delete, Download, Upload, View } from '@element-plus/icons-vue'
-import { getReceiptList, createReceipt, updateReceipt, deleteReceipt, downloadTemplate, importReceipts } from '@/api/receipt'
+import { getReceiptList, createReceipt, updateReceipt, deleteReceipt, downloadTemplate, importReceipts, exportReceipts } from '@/api/receipt'
 import { getCustomerAll } from '@/api/customer'
 import { getProcessAll } from '@/api/process'
 import request from '@/utils/request'
@@ -533,6 +534,32 @@ onMounted(() => {
   loadCustomers()
   loadProcesses()
 })
+
+const exporting = ref(false)
+const handleExport = async () => {
+  exporting.value = true
+  try {
+    const res = await exportReceipts({
+      keyword: searchForm.keyword,
+      customerId: searchForm.customerId,
+      startDate: searchForm.dateRange?.[0],
+      endDate: searchForm.dateRange?.[1]
+    })
+    const url = URL.createObjectURL(new Blob([res]))
+    const link = document.createElement('a')
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    link.href = url
+    link.download = `收货单_${today}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error('导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <style scoped>

@@ -25,6 +25,7 @@
           <span>排产单列表</span>
           <div>
             <el-button type="warning" :icon="Upload" @click="showImportDialog = true">批量导入</el-button>
+            <el-button type="success" :loading="exporting" @click="handleExport">导出 Excel</el-button>
             <el-button type="primary" :icon="Plus" @click="openDialog()">新增排产</el-button>
           </div>
         </div>
@@ -222,6 +223,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Edit, Delete, Upload, View } from '@element-plus/icons-vue'
+import { exportProductions } from '@/api/production'
 import request from '@/utils/request'
 
 const loading = ref(false)
@@ -507,6 +509,27 @@ onMounted(() => {
   loadCustomers()
   loadProcesses()
 })
+
+const exporting = ref(false)
+const handleExport = async () => {
+  exporting.value = true
+  try {
+    const res = await exportProductions({ keyword: searchForm.keyword, customerId: searchForm.customerId })
+    const url = URL.createObjectURL(new Blob([res]))
+    const link = document.createElement('a')
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    link.href = url
+    link.download = `排产单_${today}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error('导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <style scoped>

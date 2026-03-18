@@ -22,6 +22,14 @@ public class ReceiptItemServiceImpl extends ServiceImpl<ReceiptItemMapper, Recei
     }
 
     @Override
+    public List<ReceiptItem> listByReceiptIds(List<Long> receiptIds) {
+        if (receiptIds == null || receiptIds.isEmpty()) return new java.util.ArrayList<>();
+        return this.list(new LambdaQueryWrapper<ReceiptItem>()
+            .in(ReceiptItem::getReceiptId, receiptIds)
+            .orderByAsc(ReceiptItem::getId));
+    }
+
+    @Override
     @Transactional
     public void saveItems(Long receiptId, String receiptNo, List<ReceiptItem> items) {
         if (items == null || items.isEmpty()) return;

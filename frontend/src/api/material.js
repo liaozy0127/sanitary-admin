@@ -6,3 +6,5 @@ export const createMaterial = (data) => request.post('/materials', data)
 export const updateMaterial = (id, data) => request.put(`/materials/${id}`, data)
 export const deleteMaterial = (id) => request.delete(`/materials/${id}`)
 export const updateMaterialStatus = (id, status) => request.put(`/materials/${id}/status`, null, { params: { status } })
+export const exportMaterials = (params) =>
+  request.get('/materials/export', { params, responseType: 'blob' })

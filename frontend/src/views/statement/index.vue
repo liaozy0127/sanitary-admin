@@ -27,6 +27,7 @@
           <div>
             <el-button type="warning" :icon="Upload" @click="showImportDialog = true">历史导入</el-button>
             <el-button type="success" :icon="Refresh" :loading="generateAllLoading" @click="handleGenerateAll">批量初始化</el-button>
+            <el-button type="success" :loading="exporting" @click="handleExport">导出 Excel</el-button>
             <el-button type="primary" :icon="Plus" @click="showGenerateDialog = true">生成对账单</el-button>
           </div>
         </div>
@@ -172,7 +173,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Delete, Upload } from '@element-plus/icons-vue'
-import { getStatementList, generateStatement, deleteStatement } from '@/api/statement'
+import { getStatementList, generateStatement, deleteStatement, exportStatements } from '@/api/statement'
 import { getCustomerAll } from '@/api/customer'
 import request from '@/utils/request'
 
@@ -314,6 +315,30 @@ const handleGenerateAll = async () => {
 }
 
 onMounted(() => { fetchList(); loadCustomers() })
+
+const exporting = ref(false)
+const handleExport = async () => {
+  exporting.value = true
+  try {
+    const res = await exportStatements({
+      customerId: searchForm.customerId,
+      statementMonth: searchForm.statementMonth
+    })
+    const url = URL.createObjectURL(new Blob([res]))
+    const link = document.createElement('a')
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    link.href = url
+    link.download = `对账单_${today}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error('导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <style scoped>

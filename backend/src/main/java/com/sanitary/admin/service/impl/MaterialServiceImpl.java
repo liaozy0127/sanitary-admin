@@ -8,12 +8,16 @@ import com.sanitary.admin.entity.Customer;
 import com.sanitary.admin.mapper.MaterialMapper;
 import com.sanitary.admin.mapper.CustomerMapper;
 import com.sanitary.admin.service.MaterialService;
+import com.sanitary.admin.util.ExcelExportUtil;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -204,5 +208,52 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
             }
             default -> "";
         };
+    }
+
+    @Override
+    public void exportExcel(HttpServletResponse response, String keyword, Long customerId, Integer status) {
+        LambdaQueryWrapper<Material> wrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w -> w.like(Material::getMaterialName, keyword).or().like(Material::getMaterialCode, keyword));
+        }
+        if (customerId != null) wrapper.eq(Material::getCustomerId, customerId);
+        if (status != null) wrapper.eq(Material::getStatus, status);
+        wrapper.orderByDesc(Material::getCreateTime).last("LIMIT 50000");
+        List<Material> list = this.list(wrapper);
+
+        XSSFWorkbook wb = new XSSFWorkbook();
+        Sheet sheet = wb.createSheet("物料档案");
+        String[] headers = {"物料编码","物料名称","型号规格","所属客户","默认单价","计量单位","状态"};
+        ExcelExportUtil.writeTitleRow(sheet, wb, "物料档案", headers.length);
+        ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
+
+        CellStyle s0 = ExcelExportUtil.dataStyle(wb, false);
+        CellStyle s1 = ExcelExportUtil.dataStyle(wb, true);
+        CellStyle n0 = ExcelExportUtil.numStyle(wb, false);
+        CellStyle n1 = ExcelExportUtil.numStyle(wb, true);
+
+        int rowIdx = 2;
+        for (Material m : list) {
+            boolean even = (rowIdx % 2 == 0);
+            CellStyle s = even ? s1 : s0;
+            CellStyle ns = even ? n1 : n0;
+            Row row = sheet.createRow(rowIdx++);
+            ExcelExportUtil.setCell(row, 0, m.getMaterialCode(), s);
+            ExcelExportUtil.setCell(row, 1, m.getMaterialName(), s);
+            ExcelExportUtil.setCell(row, 2, m.getSpec(), s);
+            ExcelExportUtil.setCell(row, 3, m.getCustomerName(), s);
+            ExcelExportUtil.setCell(row, 4, m.getDefaultPrice(), ns);
+            ExcelExportUtil.setCell(row, 5, m.getUnit(), s);
+            ExcelExportUtil.setCell(row, 6, m.getStatus() != null && m.getStatus() == 1 ? "启用" : "禁用", s);
+        }
+
+        sheet.createFreezePane(0, 2);
+        ExcelExportUtil.autoSize(sheet, headers.length);
+        try {
+            String today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+            ExcelExportUtil.writeResponse(wb, response, "物料档案_" + today + ".xlsx");
+        } catch (IOException e) {
+            throw new RuntimeException("导出失败: " + e.getMessage());
+        }
     }
 }

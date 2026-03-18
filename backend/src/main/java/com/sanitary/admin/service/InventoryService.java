@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.sanitary.admin.entity.Inventory;
 import com.sanitary.admin.entity.InventoryLog;
 
+import jakarta.servlet.http.HttpServletResponse;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -40,4 +41,9 @@ public interface InventoryService extends IService<Inventory> {
      * 根据收货单和发货单重建全量库存（净额 = 收货 - 发货）
      */
     Map<String, Object> rebuildFromOrders();
+
+    /**
+     * 导出库存明细
+     */
+    void exportExcel(HttpServletResponse response, String keyword, Long customerId);
 }

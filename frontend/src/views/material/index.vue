@@ -40,7 +40,10 @@
       <template #header>
         <div class="table-header">
           <span>物料列表</span>
-          <el-button type="primary" :icon="Plus" @click="openDialog()">新增物料</el-button>
+          <div>
+            <el-button type="success" :loading="exporting" @click="handleExport">导出 Excel</el-button>
+            <el-button type="primary" :icon="Plus" @click="openDialog()">新增物料</el-button>
+          </div>
         </div>
       </template>
 
@@ -152,7 +155,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Edit, Delete } from '@element-plus/icons-vue'
-import { getMaterialList, createMaterial, updateMaterial, deleteMaterial, updateMaterialStatus } from '@/api/material'
+import { getMaterialList, createMaterial, updateMaterial, deleteMaterial, updateMaterialStatus, exportMaterials } from '@/api/material'
 import { getCustomerAll } from '@/api/customer'
 
 const loading = ref(false)
@@ -262,6 +265,27 @@ onMounted(async () => {
   customerOptions.value = res.data || []
   fetchList()
 })
+
+const exporting = ref(false)
+const handleExport = async () => {
+  exporting.value = true
+  try {
+    const res = await exportMaterials({ keyword: searchForm.keyword, customerId: searchForm.customerId })
+    const url = URL.createObjectURL(new Blob([res]))
+    const link = document.createElement('a')
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    link.href = url
+    link.download = `物料档案_${today}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error('导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <style scoped>

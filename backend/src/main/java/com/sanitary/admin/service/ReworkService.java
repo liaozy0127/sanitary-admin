@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.sanitary.admin.entity.Rework;
 
+import jakarta.servlet.http.HttpServletResponse;
+
 public interface ReworkService extends IService<Rework> {
     Page<Rework> pageList(int page, int size, String keyword, Long customerId, String reworkStatus);
     Rework createRework(Rework rework);
@@ -11,4 +13,5 @@ public interface ReworkService extends IService<Rework> {
     boolean deleteRework(Long id);
     void confirm(Long id);
     Rework getByIdWithItems(Long id);
+    void exportExcel(HttpServletResponse response, String keyword, Long customerId, String startDate, String endDate);
 }

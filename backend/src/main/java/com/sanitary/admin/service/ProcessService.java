@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.sanitary.admin.entity.Process;
 
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
 
@@ -12,4 +13,5 @@ public interface ProcessService extends IService<Process> {
     Page<Process> pageList(int page, int size, String keyword);
     List<Map<String, Object>> listAll();
     Map<String, Object> importFromExcel(MultipartFile file);
+    void exportExcel(HttpServletResponse response, String keyword);
 }

@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
@@ -63,5 +64,11 @@ public class ProcessController {
     @PostMapping("/import")
     public Result<Map<String, Object>> importExcel(@RequestParam("file") MultipartFile file) {
         return Result.success(processService.importFromExcel(file));
+    }
+
+    @GetMapping("/export")
+    public void export(HttpServletResponse response,
+                       @RequestParam(required = false) String keyword) {
+        processService.exportExcel(response, keyword);
     }
 }

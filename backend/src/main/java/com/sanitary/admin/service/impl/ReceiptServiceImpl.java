@@ -15,6 +15,7 @@ import com.sanitary.admin.entity.Process;
 import com.sanitary.admin.service.InventoryService;
 import com.sanitary.admin.service.ReceiptItemService;
 import com.sanitary.admin.service.ReceiptService;
+import com.sanitary.admin.util.ExcelExportUtil;
 import com.sanitary.admin.util.GenerateNoUtil;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
@@ -506,6 +507,119 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
         if (mat != null && item.getUnitPrice().compareTo(mat.getDefaultPrice() != null ? mat.getDefaultPrice() : BigDecimal.ZERO) != 0) {
             mat.setDefaultPrice(item.getUnitPrice());
             materialMapper.updateById(mat);
+        }
+    }
+
+    @Override
+    public void exportExcel(HttpServletResponse response, String keyword, Long customerId,
+                            String startDate, String endDate) {
+        LambdaQueryWrapper<Receipt> wrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w -> w.like(Receipt::getReceiptNo, keyword).or().like(Receipt::getCustomerName, keyword));
+        }
+        if (customerId != null) wrapper.eq(Receipt::getCustomerId, customerId);
+        if (StringUtils.hasText(startDate)) wrapper.ge(Receipt::getReceiptDate, startDate);
+        if (StringUtils.hasText(endDate)) wrapper.le(Receipt::getReceiptDate, endDate);
+        wrapper.orderByDesc(Receipt::getReceiptDate).last("LIMIT 5000");
+        List<Receipt> receipts = this.list(wrapper);
+
+        List<Long> ids = receipts.stream().map(Receipt::getId).collect(java.util.stream.Collectors.toList());
+        List<ReceiptItem> allItems = ids.isEmpty() ? new ArrayList<>() :
+            receiptItemService.listByReceiptIds(ids);
+        java.util.Map<Long, List<ReceiptItem>> itemMap = allItems.stream()
+            .collect(java.util.stream.Collectors.groupingBy(ReceiptItem::getReceiptId));
+
+        org.apache.poi.xssf.usermodel.XSSFWorkbook wb = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
+        org.apache.poi.ss.usermodel.Sheet sheet = wb.createSheet("收货单");
+        String[] headers = {"收货单号","收货日期","客户名称","备注","物料编码","物料名称","型号规格","工艺名称",
+            "收货来源","收货数量","发货数量","未发货数量","排产数量","入库数量","未入库数量","单价","金额","客户单号","明细备注"};
+        ExcelExportUtil.writeTitleRow(sheet, wb, "收货单", headers.length);
+        ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
+
+        org.apache.poi.ss.usermodel.CellStyle masterS = ExcelExportUtil.masterRowStyle(wb);
+        org.apache.poi.ss.usermodel.CellStyle masterDateS = ExcelExportUtil.masterRowDateStyle(wb);
+        org.apache.poi.ss.usermodel.CellStyle s0 = ExcelExportUtil.dataStyle(wb, false);
+        org.apache.poi.ss.usermodel.CellStyle s1 = ExcelExportUtil.dataStyle(wb, true);
+        org.apache.poi.ss.usermodel.CellStyle n0 = ExcelExportUtil.numStyle(wb, false);
+        org.apache.poi.ss.usermodel.CellStyle n1 = ExcelExportUtil.numStyle(wb, true);
+
+        // 合计累加器
+        BigDecimal totalQty = BigDecimal.ZERO, totalShipped = BigDecimal.ZERO,
+            totalUnshipped = BigDecimal.ZERO, totalPlanned = BigDecimal.ZERO,
+            totalWarehoused = BigDecimal.ZERO, totalUnwarehoused = BigDecimal.ZERO,
+            totalAmount = BigDecimal.ZERO;
+
+        int rowIdx = 2;
+        int detailCount = 0;
+        for (Receipt r : receipts) {
+            List<ReceiptItem> items = itemMap.getOrDefault(r.getId(), new ArrayList<>());
+            // 主单行
+            org.apache.poi.ss.usermodel.Row masterRow = sheet.createRow(rowIdx++);
+            ExcelExportUtil.setCell(masterRow, 0, r.getReceiptNo(), masterS);
+            ExcelExportUtil.setCell(masterRow, 1, ExcelExportUtil.fmtDate(r.getReceiptDate()), masterDateS);
+            ExcelExportUtil.setCell(masterRow, 2, r.getCustomerName(), masterS);
+            ExcelExportUtil.setCell(masterRow, 3, r.getRemark(), masterS);
+            for (int i = 4; i < headers.length; i++) ExcelExportUtil.setCell(masterRow, i, "", masterS);
+
+            // 明细行
+            for (ReceiptItem item : items) {
+                if (detailCount >= 50000) break;
+                boolean even = (detailCount % 2 == 0);
+                org.apache.poi.ss.usermodel.CellStyle s = even ? s0 : s1;
+                org.apache.poi.ss.usermodel.CellStyle ns = even ? n0 : n1;
+                org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
+                for (int i = 0; i < 4; i++) ExcelExportUtil.setCell(row, i, "", s);
+                ExcelExportUtil.setCell(row, 4, item.getMaterialCode(), s);
+                ExcelExportUtil.setCell(row, 5, item.getMaterialName(), s);
+                ExcelExportUtil.setCell(row, 6, item.getSpec(), s);
+                ExcelExportUtil.setCell(row, 7, item.getProcessName(), s);
+                ExcelExportUtil.setCell(row, 8, item.getReceiptSource(), s);
+                ExcelExportUtil.setCell(row, 9, item.getQuantity(), ns);
+                ExcelExportUtil.setCell(row, 10, item.getShippedQty(), ns);
+                ExcelExportUtil.setCell(row, 11, item.getUnshippedQty(), ns);
+                ExcelExportUtil.setCell(row, 12, item.getPlannedQty(), ns);
+                ExcelExportUtil.setCell(row, 13, item.getWareHousedQty(), ns);
+                ExcelExportUtil.setCell(row, 14, item.getUnwareHousedQty(), ns);
+                ExcelExportUtil.setCell(row, 15, item.getUnitPrice(), ns);
+                ExcelExportUtil.setCell(row, 16, item.getAmount(), ns);
+                ExcelExportUtil.setCell(row, 17, item.getCustomerOrderNo(), s);
+                ExcelExportUtil.setCell(row, 18, item.getDetailRemark(), s);
+                // 累计
+                if (item.getQuantity() != null) totalQty = totalQty.add(item.getQuantity());
+                if (item.getShippedQty() != null) totalShipped = totalShipped.add(item.getShippedQty());
+                if (item.getUnshippedQty() != null) totalUnshipped = totalUnshipped.add(item.getUnshippedQty());
+                if (item.getPlannedQty() != null) totalPlanned = totalPlanned.add(item.getPlannedQty());
+                if (item.getWareHousedQty() != null) totalWarehoused = totalWarehoused.add(item.getWareHousedQty());
+                if (item.getUnwareHousedQty() != null) totalUnwarehoused = totalUnwarehoused.add(item.getUnwareHousedQty());
+                if (item.getAmount() != null) totalAmount = totalAmount.add(item.getAmount());
+                detailCount++;
+            }
+        }
+
+        // 合计行
+        org.apache.poi.ss.usermodel.CellStyle sumS = ExcelExportUtil.summaryStyle(wb);
+        org.apache.poi.ss.usermodel.CellStyle sumN = ExcelExportUtil.summaryNumStyle(wb);
+        org.apache.poi.ss.usermodel.Row sumRow = sheet.createRow(rowIdx);
+        ExcelExportUtil.setCell(sumRow, 0, "合计", sumS);
+        for (int i = 1; i <= 8; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 9, totalQty, sumN);
+        ExcelExportUtil.setCell(sumRow, 10, totalShipped, sumN);
+        ExcelExportUtil.setCell(sumRow, 11, totalUnshipped, sumN);
+        ExcelExportUtil.setCell(sumRow, 12, totalPlanned, sumN);
+        ExcelExportUtil.setCell(sumRow, 13, totalWarehoused, sumN);
+        ExcelExportUtil.setCell(sumRow, 14, totalUnwarehoused, sumN);
+        ExcelExportUtil.setCell(sumRow, 15, BigDecimal.ZERO, sumN);
+        ExcelExportUtil.setCell(sumRow, 16, totalAmount, sumN);
+        ExcelExportUtil.setCell(sumRow, 17, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 18, "", sumS);
+
+        sheet.createFreezePane(0, 2);
+        ExcelExportUtil.autoSize(sheet, headers.length);
+        try {
+            String today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+            ExcelExportUtil.writeResponse(wb, response, "收货单_" + today + ".xlsx");
+        } catch (IOException e) {
+            throw new RuntimeException("导出失败: " + e.getMessage());
         }
     }
 }

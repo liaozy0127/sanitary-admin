@@ -8,14 +8,18 @@ import com.sanitary.admin.entity.Payment;
 import com.sanitary.admin.mapper.CustomerMapper;
 import com.sanitary.admin.mapper.PaymentMapper;
 import com.sanitary.admin.service.PaymentService;
+import com.sanitary.admin.util.ExcelExportUtil;
 import com.sanitary.admin.util.GenerateNoUtil;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -178,6 +182,68 @@ public class PaymentServiceImpl extends ServiceImpl<PaymentMapper, Payment> impl
             newCustomer.setStatus(1);
             customerMapper.insert(newCustomer);
             return newCustomer.getId();
+        }
+    }
+
+    @Override
+    public void exportExcel(HttpServletResponse response, Long customerId, String startDate, String endDate) {
+        LambdaQueryWrapper<Payment> wrapper = new LambdaQueryWrapper<>();
+        if (customerId != null) wrapper.eq(Payment::getCustomerId, customerId);
+        if (org.springframework.util.StringUtils.hasText(startDate)) wrapper.ge(Payment::getPaymentDate, startDate);
+        if (org.springframework.util.StringUtils.hasText(endDate)) wrapper.le(Payment::getPaymentDate, endDate);
+        wrapper.orderByDesc(Payment::getPaymentDate).last("LIMIT 50000");
+        List<Payment> list = this.list(wrapper);
+
+        XSSFWorkbook wb = new XSSFWorkbook();
+        Sheet sheet = wb.createSheet("收款记录");
+        String[] headers = {"收款单号","收款日期","客户名称","金额","收款方式","参考单号","备注"};
+        ExcelExportUtil.writeTitleRow(sheet, wb, "收款记录", headers.length);
+        ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
+
+        CellStyle s0 = ExcelExportUtil.dataStyle(wb, false);
+        CellStyle s1 = ExcelExportUtil.dataStyle(wb, true);
+        CellStyle n0 = ExcelExportUtil.numStyle(wb, false);
+        CellStyle n1 = ExcelExportUtil.numStyle(wb, true);
+        CellStyle d0 = ExcelExportUtil.dateStyle(wb, false);
+        CellStyle d1 = ExcelExportUtil.dateStyle(wb, true);
+
+        java.math.BigDecimal totalAmount = java.math.BigDecimal.ZERO;
+        int rowIdx = 2;
+        for (Payment p : list) {
+            boolean even = (rowIdx % 2 == 0);
+            CellStyle s = even ? s1 : s0;
+            CellStyle ns = even ? n1 : n0;
+            CellStyle ds = even ? d1 : d0;
+            Row row = sheet.createRow(rowIdx++);
+            ExcelExportUtil.setCell(row, 0, p.getPaymentNo(), s);
+            ExcelExportUtil.setCell(row, 1, ExcelExportUtil.fmtDate(p.getPaymentDate()), ds);
+            ExcelExportUtil.setCell(row, 2, p.getCustomerName(), s);
+            ExcelExportUtil.setCell(row, 3, p.getAmount(), ns);
+            ExcelExportUtil.setCell(row, 4, p.getPaymentMethod(), s);
+            ExcelExportUtil.setCell(row, 5, p.getReferenceNo(), s);
+            ExcelExportUtil.setCell(row, 6, p.getRemark(), s);
+            if (p.getAmount() != null) totalAmount = totalAmount.add(p.getAmount());
+        }
+
+        // 合计行
+        CellStyle sumS = ExcelExportUtil.summaryStyle(wb);
+        CellStyle sumN = ExcelExportUtil.summaryNumStyle(wb);
+        Row sumRow = sheet.createRow(rowIdx);
+        ExcelExportUtil.setCell(sumRow, 0, "合计", sumS);
+        ExcelExportUtil.setCell(sumRow, 1, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 2, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 3, totalAmount, sumN);
+        ExcelExportUtil.setCell(sumRow, 4, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 5, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 6, "", sumS);
+
+        sheet.createFreezePane(0, 2);
+        ExcelExportUtil.autoSize(sheet, headers.length);
+        try {
+            String today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+            ExcelExportUtil.writeResponse(wb, response, "收款记录_" + today + ".xlsx");
+        } catch (IOException e) {
+            throw new RuntimeException("导出失败: " + e.getMessage());
         }
     }
 }

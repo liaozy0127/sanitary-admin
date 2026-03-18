@@ -30,7 +30,10 @@
       <template #header>
         <div class="table-header">
           <span>客户列表</span>
-          <el-button type="primary" :icon="Plus" @click="openDialog()">新增客户</el-button>
+          <div>
+            <el-button type="success" :loading="exporting" @click="handleExport">导出 Excel</el-button>
+            <el-button type="primary" :icon="Plus" @click="openDialog()">新增客户</el-button>
+          </div>
         </div>
       </template>
 
@@ -161,7 +164,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Edit, Delete } from '@element-plus/icons-vue'
-import { getCustomerList, createCustomer, updateCustomer, deleteCustomer, updateCustomerStatus } from '@/api/customer'
+import { getCustomerList, createCustomer, updateCustomer, deleteCustomer, updateCustomerStatus, exportCustomers } from '@/api/customer'
 
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -263,6 +266,27 @@ const toggleStatus = async (row) => {
 }
 
 onMounted(fetchList)
+
+const exporting = ref(false)
+const handleExport = async () => {
+  exporting.value = true
+  try {
+    const res = await exportCustomers({ keyword: searchForm.keyword, customerType: searchForm.customerType })
+    const url = URL.createObjectURL(new Blob([res]))
+    const link = document.createElement('a')
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    link.href = url
+    link.download = `客户档案_${today}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error('导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <style scoped>

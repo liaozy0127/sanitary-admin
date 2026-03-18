@@ -6,12 +6,15 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sanitary.admin.entity.Process;
 import com.sanitary.admin.mapper.ProcessMapper;
 import com.sanitary.admin.service.ProcessService;
+import com.sanitary.admin.util.ExcelExportUtil;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -136,5 +139,48 @@ public class ProcessServiceImpl extends ServiceImpl<ProcessMapper, Process> impl
     private boolean processExists(String processCode) {
         if (processCode == null || processCode.trim().isEmpty()) return false;
         return this.count(new LambdaQueryWrapper<Process>().eq(Process::getProcessCode, processCode.trim())) > 0;
+    }
+
+    @Override
+    public void exportExcel(HttpServletResponse response, String keyword) {
+        LambdaQueryWrapper<Process> wrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w -> w.like(Process::getProcessName, keyword).or().like(Process::getProcessCode, keyword));
+        }
+        wrapper.orderByAsc(Process::getPriorityNo).last("LIMIT 50000");
+        List<Process> list = this.list(wrapper);
+
+        XSSFWorkbook wb = new XSSFWorkbook();
+        Sheet sheet = wb.createSheet("工艺档案");
+        String[] headers = {"工艺编码","工艺名称","工艺类别","工艺性质","厚度要求","是否默认报价","优先级","状态"};
+        ExcelExportUtil.writeTitleRow(sheet, wb, "工艺档案", headers.length);
+        ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
+
+        CellStyle s0 = ExcelExportUtil.dataStyle(wb, false);
+        CellStyle s1 = ExcelExportUtil.dataStyle(wb, true);
+
+        int rowIdx = 2;
+        for (Process p : list) {
+            boolean even = (rowIdx % 2 == 0);
+            CellStyle s = even ? s1 : s0;
+            Row row = sheet.createRow(rowIdx++);
+            ExcelExportUtil.setCell(row, 0, p.getProcessCode(), s);
+            ExcelExportUtil.setCell(row, 1, p.getProcessName(), s);
+            ExcelExportUtil.setCell(row, 2, p.getProcessCategory(), s);
+            ExcelExportUtil.setCell(row, 3, p.getProcessNature(), s);
+            ExcelExportUtil.setCell(row, 4, p.getThicknessReq(), s);
+            ExcelExportUtil.setCell(row, 5, p.getDefaultQuote() != null && p.getDefaultQuote() == 1 ? "是" : "否", s);
+            ExcelExportUtil.setCell(row, 6, p.getPriorityNo(), s);
+            ExcelExportUtil.setCell(row, 7, p.getStatus() != null && p.getStatus() == 1 ? "启用" : "禁用", s);
+        }
+
+        sheet.createFreezePane(0, 2);
+        ExcelExportUtil.autoSize(sheet, headers.length);
+        try {
+            String today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+            ExcelExportUtil.writeResponse(wb, response, "工艺档案_" + today + ".xlsx");
+        } catch (IOException e) {
+            throw new RuntimeException("导出失败: " + e.getMessage());
+        }
     }
 }

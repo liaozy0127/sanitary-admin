@@ -9,6 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
@@ -69,5 +70,12 @@ public class CustomerController {
     @PostMapping("/import")
     public Result<Map<String, Object>> importExcel(@RequestParam("file") MultipartFile file) {
         return Result.success(customerService.importFromExcel(file));
+    }
+
+    @GetMapping("/export")
+    public void export(HttpServletResponse response,
+                       @RequestParam(required = false) String keyword,
+                       @RequestParam(required = false) String customerType) {
+        customerService.exportExcel(response, keyword, customerType);
     }
 }

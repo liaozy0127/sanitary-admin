@@ -6,3 +6,5 @@ export const createProcess = (data) => request.post('/processes', data)
 export const updateProcess = (id, data) => request.put(`/processes/${id}`, data)
 export const deleteProcess = (id) => request.delete(`/processes/${id}`)
 export const updateProcessStatus = (id, status) => request.put(`/processes/${id}/status`, null, { params: { status } })
+export const exportProcesses = (params) =>
+  request.get('/processes/export', { params, responseType: 'blob' })

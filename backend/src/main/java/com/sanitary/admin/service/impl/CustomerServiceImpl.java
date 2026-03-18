@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sanitary.admin.entity.Customer;
 import com.sanitary.admin.mapper.CustomerMapper;
 import com.sanitary.admin.service.CustomerService;
+import com.sanitary.admin.util.ExcelExportUtil;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -164,5 +165,61 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     private boolean customerExists(String customerCode) {
         if (customerCode == null || customerCode.trim().isEmpty()) return false;
         return this.count(new LambdaQueryWrapper<Customer>().eq(Customer::getCustomerCode, customerCode.trim())) > 0;
+    }
+
+    @Override
+    public void exportExcel(HttpServletResponse response, String keyword, String customerType) {
+        LambdaQueryWrapper<Customer> wrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w -> w.like(Customer::getCustomerName, keyword).or().like(Customer::getCustomerCode, keyword));
+        }
+        if (StringUtils.hasText(customerType)) {
+            wrapper.eq(Customer::getCustomerType, customerType);
+        }
+        wrapper.orderByDesc(Customer::getCreateTime).last("LIMIT 50000");
+        List<Customer> list = this.list(wrapper);
+
+        XSSFWorkbook wb = new XSSFWorkbook();
+        Sheet sheet = wb.createSheet("客户档案");
+
+        String[] headers = {"客户编码","客户名称","客户类型","联系人","联系电话","地址","业务员","开户银行","银行账号","税号","状态","创建时间","备注"};
+        ExcelExportUtil.writeTitleRow(sheet, wb, "客户档案", headers.length);
+        ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
+
+        CellStyle s0 = ExcelExportUtil.dataStyle(wb, false);
+        CellStyle s1 = ExcelExportUtil.dataStyle(wb, true);
+        CellStyle d0 = ExcelExportUtil.dateStyle(wb, false);
+        CellStyle d1 = ExcelExportUtil.dateStyle(wb, true);
+
+        int rowIdx = 2;
+        for (Customer c : list) {
+            boolean even = (rowIdx % 2 == 0);
+            CellStyle s = even ? s1 : s0;
+            CellStyle ds = even ? d1 : d0;
+            Row row = sheet.createRow(rowIdx++);
+            ExcelExportUtil.setCell(row, 0, c.getCustomerCode(), s);
+            ExcelExportUtil.setCell(row, 1, c.getCustomerName(), s);
+            ExcelExportUtil.setCell(row, 2, c.getCustomerType(), s);
+            ExcelExportUtil.setCell(row, 3, c.getContactPerson(), s);
+            ExcelExportUtil.setCell(row, 4, c.getContactPhone(), s);
+            ExcelExportUtil.setCell(row, 5, c.getAddress(), s);
+            ExcelExportUtil.setCell(row, 6, c.getSalesperson(), s);
+            ExcelExportUtil.setCell(row, 7, c.getBankName(), s);
+            ExcelExportUtil.setCell(row, 8, c.getBankAccount(), s);
+            ExcelExportUtil.setCell(row, 9, c.getTaxNo(), s);
+            ExcelExportUtil.setCell(row, 10, c.getStatus() != null && c.getStatus() == 1 ? "启用" : "禁用", s);
+            ExcelExportUtil.setCell(row, 11, ExcelExportUtil.fmtDateTime(c.getCreateTime()), ds);
+            ExcelExportUtil.setCell(row, 12, c.getRemark(), s);
+        }
+
+        sheet.createFreezePane(0, 2);
+        ExcelExportUtil.autoSize(sheet, headers.length);
+
+        try {
+            String today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+            ExcelExportUtil.writeResponse(wb, response, "客户档案_" + today + ".xlsx");
+        } catch (IOException e) {
+            throw new RuntimeException("导出失败: " + e.getMessage());
+        }
     }
 }
