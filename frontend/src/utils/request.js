@@ -34,13 +34,11 @@ request.interceptors.response.use(
   },
   (error) => {
     const status = error.response?.status
-    if (status === 401) {
+    if (status === 401 || status === 403) {
       const userStore = useUserStore()
       userStore.logout()
       ElMessage.error('登录已过期，请重新登录')
       router.push('/login')
-    } else if (status === 403) {
-      ElMessage.error('没有权限执行此操作')
     } else if (status === 404) {
       ElMessage.error('请求的资源不存在')
     } else if (status >= 500) {
