@@ -33,6 +33,10 @@
             <el-icon><Menu /></el-icon>
             <template #title>菜单管理</template>
           </el-menu-item>
+          <el-menu-item index="/print-config">
+            <el-icon><Printer /></el-icon>
+            <template #title>打印设置</template>
+          </el-menu-item>
         </el-sub-menu>
 
         <!-- 基础数据 -->
@@ -137,7 +141,7 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import {
   User, Fold, Expand, ArrowDown, OfficeBuilding, UserFilled, Menu,
   Setting, Files, Operation, Box, SetUp, Download, Upload,
-  Money, Wallet, Document, Calendar
+  Money, Wallet, Document, Calendar, Printer
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 
