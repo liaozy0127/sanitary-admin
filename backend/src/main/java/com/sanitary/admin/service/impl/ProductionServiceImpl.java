@@ -14,8 +14,10 @@ import com.sanitary.admin.mapper.MaterialMapper;
 import com.sanitary.admin.mapper.ProcessMapper;
 import com.sanitary.admin.service.ProductionItemService;
 import com.sanitary.admin.service.ProductionService;
+import com.sanitary.admin.service.SysConfigService;
 import com.sanitary.admin.util.ExcelExportUtil;
 import com.sanitary.admin.util.GenerateNoUtil;
+import com.sanitary.admin.util.PdfGenerator;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -27,6 +29,8 @@ import org.springframework.web.multipart.MultipartFile;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,6 +47,7 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
     private final MaterialMapper materialMapper;
     private final ProcessMapper processMapper;
     private final ProductionItemService productionItemService;
+    private final SysConfigService sysConfigService;
 
     @Override
     public Page<Production> pageList(int page, int size, String keyword, Long customerId, String prodStatus) {
@@ -397,5 +402,130 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
         } catch (IOException e) {
             throw new RuntimeException("导出失败: " + e.getMessage());
         }
+    }
+
+    @Override
+    public void exportPdf(Long id, HttpServletResponse response) {
+        Production production = getById(id);
+        if (production == null) throw new RuntimeException("排产单不存在");
+        production.setItems(productionItemService.listByProductionId(id));
+
+        Map<String, String> config = sysConfigService.getPrintConfig();
+        String docTitle = nvl(config.get("printTitleProduction"), "致恒（致越）金属表面加工厂生产安排表");
+        String sig1 = nvl(config.get("printSignature1Label"), "生产班长");
+        String sig2 = nvl(config.get("printSignature2Label"), "仓管");
+        String sig3 = nvl(config.get("printSignature3Label"), "签名");
+
+        List<ProductionItem> items = production.getItems() == null ? new ArrayList<>() : production.getItems();
+        BigDecimal totalQty = items.stream()
+            .map(it -> it.getPlannedQty() == null ? BigDecimal.ZERO : it.getPlannedQty())
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        StringBuilder rows = new StringBuilder();
+        for (ProductionItem item : items) {
+            rows.append("<tr>")
+                .append("<td>").append(esc(production.getCustomerName())).append("</td>")
+                .append("<td>").append(esc(item.getMaterialName())).append("</td>")
+                .append("<td>").append(esc(item.getSpec())).append("</td>")
+                .append("<td>").append(esc(item.getProcessName())).append("</td>")
+                .append("<td style=\"text-align:right\">").append(item.getPlannedQty() != null ? item.getPlannedQty().toPlainString() : "").append("</td>")
+                .append("<td style=\"text-align:center\">").append(esc(item.getProductionType())).append("</td>")
+                .append("<td></td><td></td><td></td><td></td>")
+                .append("<td>").append(esc(item.getDetailRemark())).append("</td>")
+                .append("</tr>");
+        }
+
+        String prodDate = production.getProductionDate() != null ? production.getProductionDate().toString() : "";
+        String shiftVal = "";
+        String remark = nvl(production.getRemark(), "");
+
+        String html = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+            + "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\">\n"
+            + "<html xmlns=\"http://www.w3.org/1999/xhtml\">\n"
+            + "<head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\"/>\n"
+            + "<style type=\"text/css\">\n"
+            + "@page {\n"
+            + "  size: 241mm 120mm;\n"
+            + "  margin: 18mm 5mm 16mm 5mm;\n"
+            + "  @top-center { content: element(pageHeader); }\n"
+            + "  @bottom-center { content: element(pageFooter); }\n"
+            + "}\n"
+            + "body { font-family: 'WenQuanYi Zen Hei', 'AR PL UMing CN', serif; font-size: 9pt; margin:0; padding:0; }\n"
+            + "#pageHeader {\n"
+            + "  position: running(pageHeader);\n"
+            + "  width: 100%;\n"
+            + "}\n"
+            + "#pageHeader h2 { text-align:center; font-size:12pt; margin:0 0 4pt 0; }\n"
+            + "#pageHeader .meta { display:table; width:100%; border-collapse:collapse; font-size:9pt; }\n"
+            + "#pageHeader .meta td { display:table-cell; width:25%; padding:1pt 2pt; }\n"
+            + "#pageFooter {\n"
+            + "  position: running(pageFooter);\n"
+            + "  width: 100%;\n"
+            + "  font-size:9pt;\n"
+            + "}\n"
+            + "#pageFooter .remark { margin-bottom:2pt; }\n"
+            + "#pageFooter .sigs { display:table; width:100%; }\n"
+            + "#pageFooter .sigs td { display:table-cell; width:33%; }\n"
+            + "table.main { width:100%; border-collapse:collapse; font-size:8pt; }\n"
+            + "table.main th, table.main td { border:1pt solid #0066CC; padding:2pt 3pt; }\n"
+            + "table.main th { background-color:#D9E8F7; text-align:center; font-weight:bold; }\n"
+            + "</style>\n"
+            + "</head><body>\n"
+            + "<div id=\"pageHeader\">\n"
+            + "  <h2>" + esc(docTitle) + "</h2>\n"
+            + "  <table class=\"meta\"><tr>\n"
+            + "    <td>排产日期：" + esc(prodDate) + "</td>\n"
+            + "    <td>单号：" + esc(production.getProductionNo()) + "</td>\n"
+            + "    <td>班次：" + esc(shiftVal) + "</td>\n"
+            + "    <td>客户：" + esc(production.getCustomerName()) + "</td>\n"
+            + "  </tr></table>\n"
+            + "</div>\n"
+            + "<div id=\"pageFooter\">\n"
+            + "  <div class=\"remark\">备注：" + esc(remark) + "</div>\n"
+            + "  <table class=\"sigs\"><tr>\n"
+            + "    <td>" + esc(sig3) + "：________________</td>\n"
+            + "    <td>" + esc(sig1) + "：________________</td>\n"
+            + "    <td>" + esc(sig2) + "：________________</td>\n"
+            + "  </tr></table>\n"
+            + "</div>\n"
+            + "<table class=\"main\">\n"
+            + "  <thead>\n"
+            + "    <tr>\n"
+            + "      <th rowspan=\"2\">客户</th><th rowspan=\"2\">品名</th><th rowspan=\"2\">规格</th>"
+            + "<th rowspan=\"2\">工艺</th><th rowspan=\"2\">数量</th><th rowspan=\"2\">类型</th>"
+            + "<th colspan=\"4\">完成情况</th><th rowspan=\"2\">备注</th>\n"
+            + "    </tr>\n"
+            + "    <tr>\n"
+            + "      <th>1良品</th><th>2良品</th><th>3良品</th><th>不良</th>\n"
+            + "    </tr>\n"
+            + "  </thead>\n"
+            + "  <tbody>\n"
+            + rows.toString()
+            + "    <tr>\n"
+            + "      <td colspan=\"4\" style=\"text-align:right;font-weight:bold;\">合计</td>\n"
+            + "      <td style=\"text-align:right;font-weight:bold;\">" + totalQty.toPlainString() + "</td>\n"
+            + "      <td colspan=\"6\"></td>\n"
+            + "    </tr>\n"
+            + "  </tbody>\n"
+            + "</table>\n"
+            + "</body></html>";
+
+        try {
+            String filename = URLEncoder.encode("排产单_" + production.getProductionNo() + ".pdf", StandardCharsets.UTF_8);
+            response.setContentType("application/pdf");
+            response.setHeader("Content-Disposition", "inline; filename*=UTF-8''" + filename);
+            PdfGenerator.render(html, response.getOutputStream());
+        } catch (Exception e) {
+            throw new RuntimeException("PDF生成失败: " + e.getMessage(), e);
+        }
+    }
+
+    private static String nvl(String v, String def) {
+        return (v != null && !v.isEmpty()) ? v : def;
+    }
+
+    private static String esc(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
     }
 }

@@ -36,9 +36,27 @@ public class SysConfigServiceImpl extends ServiceImpl<SysConfigMapper, SysConfig
     }
 
     @Override
-    public void savePrintConfig(String factoryName, String makerName) {
-        setConfigValue("print.factory_name", factoryName);
-        setConfigValue("print.maker_name",   makerName);
+    public void savePrintConfig(Map<String, String> config) {
+        Map<String, String> keyMap = new java.util.LinkedHashMap<>();
+        keyMap.put("factoryName",          "print.factory_name");
+        keyMap.put("makerName",            "print.maker_name");
+        keyMap.put("printTitleProduction", "print.title_production");
+        keyMap.put("printTitleDelivery",   "print.title_delivery");
+        keyMap.put("printCompanyName",     "print.company_name");
+        keyMap.put("printCompanyPhone",    "print.company_phone");
+        keyMap.put("printCompanyAddress",  "print.company_address");
+        keyMap.put("printContact1",        "print.contact_1");
+        keyMap.put("printContact2",        "print.contact_2");
+        keyMap.put("printSignature1Label", "print.signature_1_label");
+        keyMap.put("printSignature2Label", "print.signature_2_label");
+        keyMap.put("printSignature3Label", "print.signature_3_label");
+        keyMap.put("printMakerLabel",      "print.maker_label");
+        keyMap.put("printDeliveryRemark",  "print.delivery_remark");
+        for (Map.Entry<String, String> entry : keyMap.entrySet()) {
+            if (config.containsKey(entry.getKey())) {
+                setConfigValue(entry.getValue(), config.get(entry.getKey()));
+            }
+        }
     }
 
     private String getConfigValue(String key, String defaultValue) {

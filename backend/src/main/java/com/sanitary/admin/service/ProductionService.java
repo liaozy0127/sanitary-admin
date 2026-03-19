@@ -16,4 +16,5 @@ public interface ProductionService extends IService<Production> {
     boolean deleteProduction(Long id);
     Map<String, Object> importFromExcel(MultipartFile file, String mode);
     void exportExcel(HttpServletResponse response, String keyword, Long customerId, String startDate, String endDate);
+    void exportPdf(Long id, HttpServletResponse response);
 }

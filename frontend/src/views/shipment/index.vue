@@ -578,7 +578,7 @@ const handlePrint = async (row) => {
     const win = window.open('', '_blank', 'width=900,height=650')
     win.document.write(html)
     win.document.close()
-    win.onload = () => { win.print(); win.close() }
+    win.onload = () => { win.print() }
   } catch (e) {
     ElMessage.error('打印失败，请重试')
   }

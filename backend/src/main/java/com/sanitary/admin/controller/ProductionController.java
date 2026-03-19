@@ -77,4 +77,9 @@ public class ProductionController {
                        @RequestParam(required = false) String endDate) {
         productionService.exportExcel(response, keyword, customerId, startDate, endDate);
     }
+
+    @GetMapping("/{id}/pdf")
+    public void exportPdf(@PathVariable Long id, HttpServletResponse response) {
+        productionService.exportPdf(id, response);
+    }
 }

@@ -7,7 +7,9 @@ RUN mvn package -DskipTests -B --no-transfer-progress
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl fontconfig \
+    && apk add --no-cache --repository https://dl-cdn.alpinelinux.org/alpine/edge/testing font-wqy-zenhei \
+    && fc-cache -fv
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-Xmx512m", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]

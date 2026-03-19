@@ -7,5 +7,5 @@ import java.util.Map;
 
 public interface SysConfigService extends IService<SysConfig> {
     Map<String, String> getPrintConfig();
-    void savePrintConfig(String factoryName, String makerName);
+    void savePrintConfig(Map<String, String> config);
 }

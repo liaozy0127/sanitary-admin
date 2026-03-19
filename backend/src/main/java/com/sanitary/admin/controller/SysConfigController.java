@@ -21,9 +21,7 @@ public class SysConfigController {
 
     @PutMapping("/print")
     public Result<Void> savePrintConfig(@RequestBody Map<String, String> body) {
-        String factoryName = body.getOrDefault("factoryName", "");
-        String makerName   = body.getOrDefault("makerName", "");
-        sysConfigService.savePrintConfig(factoryName, makerName);
+        sysConfigService.savePrintConfig(body);
         return Result.success();
     }
 }
