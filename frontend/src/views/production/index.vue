@@ -60,9 +60,10 @@
         <el-table-column prop="productionDate" label="排产日期" width="110" />
         <el-table-column prop="customerName" label="客户名称" min-width="120" />
         <el-table-column prop="remark" label="备注" min-width="120" />
-        <el-table-column label="操作" width="170" align="center" fixed="right">
+        <el-table-column label="操作" width="250" align="center" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" :icon="Edit" @click="openDialog(row)">编辑</el-button>
+            <el-button size="small" type="success" :icon="Printer" @click="handlePrint(row)">打印</el-button>
             <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -222,8 +223,9 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, Edit, Delete, Upload, View } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Edit, Delete, Upload, View, Printer } from '@element-plus/icons-vue'
 import { exportProductions } from '@/api/production'
+import { getPrintConfig } from '@/api/config'
 import request from '@/utils/request'
 
 const loading = ref(false)
@@ -501,6 +503,75 @@ const handleImport = async () => {
   } finally {
     importLoading.value = false
     importFile.value = null
+  }
+}
+
+const handlePrint = async (row) => {
+  try {
+    const [detailRes, configRes] = await Promise.all([
+      request.get(`/productions/${row.id}`),
+      getPrintConfig()
+    ])
+    const detail = detailRes.data || detailRes
+    const config = configRes.data || configRes
+    const items = detail.items || []
+    const factoryName = config.factoryName || ''
+    const makerName = config.makerName || ''
+
+    const itemRows = items.map((item, i) => {
+      const nameSpec = [item.materialName, item.spec].filter(Boolean).join(' ')
+      const qty = (item.plannedQty != null ? item.plannedQty : '') + (item.unit ? ' ' + item.unit : '')
+      return `<tr>
+        <td style="text-align:center">${i + 1}</td>
+        <td>${nameSpec}</td>
+        <td style="text-align:center">${qty}</td>
+        <td>${item.detailRemark || ''}</td>
+      </tr>`
+    }).join('')
+
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>排产单 ${detail.productionNo || ''}</title>
+<style>
+  @page { size: 241mm 140mm; margin: 10mm 5mm; }
+  * { box-sizing: border-box; }
+  body { width: 231mm; font-family: SimSun, "宋体", serif; font-size: 9pt; margin: 0; }
+  .factory-name { text-align: center; font-size: 14pt; font-weight: bold; margin-bottom: 2mm; }
+  .doc-title { text-align: center; font-size: 12pt; font-weight: bold; margin-bottom: 3mm; letter-spacing: 4px; }
+  .header-row { display: flex; justify-content: space-between; margin-bottom: 1.5mm; font-size: 9pt; }
+  .items-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 2mm; }
+  .items-table th, .items-table td { border: 0.5pt solid #000; padding: 1mm 2mm; }
+  .items-table th { text-align: center; background: #f0f0f0; font-weight: bold; }
+  .items-table td:first-child { text-align: center; width: 8mm; }
+  .items-table td:nth-child(2) { width: 55%; }
+  .items-table td:nth-child(3) { text-align: center; width: 20%; }
+  .footer-row { margin-top: 3mm; display: flex; justify-content: flex-start; gap: 20mm; }
+</style>
+</head><body>
+<div class="factory-name">${factoryName}</div>
+<div class="doc-title">排 产 单</div>
+<div class="header-row">
+  <span>客户：${detail.customerName || ''}</span>
+  <span>日期：${detail.productionDate || ''}</span>
+</div>
+<div class="header-row">
+  <span>单号：${detail.productionNo || ''}</span>
+</div>
+<table class="items-table">
+  <thead><tr><th>序号</th><th>品名规格</th><th>数量</th><th>备注</th></tr></thead>
+  <tbody>${itemRows}</tbody>
+</table>
+<div class="footer-row">
+  <span>制单人：${makerName}</span>
+</div>
+</body></html>`
+
+    const win = window.open('', '_blank', 'width=800,height=600')
+    win.document.write(html)
+    win.document.close()
+    win.onload = () => { win.print(); win.close() }
+  } catch (e) {
+    ElMessage.error('打印失败，请重试')
   }
 }
 

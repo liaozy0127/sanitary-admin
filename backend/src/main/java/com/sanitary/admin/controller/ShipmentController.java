@@ -2,7 +2,9 @@ package com.sanitary.admin.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sanitary.admin.common.Result;
+import com.sanitary.admin.entity.Customer;
 import com.sanitary.admin.entity.Shipment;
+import com.sanitary.admin.service.CustomerService;
 import com.sanitary.admin.service.ShipmentItemService;
 import com.sanitary.admin.service.ShipmentService;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ public class ShipmentController {
 
     private final ShipmentService shipmentService;
     private final ShipmentItemService shipmentItemService;
+    private final CustomerService customerService;
 
     @GetMapping
     public Result<Page<Shipment>> list(
@@ -37,6 +40,12 @@ public class ShipmentController {
         Shipment shipment = shipmentService.getById(id);
         if (shipment != null) {
             shipment.setItems(shipmentItemService.listByShipmentId(id));
+            if (shipment.getCustomerId() != null) {
+                Customer customer = customerService.getById(shipment.getCustomerId());
+                if (customer != null) {
+                    shipment.setCustomerAddress(customer.getAddress());
+                }
+            }
         }
         return Result.success(shipment);
     }

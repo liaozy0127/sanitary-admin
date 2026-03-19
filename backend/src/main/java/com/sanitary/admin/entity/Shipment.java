@@ -45,4 +45,7 @@ public class Shipment {
 
     @TableField(exist = false)
     private List<ShipmentItem> items;
+
+    @TableField(exist = false)
+    private String customerAddress;
 }

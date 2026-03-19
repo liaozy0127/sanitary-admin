@@ -663,6 +663,7 @@ ReceiptServiceImpl.importExcel()
 | 收货单分批上传（前端按3000行拆分）| 中 | 待开发 |
 | inventory 查询接口带 keyword 参数时返回 400 | 中 | 待修复 |
 | **全模块 Excel 导出功能**（基础档案/生产/财务所有列表页）| 高 | 🚧 开发中 |
+| **排产单/发货单打印功能**（含打印配置管理）| 高 | 🚧 开发中 |
 
 ---
 
@@ -889,4 +890,187 @@ const handleExport = async () => {
 
 ---
 
-*文档版本：v1.5 | 最后更新：2026-03-18*
+## 九、打印单据功能设计
+
+> 适用于：排产单（production）、发货单（shipment）两个模块。
+
+### 9.1 后端设计
+
+#### 9.1.1 sys_config 表（新建）
+
+```sql
+CREATE TABLE sys_config (
+  id        BIGINT PRIMARY KEY AUTO_INCREMENT,
+  config_key   VARCHAR(100) NOT NULL UNIQUE COMMENT '配置键',
+  config_value VARCHAR(500)          COMMENT '配置值',
+  remark       VARCHAR(200)          COMMENT '说明',
+  create_time  DATETIME,
+  update_time  DATETIME
+) COMMENT='系统配置表';
+
+-- 初始化打印配置
+INSERT INTO sys_config (config_key, config_value, remark) VALUES
+  ('print.factory_name', '', '打印单据工厂名称'),
+  ('print.maker_name',   '', '打印单据制单人');
+```
+
+#### 9.1.2 打印配置接口
+
+```
+GET  /api/config/print   → { factoryName, makerName }
+PUT  /api/config/print   body: { factoryName, makerName }
+```
+
+对应后端实现：
+- `SysConfigController` + `SysConfigService`
+- `SysConfigMapper` — MyBatis-Plus CRUD
+- `SysConfig` 实体 (`@TableName("sys_config")`)
+
+#### 9.1.3 打印数据接口
+
+打印预览所需数据通过已有的明细查询接口获取，**无需新增后端接口**：
+- 排产单：`GET /api/productions/{id}`（已含 items）
+- 发货单：`GET /api/shipments/{id}`（已含 items）
+- 打印配置：`GET /api/config/print`
+
+> ⚠️ 发货单需要客户地址：`shipment.customer_id → customer.address`，需确认 `GET /api/shipments/{id}` 是否返回 `customerAddress`，若无需在 ShipmentVO 中补充该字段（JOIN customer 表取 address）。
+
+### 9.2 前端设计
+
+#### 9.2.1 打印预览实现方案
+
+使用**新窗口 + CSS @media print** 方案：
+1. 点击"打印"按钮，先并行请求打印配置和单据数据
+2. 用 `window.open()` 打开新窗口，动态写入 HTML（含样式和数据）
+3. 在新窗口中调用 `window.print()`，打印完成后关闭窗口
+
+```js
+// 核心逻辑
+const handlePrint = async (row) => {
+  const [detail, config] = await Promise.all([
+    getProductionById(row.id),
+    getPrintConfig()
+  ])
+  const html = buildPrintHtml(detail, config)  // 构造打印 HTML
+  const win = window.open('', '_blank', 'width=800,height=600')
+  win.document.write(html)
+  win.document.close()
+  win.onload = () => { win.print(); win.close() }
+}
+```
+
+#### 9.2.2 CSS 页面尺寸设置
+
+```css
+@page {
+  size: 241mm 140mm;        /* 物理纸张尺寸 */
+  margin: 10mm 5mm;         /* 上下10mm留孔戳，左右5mm */
+}
+body {
+  width: 231mm;             /* 231 = 241 - 2*5 */
+  font-family: SimSun, '宋体', serif;
+  font-size: 9pt;
+}
+```
+
+可用内容区域：`231mm × 120mm`（上下各10mm留给孔戳区）
+
+#### 9.2.3 排产单 HTML 模板结构
+
+```html
+<div class="print-container">
+  <div class="factory-name">{{ factoryName }}</div>
+  <div class="doc-title">排 产 单</div>
+  <div class="header-row">
+    <span>客户：{{ customerName }}</span>
+    <span>日期：{{ productionDate }}</span>
+  </div>
+  <div class="header-row">
+    <span>单号：{{ productionNo }}</span>
+  </div>
+  <table class="items-table">
+    <thead>
+      <tr><th>序号</th><th>品名规格</th><th>数量</th><th>备注</th></tr>
+    </thead>
+    <tbody>
+      <tr v-for="(item, i) in items">
+        <td>{{ i+1 }}</td>
+        <td>{{ item.materialName }}{{ item.spec ? ' '+item.spec : '' }}</td>
+        <td>{{ item.plannedQty }}{{ item.unit }}</td>
+        <td>{{ item.detailRemark }}</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="footer-row">制单人：{{ makerName }}</div>
+</div>
+```
+
+#### 9.2.4 发货单 HTML 模板结构
+
+```html
+<div class="print-container">
+  <div class="factory-name">{{ factoryName }}</div>
+  <div class="doc-title">发 货 单</div>
+  <div class="header-row">
+    <span>客户：{{ customerName }}</span>
+    <span>日期：{{ shipmentDate }}</span>
+  </div>
+  <div class="header-row">
+    <span>单号：{{ shipmentNo }}</span>
+    <span>收货地址：{{ customerAddress }}</span>
+  </div>
+  <table class="items-table">
+    <thead>
+      <tr><th>序号</th><th>品名规格</th><th>单位</th><th>数量</th><th>备注</th></tr>
+    </thead>
+    <tbody>
+      <tr v-for="(item, i) in items">
+        <td>{{ i+1 }}</td>
+        <td>{{ item.materialName }}{{ item.spec ? ' '+item.spec : '' }}</td>
+        <td>{{ item.unit }}</td>
+        <td>{{ item.quantity }}</td>
+        <td>{{ item.detailRemark }}</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="footer-row">
+    <span>制单人：{{ makerName }}</span>
+    <span>收货人：________________</span>
+  </div>
+</div>
+```
+
+#### 9.2.5 前端文件变更清单
+
+| 文件 | 变更说明 |
+|------|---------|
+| `src/api/config.js`（新建）| `getPrintConfig()` / `updatePrintConfig()` |
+| `src/views/system/PrintConfig.vue`（新建）| 打印配置设置页面 |
+| `src/views/production/index.vue` | 操作列新增"打印"按钮 + `handlePrint` 函数 |
+| `src/views/shipment/index.vue` | 操作列新增"打印"按钮 + `handlePrint` 函数 |
+| `src/router/index.js` | 新增打印设置路由（系统管理下）|
+
+### 9.3 打印样式规范
+
+```css
+/* 工厂名称：大字居中，加粗 */
+.factory-name { text-align: center; font-size: 14pt; font-weight: bold; margin-bottom: 2mm; }
+
+/* 单据标题：居中，加粗 */
+.doc-title { text-align: center; font-size: 12pt; font-weight: bold; margin-bottom: 3mm; }
+
+/* 表格：全宽，细边框 */
+.items-table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+.items-table th, .items-table td { border: 0.5pt solid #000; padding: 1mm 2mm; }
+.items-table th { text-align: center; background: #f0f0f0; }
+
+/* 品名规格列宽：占约50%，数量列约20% */
+.items-table th:nth-child(2), .items-table td:nth-child(2) { width: 50%; }
+
+/* 签名行：底部，两端分布 */
+.footer-row { margin-top: 3mm; display: flex; justify-content: space-between; }
+```
+
+---
+
+*文档版本：v1.6 | 最后更新：2026-03-19*

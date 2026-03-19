@@ -87,6 +87,13 @@ const routes = [
         name: 'Statement',
         component: () => import('@/views/statement/index.vue'),
         meta: { title: '对账单', requiresAuth: true }
+      },
+      // 系统设置
+      {
+        path: 'print-config',
+        name: 'PrintConfig',
+        component: () => import('@/views/system/PrintConfig.vue'),
+        meta: { title: '打印设置', requiresAuth: true }
       }
     ]
   },
