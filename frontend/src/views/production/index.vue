@@ -515,16 +515,26 @@ const handlePrint = async (row) => {
     const detail = detailRes.data || detailRes
     const config = configRes.data || configRes
     const items = detail.items || []
-    const factoryName = config.factoryName || ''
-    const makerName = config.makerName || ''
 
-    const itemRows = items.map((item, i) => {
-      const nameSpec = [item.materialName, item.spec].filter(Boolean).join(' ')
-      const qty = (item.plannedQty != null ? item.plannedQty : '') + (item.unit ? ' ' + item.unit : '')
+    const docTitle = config.printTitleProduction || '致恒（致越）金属表面加工厂生产安排表'
+    const sig1 = config.printSignature1Label || '生产班长'
+    const sig2 = config.printSignature2Label || '仓管'
+    const sig3 = config.printSignature3Label || '签名'
+
+    const totalQty = items.reduce((sum, item) => sum + (parseFloat(item.plannedQty) || 0), 0)
+
+    const itemRows = items.map((item) => {
       return `<tr>
-        <td style="text-align:center">${i + 1}</td>
-        <td>${nameSpec}</td>
-        <td style="text-align:center">${qty}</td>
+        <td>${detail.customerName || ''}</td>
+        <td>${item.materialName || ''}</td>
+        <td>${item.spec || ''}</td>
+        <td>${item.processName || ''}</td>
+        <td style="text-align:right">${item.plannedQty != null ? item.plannedQty : ''}</td>
+        <td style="text-align:center">${item.productionType || ''}</td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
         <td>${item.detailRemark || ''}</td>
       </tr>`
     }).join('')
@@ -533,40 +543,64 @@ const handlePrint = async (row) => {
 <html><head><meta charset="utf-8">
 <title>排产单 ${detail.productionNo || ''}</title>
 <style>
-  @page { size: 241mm 140mm; margin: 10mm 5mm; }
+  @page { size: 241mm 120mm; margin: 10mm 5mm; }
   * { box-sizing: border-box; }
   body { width: 231mm; font-family: SimSun, "宋体", serif; font-size: 9pt; margin: 0; }
-  .factory-name { text-align: center; font-size: 14pt; font-weight: bold; margin-bottom: 2mm; }
-  .doc-title { text-align: center; font-size: 12pt; font-weight: bold; margin-bottom: 3mm; letter-spacing: 4px; }
-  .header-row { display: flex; justify-content: space-between; margin-bottom: 1.5mm; font-size: 9pt; }
-  .items-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 2mm; }
-  .items-table th, .items-table td { border: 0.5pt solid #000; padding: 1mm 2mm; }
-  .items-table th { text-align: center; background: #f0f0f0; font-weight: bold; }
-  .items-table td:first-child { text-align: center; width: 8mm; }
-  .items-table td:nth-child(2) { width: 55%; }
-  .items-table td:nth-child(3) { text-align: center; width: 20%; }
-  .footer-row { margin-top: 3mm; display: flex; justify-content: flex-start; gap: 20mm; }
+  .doc-title { text-align: center; font-size: 14pt; font-weight: bold; margin-bottom: 3mm; }
+  .header-row { display: flex; gap: 8mm; margin-bottom: 2mm; font-size: 9pt; }
+  .items-table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  .items-table th, .items-table td { border: 0.5pt solid #0066CC; padding: 1mm 1.5mm; }
+  .items-table th { text-align: center; font-weight: bold; background: #f5f5f5; }
+  .items-table .th1 { height: 6mm; }
+  .items-table .th2 { height: 4mm; font-size: 8pt; }
+  .items-table tfoot td { font-weight: bold; }
+  .items-table tfoot td.total { text-align: right; }
+  .signature-row { margin-top: 3mm; display: flex; justify-content: space-around; font-size: 9pt; }
 </style>
 </head><body>
-<div class="factory-name">${factoryName}</div>
-<div class="doc-title">排 产 单</div>
+<div class="doc-title">${docTitle}</div>
 <div class="header-row">
+  <span>排产日期：${detail.productionDate || ''}</span>
+  <span>排产单号：${detail.productionNo || ''}</span>
+  <span>班别：</span>
   <span>客户：${detail.customerName || ''}</span>
-  <span>日期：${detail.productionDate || ''}</span>
-</div>
-<div class="header-row">
-  <span>单号：${detail.productionNo || ''}</span>
 </div>
 <table class="items-table">
-  <thead><tr><th>序号</th><th>品名规格</th><th>数量</th><th>备注</th></tr></thead>
+  <thead>
+    <tr class="th1">
+      <th rowspan="2" style="width:12%">客户</th>
+      <th rowspan="2" style="width:18%">品名规格</th>
+      <th rowspan="2" style="width:8%">规格</th>
+      <th rowspan="2" style="width:12%">工艺</th>
+      <th rowspan="2" style="width:8%">排产数量</th>
+      <th rowspan="2" style="width:6%">类型</th>
+      <th colspan="4">完成情况</th>
+      <th rowspan="2" style="width:10%">备注</th>
+    </tr>
+    <tr class="th2">
+      <th style="width:5%">1</th>
+      <th style="width:5%">2</th>
+      <th style="width:5%">3</th>
+      <th style="width:5%">不良</th>
+    </tr>
+  </thead>
   <tbody>${itemRows}</tbody>
+  <tfoot>
+    <tr>
+      <td colspan="4">合计</td>
+      <td class="total">${totalQty || ''}</td>
+      <td colspan="6"></td>
+    </tr>
+  </tfoot>
 </table>
-<div class="footer-row">
-  <span>制单人：${makerName}</span>
+<div class="signature-row">
+  <span>${sig1}：________________</span>
+  <span>${sig2}：________________</span>
+  <span>${sig3}：________________</span>
 </div>
 </body></html>`
 
-    const win = window.open('', '_blank', 'width=800,height=600')
+    const win = window.open('', '_blank', 'width=900,height=650')
     win.document.write(html)
     win.document.close()
     win.onload = () => { win.print(); win.close() }

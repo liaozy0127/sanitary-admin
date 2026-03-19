@@ -470,60 +470,112 @@ const handlePrint = async (row) => {
     const detail = detailRes.data || detailRes
     const config = configRes.data || configRes
     const items = detail.items || []
-    const factoryName = config.factoryName || ''
-    const makerName = config.makerName || ''
+
+    const docTitle = config.printTitleDelivery || '致恒（致越）金属表面加工厂送货单'
+    const companyName = config.printCompanyName || '致恒（致越）金属表面加工厂'
+    const companyPhone = config.printCompanyPhone || '0750-2766036'
+    const companyAddress = config.printCompanyAddress || '开平市，水口镇，唐良良兴村矮岗山'
+    const contact1 = config.printContact1 || '廖总：13536094788'
+    const contact2 = config.printContact2 || '仓管：13672842611'
+    const sig1Label = config.printSignature1Label || '收货单位'
+    const sig2Label = config.printSignature2Label || '仓管'
+    const makerLabel = config.printMakerLabel || '制单人'
+    const makerName = config.makerName || detail.operator || ''
+    const deliveryRemark = config.printDeliveryRemark || '1. 货到当场验收，签收后概不负责\n2. 如有质量问题，3天内退货\n3. 本单据一式三联（客户、财务、仓库各一联）'
+
+    const totalGoodQty = items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)
+    const totalDefectiveQty = items.reduce((sum, item) => sum + (parseFloat(item.defectiveQty) || 0), 0)
 
     const itemRows = items.map((item, i) => {
-      const nameSpec = [item.materialName, item.spec].filter(Boolean).join(' ')
       return `<tr>
         <td style="text-align:center">${i + 1}</td>
-        <td>${nameSpec}</td>
+        <td>${item.materialName || ''}</td>
+        <td>${item.spec || ''}</td>
         <td style="text-align:center">${item.unit || ''}</td>
-        <td style="text-align:center">${item.quantity != null ? item.quantity : ''}</td>
+        <td>${item.processName || ''}</td>
+        <td style="text-align:center">${item.productionType || ''}</td>
+        <td style="text-align:right">${item.quantity != null ? item.quantity : ''}</td>
+        <td style="text-align:right">${item.defectiveQty != null ? item.defectiveQty : ''}</td>
+        <td></td>
         <td>${item.detailRemark || ''}</td>
+        <td style="text-align:right">${item.quantity != null ? item.quantity : ''}</td>
       </tr>`
     }).join('')
+
+    const remarkLines = deliveryRemark.split('\n').join('<br>')
 
     const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <title>发货单 ${detail.shipmentNo || ''}</title>
 <style>
-  @page { size: 241mm 140mm; margin: 10mm 5mm; }
+  @page { size: 241mm 120mm; margin: 10mm 5mm; }
   * { box-sizing: border-box; }
   body { width: 231mm; font-family: SimSun, "宋体", serif; font-size: 9pt; margin: 0; }
-  .factory-name { text-align: center; font-size: 14pt; font-weight: bold; margin-bottom: 2mm; }
-  .doc-title { text-align: center; font-size: 12pt; font-weight: bold; margin-bottom: 3mm; letter-spacing: 4px; }
-  .header-row { display: flex; justify-content: space-between; margin-bottom: 1.5mm; font-size: 9pt; }
-  .items-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 2mm; }
-  .items-table th, .items-table td { border: 0.5pt solid #000; padding: 1mm 2mm; }
-  .items-table th { text-align: center; background: #f0f0f0; font-weight: bold; }
-  .items-table td:first-child { text-align: center; width: 8mm; }
-  .items-table td:nth-child(2) { width: 50%; }
-  .items-table td:nth-child(3), .items-table td:nth-child(4) { text-align: center; width: 10%; }
-  .footer-row { margin-top: 3mm; display: flex; justify-content: space-between; }
+  .header { display: flex; justify-content: flex-end; margin-bottom: 2mm; }
+  .company-info { text-align: right; font-size: 9pt; line-height: 1.5; }
+  .company-info .title { font-size: 14pt; font-weight: bold; }
+  .order-info { display: flex; gap: 6mm; margin-bottom: 2mm; font-size: 9pt; }
+  .content { display: flex; gap: 1mm; }
+  .remark-vertical { writing-mode: vertical-rl; text-orientation: upright; border: 0.5pt solid #000; padding: 1mm; font-size: 8pt; min-width: 8mm; }
+  .items-table { flex: 1; width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  .items-table th, .items-table td { border: 0.5pt solid #000; padding: 1mm 1.5mm; }
+  .items-table th { text-align: center; font-weight: bold; }
+  .items-table tfoot td { font-weight: bold; }
+  .items-table tfoot td.total { text-align: right; }
+  .signature-row { margin-top: 3mm; display: flex; justify-content: space-between; font-size: 9pt; }
 </style>
 </head><body>
-<div class="factory-name">${factoryName}</div>
-<div class="doc-title">发 货 单</div>
-<div class="header-row">
+<div class="header">
+  <div class="company-info">
+    <div class="title">${docTitle}</div>
+    <div>电话/传真：${companyPhone}</div>
+    <div>地址：${companyAddress}</div>
+    <div>${contact1} &nbsp;&nbsp; ${contact2}</div>
+  </div>
+</div>
+<div class="order-info">
   <span>客户：${detail.customerName || ''}</span>
   <span>日期：${detail.shipmentDate || ''}</span>
+  <span>单据编号：${detail.shipmentNo || ''}</span>
 </div>
-<div class="header-row">
-  <span>单号：${detail.shipmentNo || ''}</span>
-  <span>收货地址：${detail.customerAddress || ''}</span>
+<div class="content">
+  <div class="remark-vertical">备注：${remarkLines}</div>
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th style="width:5%">序号</th>
+        <th style="width:20%">品名</th>
+        <th style="width:10%">规格</th>
+        <th style="width:6%">单位</th>
+        <th style="width:12%">工艺要求</th>
+        <th style="width:8%">类型</th>
+        <th style="width:10%">良品数量</th>
+        <th style="width:8%">不良品</th>
+        <th style="width:8%">原件退回</th>
+        <th style="width:8%">备注</th>
+        <th style="width:5%">合计</th>
+      </tr>
+    </thead>
+    <tbody>${itemRows}</tbody>
+    <tfoot>
+      <tr>
+        <td colspan="6">合计</td>
+        <td class="total">${totalGoodQty || ''}</td>
+        <td class="total">${totalDefectiveQty || ''}</td>
+        <td class="total"></td>
+        <td colspan="2"></td>
+      </tr>
+    </tfoot>
+  </table>
 </div>
-<table class="items-table">
-  <thead><tr><th>序号</th><th>品名规格</th><th>单位</th><th>数量</th><th>备注</th></tr></thead>
-  <tbody>${itemRows}</tbody>
-</table>
-<div class="footer-row">
-  <span>制单人：${makerName}</span>
-  <span>收货人：________________</span>
+<div class="signature-row">
+  <span>${sig1Label}：________________</span>
+  <span>${sig2Label}：________________</span>
+  <span>${makerLabel}：${makerName}</span>
 </div>
 </body></html>`
 
-    const win = window.open('', '_blank', 'width=800,height=600')
+    const win = window.open('', '_blank', 'width=900,height=650')
     win.document.write(html)
     win.document.close()
     win.onload = () => { win.print(); win.close() }
