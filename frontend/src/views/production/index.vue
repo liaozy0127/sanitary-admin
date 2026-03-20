@@ -524,44 +524,30 @@ const handlePrint = async (row) => {
 
     const totalQty = items.reduce((sum, item) => sum + (parseFloat(item.plannedQty) || 0), 0)
 
-    // 每页数据行数（根据 241mm×120mm 纸张预估）
-    const ROWS_PER_PAGE = 10
+    // 根据纸张和CSS自动计算每页行数
+    // 纸张: 241mm × 120mm，页边距 5mm → 可用高度 110mm
+    // 1pt = 0.353mm（印刷分辨率）
+    const R = 0.353
+    const titleH  = 13 * R + 4       // 标题行: 13pt + 上下各2mm ≈ 8.6mm
+    const metaH   = 9  * R + 2       // 日期行: 9pt  + 上下各1mm ≈ 5.2mm
+    const hdrH    = 8.5* R + 2.5     // 列标题行: 8.5pt + 1mm+1.5mm ≈ 5.5mm
+    const rowH    = hdrH              // 数据行与列标题行同高 ≈ 5.5mm
+    const remarkH = rowH              // 备注行同高 ≈ 5.5mm
+    const sigH    = 7                 // 签名栏 div ≈ 7mm
+    const overhead = titleH + metaH + hdrH * 2 + remarkH + sigH + 2 // +2mm 边框余量
+    const ROWS_PER_PAGE = Math.max(1, Math.floor((110 - overhead) / rowH))
+    // 实际计算约 13 行/页
+
+    // 分割数据
     const chunks = []
-    if (items.length === 0) {
-      chunks.push([])
-    } else {
-      for (let i = 0; i < items.length; i += ROWS_PER_PAGE) {
-        chunks.push(items.slice(i, i + ROWS_PER_PAGE))
-      }
-    }
+    if (items.length === 0) chunks.push([])
+    else for (let i = 0; i < items.length; i += ROWS_PER_PAGE) chunks.push(items.slice(i, i + ROWS_PER_PAGE))
 
-    const metaInfo = `排产日期：${detail.productionDate || ''}&nbsp;&nbsp;&nbsp;&nbsp;排产单号：${detail.productionNo || ''}&nbsp;&nbsp;&nbsp;&nbsp;班别：&nbsp;&nbsp;&nbsp;&nbsp;客户：${detail.customerName || ''}`
+    // 空白填充行（11列）
+    const emptyRow = `<tr>${'<td></td>'.repeat(11)}</tr>`
 
-    const thead = `<thead>
-      <tr><th colspan="11" class="title-cell">${docTitle}</th></tr>
-      <tr><td colspan="11" class="meta-cell">${metaInfo}</td></tr>
-      <tr>
-        <th rowspan="2">客户</th><th rowspan="2">品名</th><th rowspan="2">规格</th>
-        <th rowspan="2">工艺</th><th rowspan="2">数量</th><th rowspan="2">类型</th>
-        <th colspan="4">完成情况</th><th rowspan="2">备注</th>
-      </tr>
-      <tr><th>1良品</th><th>2良品</th><th>3良品</th><th>不良</th></tr>
-    </thead>`
-
-    const tfoot = `<tfoot>
-      <tr><td colspan="11" class="foot-remark">备注：${remark}</td></tr>
-      <tr>
-        <td colspan="4" class="foot-sig">${sig3}：________________</td>
-        <td colspan="3" class="foot-sig">${sig1}：________________</td>
-        <td colspan="4" class="foot-sig">${sig2}：________________</td>
-      </tr>
-    </tfoot>`
-
-    const tables = chunks.map((chunk, pageIndex) => {
-      const isLastPage = pageIndex === chunks.length - 1
-      const pageBreak = isLastPage ? '' : ' style="page-break-after:always"'
-
-      const rowsHtml = chunk.map(item => `<tr>
+    const makePage = (chunk, isLast) => {
+      const dataRows = chunk.map(item => `<tr>
         <td>${detail.customerName || ''}</td>
         <td>${item.materialName || ''}</td>
         <td>${item.spec || ''}</td>
@@ -572,18 +558,49 @@ const handlePrint = async (row) => {
         <td>${item.detailRemark || ''}</td>
       </tr>`).join('')
 
-      const totalRow = isLastPage ? `<tr>
+      // 末页留1行给合计，其余页填满
+      const fillTarget = isLast ? ROWS_PER_PAGE - 1 : ROWS_PER_PAGE
+      const padRows = emptyRow.repeat(Math.max(0, fillTarget - chunk.length))
+
+      const totalRow = isLast ? `<tr>
         <td colspan="4" style="text-align:right;font-weight:bold;">合计</td>
         <td style="text-align:right;font-weight:bold;">${totalQty || ''}</td>
         <td colspan="6"></td>
       </tr>` : ''
 
-      return `<table class="items-table"${pageBreak}>
-        ${thead}
-        <tbody>${rowsHtml}${totalRow}</tbody>
-        ${tfoot}
-      </table>`
-    }).join('\n')
+      return `<div class="page${isLast ? ' last' : ''}">
+        <table class="pt">
+          <thead>
+            <tr><th colspan="11" class="title-cell">${docTitle}</th></tr>
+            <tr><td colspan="11" class="meta-cell">
+              <div class="meta-flex">
+                <span>排产日期：${detail.productionDate || ''}</span>
+                <span>单号：${detail.productionNo || ''}</span>
+                <span>班别：</span>
+                <span>客户：${detail.customerName || ''}</span>
+              </div>
+            </td></tr>
+            <tr>
+              <th rowspan="2">客户</th><th rowspan="2">品名</th><th rowspan="2">规格</th>
+              <th rowspan="2">工艺</th><th rowspan="2">数量</th><th rowspan="2">类型</th>
+              <th colspan="4">完成情况</th><th rowspan="2">备注</th>
+            </tr>
+            <tr><th>1良品</th><th>2良品</th><th>3良品</th><th>不良</th></tr>
+          </thead>
+          <tbody>${dataRows}${padRows}${totalRow}</tbody>
+          <tfoot>
+            <tr><td colspan="11" class="foot-remark">备注：${remark}</td></tr>
+          </tfoot>
+        </table>
+        <div class="sig-line">
+          <span>${sig3}：________________</span>
+          <span>${sig1}：________________</span>
+          <span>${sig2}：________________</span>
+        </div>
+      </div>`
+    }
+
+    const pages = chunks.map((chunk, i) => makePage(chunk, i === chunks.length - 1)).join('\n')
 
     const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>排产单 ${detail.productionNo || ''}</title>
@@ -591,15 +608,19 @@ const handlePrint = async (row) => {
   @page { size: 241mm 120mm; margin: 5mm; }
   * { box-sizing: border-box; }
   body { font-family: SimSun, "宋体", serif; font-size: 9pt; margin: 0; }
-  .items-table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
-  .items-table th, .items-table td { border: 0.5pt solid #0066CC; padding: 1mm 1.5mm; }
-  .items-table th { text-align: center; font-weight: bold; background: #f0f6ff; }
+  .page { page-break-after: always; }
+  .page.last { page-break-after: auto; }
+  .pt { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  .pt th, .pt td { border: 0.5pt solid #0066CC; padding: 1mm 1.5mm; }
+  .pt th { text-align: center; font-weight: bold; background: #f0f6ff; }
   .title-cell { border: none !important; text-align: center; font-size: 13pt; font-weight: bold; padding: 2mm 0 !important; background: white !important; }
-  .meta-cell { border: none !important; font-size: 9pt; padding: 1mm 0 !important; background: white !important; }
+  .meta-cell { border: none !important; padding: 1mm 0 !important; background: white !important; font-weight: normal; }
+  .meta-flex { display: flex; justify-content: space-around; }
+  .meta-flex span { flex: 1; text-align: center; }
   .foot-remark { background: white; }
-  .foot-sig { border-top: none !important; text-align: center; background: white; }
+  .sig-line { display: flex; justify-content: space-around; font-size: 9pt; margin-top: 1.5mm; padding: 0 2mm; }
 </style></head><body>
-${tables}
+${pages}
 </body></html>`
 
     const win = window.open('', '_blank', 'width=950,height=680')
