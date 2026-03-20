@@ -520,64 +520,86 @@ const handlePrint = async (row) => {
     const sig1 = config.printSignature1Label || '生产班长'
     const sig2 = config.printSignature2Label || '仓管'
     const sig3 = config.printSignature3Label || '签名'
+    const remark = detail.remark || ''
 
     const totalQty = items.reduce((sum, item) => sum + (parseFloat(item.plannedQty) || 0), 0)
 
-    const itemRows = items.map((item) => `<tr>
-      <td>${detail.customerName || ''}</td>
-      <td>${item.materialName || ''}</td>
-      <td>${item.spec || ''}</td>
-      <td>${item.processName || ''}</td>
-      <td style="text-align:right">${item.plannedQty != null ? item.plannedQty : ''}</td>
-      <td style="text-align:center">${item.productionType || ''}</td>
-      <td></td><td></td><td></td><td></td>
-      <td>${item.detailRemark || ''}</td>
-    </tr>`).join('')
+    // 每页数据行数（根据 241mm×120mm 纸张预估）
+    const ROWS_PER_PAGE = 10
+    const chunks = []
+    if (items.length === 0) {
+      chunks.push([])
+    } else {
+      for (let i = 0; i < items.length; i += ROWS_PER_PAGE) {
+        chunks.push(items.slice(i, i + ROWS_PER_PAGE))
+      }
+    }
+
+    const metaInfo = `排产日期：${detail.productionDate || ''}&nbsp;&nbsp;&nbsp;&nbsp;排产单号：${detail.productionNo || ''}&nbsp;&nbsp;&nbsp;&nbsp;班别：&nbsp;&nbsp;&nbsp;&nbsp;客户：${detail.customerName || ''}`
+
+    const thead = `<thead>
+      <tr><th colspan="11" class="title-cell">${docTitle}</th></tr>
+      <tr><td colspan="11" class="meta-cell">${metaInfo}</td></tr>
+      <tr>
+        <th rowspan="2">客户</th><th rowspan="2">品名</th><th rowspan="2">规格</th>
+        <th rowspan="2">工艺</th><th rowspan="2">数量</th><th rowspan="2">类型</th>
+        <th colspan="4">完成情况</th><th rowspan="2">备注</th>
+      </tr>
+      <tr><th>1良品</th><th>2良品</th><th>3良品</th><th>不良</th></tr>
+    </thead>`
+
+    const tfoot = `<tfoot>
+      <tr><td colspan="11" class="foot-remark">备注：${remark}</td></tr>
+      <tr>
+        <td colspan="4" class="foot-sig">${sig3}：________________</td>
+        <td colspan="3" class="foot-sig">${sig1}：________________</td>
+        <td colspan="4" class="foot-sig">${sig2}：________________</td>
+      </tr>
+    </tfoot>`
+
+    const tables = chunks.map((chunk, pageIndex) => {
+      const isLastPage = pageIndex === chunks.length - 1
+      const pageBreak = isLastPage ? '' : ' style="page-break-after:always"'
+
+      const rowsHtml = chunk.map(item => `<tr>
+        <td>${detail.customerName || ''}</td>
+        <td>${item.materialName || ''}</td>
+        <td>${item.spec || ''}</td>
+        <td>${item.processName || ''}</td>
+        <td style="text-align:right">${item.plannedQty != null ? item.plannedQty : ''}</td>
+        <td style="text-align:center">${item.productionType || ''}</td>
+        <td></td><td></td><td></td><td></td>
+        <td>${item.detailRemark || ''}</td>
+      </tr>`).join('')
+
+      const totalRow = isLastPage ? `<tr>
+        <td colspan="4" style="text-align:right;font-weight:bold;">合计</td>
+        <td style="text-align:right;font-weight:bold;">${totalQty || ''}</td>
+        <td colspan="6"></td>
+      </tr>` : ''
+
+      return `<table class="items-table"${pageBreak}>
+        ${thead}
+        <tbody>${rowsHtml}${totalRow}</tbody>
+        ${tfoot}
+      </table>`
+    }).join('\n')
 
     const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>排产单 ${detail.productionNo || ''}</title>
 <style>
-  @page { size: 241mm 120mm; margin: 5mm 5mm 22mm 5mm; }
+  @page { size: 241mm 120mm; margin: 5mm; }
   * { box-sizing: border-box; }
-  body { font-family: SimSun, "宋体", serif; font-size: 9pt; margin: 0; padding-bottom: 20mm; }
+  body { font-family: SimSun, "宋体", serif; font-size: 9pt; margin: 0; }
   .items-table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
   .items-table th, .items-table td { border: 0.5pt solid #0066CC; padding: 1mm 1.5mm; }
   .items-table th { text-align: center; font-weight: bold; background: #f0f6ff; }
-  .items-table thead th.title-cell { border: none; text-align: center; font-size: 13pt; font-weight: bold; padding: 2mm 0 3mm 0; background: white; }
-  .items-table thead td.meta-cell { border: none; font-size: 9pt; padding: 1mm 0 2mm 0; background: white; }
-  .footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 2mm 5mm; background: white; border-top: 0.5pt solid #ccc; font-size: 9pt; }
-  .footer-remark { margin-bottom: 1mm; }
-  .footer-sigs { display: flex; justify-content: space-around; }
-  @media print { .footer { position: fixed; bottom: 0; } }
+  .title-cell { border: none !important; text-align: center; font-size: 13pt; font-weight: bold; padding: 2mm 0 !important; background: white !important; }
+  .meta-cell { border: none !important; font-size: 9pt; padding: 1mm 0 !important; background: white !important; }
+  .foot-remark { background: white; }
+  .foot-sig { border-top: none !important; text-align: center; background: white; }
 </style></head><body>
-<div class="footer">
-  <div class="footer-remark">备注：${detail.remark || ''}</div>
-  <div class="footer-sigs">
-    <span>${sig3}：________________</span>
-    <span>${sig1}：________________</span>
-    <span>${sig2}：________________</span>
-  </div>
-</div>
-<table class="items-table">
-  <thead>
-    <tr><th colspan="11" class="title-cell">${docTitle}</th></tr>
-    <tr><td colspan="11" class="meta-cell">排产日期：${detail.productionDate || ''}&nbsp;&nbsp;&nbsp;&nbsp;排产单号：${detail.productionNo || ''}&nbsp;&nbsp;&nbsp;&nbsp;班别：&nbsp;&nbsp;&nbsp;&nbsp;客户：${detail.customerName || ''}</td></tr>
-    <tr>
-      <th rowspan="2">客户</th><th rowspan="2">品名</th><th rowspan="2">规格</th>
-      <th rowspan="2">工艺</th><th rowspan="2">数量</th><th rowspan="2">类型</th>
-      <th colspan="4">完成情况</th><th rowspan="2">备注</th>
-    </tr>
-    <tr><th>1良品</th><th>2良品</th><th>3良品</th><th>不良</th></tr>
-  </thead>
-  <tbody>${itemRows}</tbody>
-  <tfoot>
-    <tr>
-      <td colspan="4" style="text-align:right;font-weight:bold;">合计</td>
-      <td style="text-align:right;font-weight:bold;">${totalQty || ''}</td>
-      <td colspan="6"></td>
-    </tr>
-  </tfoot>
-</table>
+${tables}
 </body></html>`
 
     const win = window.open('', '_blank', 'width=950,height=680')
