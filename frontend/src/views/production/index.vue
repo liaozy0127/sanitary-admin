@@ -508,17 +508,82 @@ const handleImport = async () => {
 
 const handlePrint = async (row) => {
   try {
-    const { useUserStore } = await import('@/stores/user')
-    const userStore = useUserStore()
-    const token = userStore.token
-    const res = await fetch(`/api/productions/${row.id}/pdf`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
-    })
-    if (!res.ok) throw new Error('PDF生成失败')
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const win = window.open(url, '_blank')
-    if (!win) ElMessage.warning('请允许弹出窗口')
+    const [detailRes, configRes] = await Promise.all([
+      request.get(`/productions/${row.id}`),
+      getPrintConfig()
+    ])
+    const detail = detailRes.data || detailRes
+    const config = configRes.data || configRes
+    const items = detail.items || []
+
+    const docTitle = config.printTitleProduction || '致恒（致越）金属表面加工厂生产安排表'
+    const sig1 = config.printSignature1Label || '生产班长'
+    const sig2 = config.printSignature2Label || '仓管'
+    const sig3 = config.printSignature3Label || '签名'
+
+    const totalQty = items.reduce((sum, item) => sum + (parseFloat(item.plannedQty) || 0), 0)
+
+    const itemRows = items.map((item) => `<tr>
+      <td>${detail.customerName || ''}</td>
+      <td>${item.materialName || ''}</td>
+      <td>${item.spec || ''}</td>
+      <td>${item.processName || ''}</td>
+      <td style="text-align:right">${item.plannedQty != null ? item.plannedQty : ''}</td>
+      <td style="text-align:center">${item.productionType || ''}</td>
+      <td></td><td></td><td></td><td></td>
+      <td>${item.detailRemark || ''}</td>
+    </tr>`).join('')
+
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>排产单 ${detail.productionNo || ''}</title>
+<style>
+  @page { size: 241mm 120mm; margin: 5mm 5mm 22mm 5mm; }
+  * { box-sizing: border-box; }
+  body { font-family: SimSun, "宋体", serif; font-size: 9pt; margin: 0; padding-bottom: 20mm; }
+  .items-table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  .items-table th, .items-table td { border: 0.5pt solid #0066CC; padding: 1mm 1.5mm; }
+  .items-table th { text-align: center; font-weight: bold; background: #f0f6ff; }
+  .items-table thead th.title-cell { border: none; text-align: center; font-size: 13pt; font-weight: bold; padding: 2mm 0 3mm 0; background: white; }
+  .items-table thead td.meta-cell { border: none; font-size: 9pt; padding: 1mm 0 2mm 0; background: white; }
+  .footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 2mm 5mm; background: white; border-top: 0.5pt solid #ccc; font-size: 9pt; }
+  .footer-remark { margin-bottom: 1mm; }
+  .footer-sigs { display: flex; justify-content: space-around; }
+  @media print { .footer { position: fixed; bottom: 0; } }
+</style></head><body>
+<div class="footer">
+  <div class="footer-remark">备注：${detail.remark || ''}</div>
+  <div class="footer-sigs">
+    <span>${sig3}：________________</span>
+    <span>${sig1}：________________</span>
+    <span>${sig2}：________________</span>
+  </div>
+</div>
+<table class="items-table">
+  <thead>
+    <tr><th colspan="11" class="title-cell">${docTitle}</th></tr>
+    <tr><td colspan="11" class="meta-cell">排产日期：${detail.productionDate || ''}&nbsp;&nbsp;&nbsp;&nbsp;排产单号：${detail.productionNo || ''}&nbsp;&nbsp;&nbsp;&nbsp;班别：&nbsp;&nbsp;&nbsp;&nbsp;客户：${detail.customerName || ''}</td></tr>
+    <tr>
+      <th rowspan="2">客户</th><th rowspan="2">品名</th><th rowspan="2">规格</th>
+      <th rowspan="2">工艺</th><th rowspan="2">数量</th><th rowspan="2">类型</th>
+      <th colspan="4">完成情况</th><th rowspan="2">备注</th>
+    </tr>
+    <tr><th>1良品</th><th>2良品</th><th>3良品</th><th>不良</th></tr>
+  </thead>
+  <tbody>${itemRows}</tbody>
+  <tfoot>
+    <tr>
+      <td colspan="4" style="text-align:right;font-weight:bold;">合计</td>
+      <td style="text-align:right;font-weight:bold;">${totalQty || ''}</td>
+      <td colspan="6"></td>
+    </tr>
+  </tfoot>
+</table>
+</body></html>`
+
+    const win = window.open('', '_blank', 'width=950,height=680')
+    win.document.write(html)
+    win.document.close()
+    win.onload = () => { win.print() }
   } catch (e) {
     ElMessage.error('打印失败，请重试')
   }
