@@ -698,90 +698,108 @@ HAVING needed_init_qty > 0
 #### 3.7.1 功能概述
 
 - 在排产单和发货单列表页，每行操作列新增"打印"按钮
-- 点击打印按钮后，弹出打印预览窗口（新浏览器窗口或弹层），显示格式化的单据内容
-- 调用 `window.print()` 触发系统打印对话框，用户选择打印机后打印
-- 单据上的**工厂名称**和**制单人**需可配置（在系统设置中维护）
+- 点击打印按钮后，用 `window.open('', '_blank')` 新开窗口，写入格式化 HTML，再调用 `win.print()` 触发打印对话框
+- 单据上的**工厂名称**和**签名栏标签**等均可在系统配置中维护
 
 #### 3.7.2 纸张规格
 
-- **物理纸张**：241mm × 140mm（针式打印机标准连续纸，9.5英寸宽）
-- **可用内容区域**：241mm × 120mm（上下各约 10mm 为孔戳区域，不可打印）
-- **CSS 页面设置**：`@page { size: 241mm 140mm; margin: 10mm 5mm; }`
+- **物理纸张**：241mm × 120mm（针式打印机标准连续纸，已去掉上下孔戳区域）
+- **CSS 页面设置**：`@page { size: 241mm 120mm; margin: 5mm; }`
+- **可用内容区域**：约 231mm × 110mm
 
-#### 3.7.3 排产单打印格式
+#### 3.7.3 排产单打印格式（已实现）
 
+**布局**：前端按行数公式将明细项预分页，每页生成一个独立 `<table>`，用 `page-break-after: always` 分隔。
+
+**每页表格结构**：
 ```
-┌─────────────────────────────────────┐
-│           【工厂名称】（大字居中）       │
-│              排 产 单                 │
-├───────────────────────────────────┤
-│ 客户：___________  日期：__________  │
-│ 单号：_______________________________│
-├──┬──────────────────┬───────┬───────┤
-│序│  品名规格          │ 数量   │ 备注  │
-│号│                   │       │       │
-├──┼──────────────────┼───────┼───────┤
-│  │                   │       │       │
-│  │                   │       │       │
-└──┴──────────────────┴───────┴───────┘
-  制单人：____________
+┌──────────────────────────────────────────────┐
+│   【docTitle：工厂名称/单据名称】（居中大字）    │  ← thead 第1行
+├──────────────────────────────────────────────┤
+│ 排产日期：__  单号：__  班别：__  客户：__      │  ← thead 第2行（4字段均分一行）
+├─────┬──────┬─────┬──────┬──────┬──────────────┤
+│客户 │品名  │规格 │工艺  │数量  │类型│1良│2良│3良│不良│备注│  ← thead 列标题（含完成情况合并列）
+├─────┼──────┼─────┼──────┼──────┼──────────────┤
+│     │      │     │      │      │              │  ← tbody 数据行（ROWS_PER_PAGE≈10行）
+│ … 空白填充行（&nbsp;保持行高） …              │
+│ 合计（colspan=4）  + totalQty    │            │  ← 末页 tbody 最后一行
+├──────────────────────────────────────────────┤
+│ 备注：…（来自 detail.remark）                │  ← tfoot 固定备注行
+└──────────────────────────────────────────────┘
+签名栏（div flex，3个签名位，位于表格下方）
+```
+
+**分页行数计算公式**（JavaScript，前端）：
+- 纸张可用高度 110mm，1pt = 0.353mm，浏览器行高系数 LH = 1.2
+- `titleH = 13pt × 0.353 × 1.2 + 4mm ≈ 9.5mm`
+- `metaH = 9pt × 0.353 × 1.2 + 2mm ≈ 5.8mm`
+- `hdrH（含2行列标题）= 8.5pt × 0.353 × 1.2 + 2.5mm ≈ 6.1mm` × 2
+- `remarkH（tfoot备注）≈ 6.1mm`
+- `sigH（签名div）≈ 7mm`
+- `ROWS_PER_PAGE = floor((110 - overhead - 3mm缓冲) / rowH)` ≈ **10行/页**
+
+**字段映射**：
+- `docTitle`：系统配置 `printTitleProduction`
+- 排产日期：`production.productionDate`
+- 单号：`production.productionNo`
+- 客户：`production.customerName`
+- 品名/规格/工艺/数量/类型/明细备注：来自 `production_item`
+- 合计数量：所有明细 `plannedQty` 之和
+- tfoot 备注：`production.remark`
+- 签名栏标签：系统配置 `printSignature1Label`/`printSignature2Label`/`printSignature3Label`
+
+#### 3.7.4 发货单打印格式（已实现）
+
+**布局**：同排产单，前端预分页，每页一个独立 `<table>`，`page-break-after: always` 分隔。
+
+**每页表格结构**：
+```
+┌──────────────────────────────────────────────┐
+│   【docTitle：工厂名称/单据名称】（居中大字）    │  ← thead 第1行
+├──────────────────────────────────────────────┤
+│ 客户：__  发货日期：__  单号：__              │  ← thead 第2行
+├──┬──────┬────┬──┬──────┬──┬───┬───┬────┬─────┤
+│序│品名  │规格│单│工艺  │类│良品│不│原件│备注 合计│  ← thead 列标题
+├──┼──────┼────┼──┼──────┼──┼───┼───┼────┼─────┤
+│  │      │    │  │      │  │   │   │    │     │  ← tbody 数据行
+│ … 空白填充行 …                              │
+│ 合计行（良品合计 + 废品合计）                 │  ← 末页
+├──────────────────────────────────────────────┤
+│ 备注：…（来自配置 printDeliveryRemark）       │  ← tfoot
+└──────────────────────────────────────────────┘
+签名栏（收货单位 / 仓管 / 制单人，div flex）
 ```
 
 **字段映射**：
-- 工厂名称：来自系统配置 `print.factory_name`
-- 客户：`production.customer_name`
-- 日期：`production.production_date`
-- 单号：`production.production_no`
-- 品名规格：`production_item.material_name` + `production_item.spec`（合并显示）
-- 数量：`production_item.planned_qty`（含计量单位 `unit`）
-- 备注：`production_item.detail_remark`
-- 制单人：来自系统配置 `print.maker_name`
-
-#### 3.7.4 发货单打印格式
-
-```
-┌─────────────────────────────────────┐
-│           【工厂名称】（大字居中）       │
-│              发 货 单                 │
-├───────────────────────────────────┤
-│ 客户：___________  日期：__________  │
-│ 单号：___________  收货地址：________ │
-├──┬──────────────────┬──┬───────┬────┤
-│序│  品名规格          │单│ 数量   │备注│
-│号│                   │位│       │    │
-├──┼──────────────────┼──┼───────┼────┤
-│  │                   │  │       │    │
-└──┴──────────────────┴──┴───────┴────┘
-  制单人：____________   收货人：____________
-```
-
-**字段映射**：
-- 工厂名称：来自系统配置 `print.factory_name`
-- 客户：`shipment.customer_name`
-- 日期：`shipment.shipment_date`
-- 单号：`shipment.shipment_no`
-- 收货地址：客户档案中的 `customer.address`
-- 品名规格：`shipment_item.material_name` + `shipment_item.spec`
-- 单位：`shipment_item.unit`（来自物料档案，若无则空）
-- 数量：`shipment_item.quantity`（良品数量）
-- 备注：`shipment_item.detail_remark`
-- 制单人：来自系统配置 `print.maker_name`
-- 收货人：空白签名行（手写）
+- `docTitle`：系统配置 `printTitleDelivery`
+- 客户：`shipment.customerName`
+- 发货日期：`shipment.shipmentDate`
+- 单号：`shipment.shipmentNo`
+- 序号/品名/规格/单位/工艺/类型/良品数量/废品数量/明细备注：来自 `shipment_item`
+- tfoot 备注：系统配置 `printDeliveryRemark`
+- 签名栏标签：系统配置 `printSignature1Label`/`printSignature2Label`/`printMakerLabel`/`makerName`
 
 #### 3.7.5 打印配置管理
 
-**配置项**（存储在 `sys_config` 表）：
+**配置项**（存储在 `sys_config` 表，通过 `GET/PUT /api/config/print` 读写）：
 
-| 配置键 | 说明 | 示例值 |
-|--------|------|--------|
-| `print.factory_name` | 工厂名称（打印单据抬头）| 广州某某电镀有限公司 |
-| `print.maker_name` | 制单人姓名（签名行）| 张三 |
+| 配置键 | 说明 |
+|--------|------|
+| `printTitleProduction` | 排产单标题（大字抬头）|
+| `printTitleDelivery` | 发货单标题（大字抬头）|
+| `printCompanyName` | 公司名称 |
+| `printCompanyPhone` | 公司电话/传真 |
+| `printCompanyAddress` | 公司地址 |
+| `printContact1` | 联系人1（发货单用）|
+| `printContact2` | 联系人2（发货单用）|
+| `printSignature1Label` | 签名栏1标签（排产单：生产班长；发货单：收货单位）|
+| `printSignature2Label` | 签名栏2标签（排产单：仓管；发货单：仓管）|
+| `printSignature3Label` | 签名栏3标签（排产单：签名）|
+| `printMakerLabel` | 制单人标签 |
+| `makerName` | 制单人姓名 |
+| `printDeliveryRemark` | 发货单固定备注（多行文本，`\n` 分隔）|
 
-**接口**：
-- `GET /api/config/print` — 获取打印配置
-- `PUT /api/config/print` — 保存打印配置
-
-**前端入口**：系统管理 → 打印设置（新增菜单项）
+**前端入口**：系统管理 → 打印设置
 
 ---
 
@@ -826,4 +844,4 @@ HAVING needed_init_qty > 0
 
 ---
 
-*文档版本：v1.5 | 最后更新：2026-03-19*
+*文档版本：v1.6 | 最后更新：2026-03-20*

@@ -472,23 +472,61 @@ const handlePrint = async (row) => {
     const items = detail.items || []
 
     const docTitle = config.printTitleDelivery || '致恒（致越）金属表面加工厂送货单'
-    const companyName = config.printCompanyName || '致恒（致越）金属表面加工厂'
-    const companyPhone = config.printCompanyPhone || '0750-2766036'
-    const companyAddress = config.printCompanyAddress || '开平市，水口镇，唐良良兴村矮岗山'
-    const contact1 = config.printContact1 || '廖总：13536094788'
-    const contact2 = config.printContact2 || '仓管：13672842611'
     const sig1Label = config.printSignature1Label || '收货单位'
-    const sig2Label = config.printSignature2Label || '仓管'
+    const sig2Label = config.printSignature2Label || '仓管员'
     const makerLabel = config.printMakerLabel || '制单人'
     const makerName = config.makerName || detail.operator || ''
     const deliveryRemark = config.printDeliveryRemark || '1. 货到当场验收，签收后概不负责\n2. 如有质量问题，3天内退货\n3. 本单据一式三联（客户、财务、仓库各一联）'
+    const companyPhone = config.printCompanyPhone || ''
+    const contact1 = config.printContact1 || ''
+    const contact2 = config.printContact2 || ''
+    const companyAddress = config.printCompanyAddress || ''
 
     const totalGoodQty = items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)
     const totalDefectiveQty = items.reduce((sum, item) => sum + (parseFloat(item.defectiveQty) || 0), 0)
 
-    const itemRows = items.map((item, i) => {
-      return `<tr>
-        <td style="text-align:center">${i + 1}</td>
+    // 按纸张高度计算每页行数（同排产单逻辑）
+    // 纸张: 241mm × 120mm，页边距 5mm → 可用高度 110mm
+    // 1pt = 0.353mm，浏览器默认行高 1.2
+    const R = 0.353
+    const LH = 1.2
+    const titleH  = 13 * R * LH + 4    // 标题行
+    const metaH   = 9  * R * LH + 2    // 日期/单号行
+    const infoH   = 9  * R * LH + 2    // 电话行
+    const addrH   = 9  * R * LH + 2    // 地址行
+    const hdrH    = 8.5 * R * LH + 2.5 // 列标题行（单行）
+    const rowH    = hdrH
+    const remarkH = rowH               // tfoot备注行
+    const sigH    = 7                  // 签名div
+    // 両行追加済みの overhead、-1 は浏览器渲染误差分の安全余量
+    const overhead = titleH + metaH + infoH + addrH + hdrH + remarkH + sigH + 6
+    const ROWS_PER_PAGE = Math.max(1, Math.floor((110 - overhead) / rowH) - 1)
+    // 例: overhead≈52mm, rowH≈6.1mm → floor(57.8/6.1)-1 = 9-1 = 8行/页
+
+    // 分割数据：非末页最多 ROWS_PER_PAGE 条，末页最多 ROWS_PER_PAGE-1 条（为合计行留位）
+    const chunks = []
+    if (items.length === 0) {
+      chunks.push([])
+    } else {
+      for (let i = 0; i < items.length; i += ROWS_PER_PAGE) {
+        chunks.push(items.slice(i, i + ROWS_PER_PAGE))
+      }
+      // 末页最多放 ROWS_PER_PAGE-1 条数据（为合计行留1位）
+      // 若末页已满 ROWS_PER_PAGE 条则合计行会溢出，把最后一条移入新页
+      const last = chunks[chunks.length - 1]
+      if (last.length >= ROWS_PER_PAGE) {
+        chunks.push(last.splice(ROWS_PER_PAGE - 1))
+      }
+    }
+
+    // 空白填充行（11列）—— &nbsp; 保证行高一致
+    const emptyRow = `<tr>${'<td>&nbsp;</td>'.repeat(11)}</tr>`
+
+    const remarkLines = deliveryRemark.split('\n').join('<br>')
+
+    const makePage = (chunk, isLast, pageIndex) => {
+      const dataRows = chunk.map((item, i) => `<tr>
+        <td style="text-align:center">${pageIndex * ROWS_PER_PAGE + i + 1}</td>
         <td>${item.materialName || ''}</td>
         <td>${item.spec || ''}</td>
         <td style="text-align:center">${item.unit || ''}</td>
@@ -499,83 +537,96 @@ const handlePrint = async (row) => {
         <td></td>
         <td>${item.detailRemark || ''}</td>
         <td style="text-align:right">${item.quantity != null ? item.quantity : ''}</td>
-      </tr>`
-    }).join('')
+      </tr>`).join('')
 
-    const remarkLines = deliveryRemark.split('\n').join('<br>')
+      const fillTarget = isLast ? ROWS_PER_PAGE - 1 : ROWS_PER_PAGE
+      const padRows = emptyRow.repeat(Math.max(0, fillTarget - chunk.length))
+
+      const totalRow = isLast ? `<tr>
+        <td colspan="6" style="text-align:right;font-weight:bold;">合计</td>
+        <td style="text-align:right;font-weight:bold;">${totalGoodQty || ''}</td>
+        <td style="text-align:right;font-weight:bold;">${totalDefectiveQty || ''}</td>
+        <td colspan="3"></td>
+      </tr>` : ''
+
+      return `<div class="page${isLast ? ' last' : ''}">
+        <table class="pt">
+          <thead>
+            <tr><th colspan="11" class="title-cell">${docTitle}</th></tr>
+            <tr><td colspan="11" class="info-cell">
+              <div class="info-flex">
+                <span>电话/传真：${companyPhone}</span>
+                <span>${contact1}</span>
+                <span>${contact2}</span>
+              </div>
+            </td></tr>
+            <tr><td colspan="11" class="info-cell">
+              <div class="info-flex">
+                <span>地址：${companyAddress}</span>
+              </div>
+            </td></tr>
+            <tr><td colspan="11" class="meta-cell">
+              <div class="meta-flex">
+                <span>客户：${detail.customerName || ''}</span>
+                <span>发货日期：${detail.shipmentDate || ''}</span>
+                <span>单号：${detail.shipmentNo || ''}</span>
+              </div>
+            </td></tr>
+            <tr>
+              <th style="width:5%">序号</th>
+              <th style="width:20%">品名</th>
+              <th style="width:10%">规格</th>
+              <th style="width:5%">单位</th>
+              <th style="width:12%">工艺要求</th>
+              <th style="width:7%">类型</th>
+              <th style="width:9%">良品数量</th>
+              <th style="width:7%">不良品</th>
+              <th style="width:8%">原件退回</th>
+              <th style="width:8%">备注</th>
+              <th style="width:9%">合计</th>
+            </tr>
+          </thead>
+          <tbody>${dataRows}${padRows}${totalRow}</tbody>
+          <tfoot>
+            <tr><td colspan="11" class="foot-remark">${remarkLines}</td></tr>
+          </tfoot>
+        </table>
+        <div class="sig-line">
+          <span>${makerLabel}：${makerName}</span>
+          <span>${sig2Label}：</span>
+          <span>${sig1Label}：</span>
+        </div>
+      </div>`
+    }
+
+    const pages = chunks.map((chunk, i) => makePage(chunk, i === chunks.length - 1, i)).join('\n')
 
     const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<title>发货单 ${detail.shipmentNo || ''}</title>
+<html><head><meta charset="utf-8"><title>发货单 ${detail.shipmentNo || ''}</title>
 <style>
-  @page { size: 241mm 120mm; margin: 10mm 5mm; }
+  @page { size: 241mm 120mm; margin: 5mm; }
   * { box-sizing: border-box; }
-  body { width: 231mm; font-family: SimSun, "宋体", serif; font-size: 9pt; margin: 0; }
-  .header { display: flex; justify-content: flex-end; margin-bottom: 2mm; }
-  .company-info { text-align: right; font-size: 9pt; line-height: 1.5; }
-  .company-info .title { font-size: 14pt; font-weight: bold; }
-  .order-info { display: flex; gap: 6mm; margin-bottom: 2mm; font-size: 9pt; }
-  .content { display: flex; gap: 1mm; }
-  .remark-vertical { writing-mode: vertical-rl; text-orientation: upright; border: 0.5pt solid #000; padding: 1mm; font-size: 8pt; min-width: 8mm; }
-  .items-table { flex: 1; width: 100%; border-collapse: collapse; font-size: 8.5pt; }
-  .items-table th, .items-table td { border: 0.5pt solid #000; padding: 1mm 1.5mm; }
-  .items-table th { text-align: center; font-weight: bold; }
-  .items-table tfoot td { font-weight: bold; }
-  .items-table tfoot td.total { text-align: right; }
-  .signature-row { margin-top: 3mm; display: flex; justify-content: space-between; font-size: 9pt; }
-</style>
-</head><body>
-<div class="header">
-  <div class="company-info">
-    <div class="title">${docTitle}</div>
-    <div>电话/传真：${companyPhone}</div>
-    <div>地址：${companyAddress}</div>
-    <div>${contact1} &nbsp;&nbsp; ${contact2}</div>
-  </div>
-</div>
-<div class="order-info">
-  <span>客户：${detail.customerName || ''}</span>
-  <span>日期：${detail.shipmentDate || ''}</span>
-  <span>单据编号：${detail.shipmentNo || ''}</span>
-</div>
-<div class="content">
-  <div class="remark-vertical">备注：${remarkLines}</div>
-  <table class="items-table">
-    <thead>
-      <tr>
-        <th style="width:5%">序号</th>
-        <th style="width:20%">品名</th>
-        <th style="width:10%">规格</th>
-        <th style="width:6%">单位</th>
-        <th style="width:12%">工艺要求</th>
-        <th style="width:8%">类型</th>
-        <th style="width:10%">良品数量</th>
-        <th style="width:8%">不良品</th>
-        <th style="width:8%">原件退回</th>
-        <th style="width:8%">备注</th>
-        <th style="width:5%">合计</th>
-      </tr>
-    </thead>
-    <tbody>${itemRows}</tbody>
-    <tfoot>
-      <tr>
-        <td colspan="6">合计</td>
-        <td class="total">${totalGoodQty || ''}</td>
-        <td class="total">${totalDefectiveQty || ''}</td>
-        <td class="total"></td>
-        <td colspan="2"></td>
-      </tr>
-    </tfoot>
-  </table>
-</div>
-<div class="signature-row">
-  <span>${sig1Label}：________________</span>
-  <span>${sig2Label}：________________</span>
-  <span>${makerLabel}：${makerName}</span>
-</div>
+  body { font-family: SimSun, "宋体", serif; font-size: 9pt; margin: 0; }
+  .page { page-break-after: always; }
+  .page.last { page-break-after: auto; }
+  .pt { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  .pt th, .pt td { border: 0.5pt solid #0066CC; padding: 1mm 1.5mm; }
+  .pt th { text-align: center; font-weight: bold; background: #f0f6ff; }
+  .title-cell { border: none !important; text-align: center; font-size: 13pt; font-weight: bold; padding: 2mm 0 !important; background: white !important; }
+  .meta-cell { border: none !important; padding: 1mm 0 !important; background: white !important; font-weight: normal; }
+  .meta-flex { display: flex; justify-content: space-around; }
+  .meta-flex span { flex: 1; text-align: center; }
+  .info-cell { border: none !important; padding: 0.5mm 0 !important; background: white !important; font-weight: normal; }
+  .info-flex { display: flex; justify-content: center; gap: 8mm; padding: 0 2mm; }
+  .info-flex span { text-align: center; }
+  .foot-remark { background: white; font-size: 7.5pt; }
+  .sig-line { display: flex; justify-content: flex-start; font-size: 9pt; margin-top: 1.5mm; padding: 0 2mm; }
+  .sig-line span { flex: 1; text-align: left; }
+</style></head><body>
+${pages}
 </body></html>`
 
-    const win = window.open('', '_blank', 'width=900,height=650')
+    const win = window.open('', '_blank', 'width=950,height=680')
     win.document.write(html)
     win.document.close()
     win.onload = () => { win.print() }

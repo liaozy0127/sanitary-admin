@@ -526,25 +526,26 @@ const handlePrint = async (row) => {
 
     // 根据纸张和CSS自动计算每页行数
     // 纸张: 241mm × 120mm，页边距 5mm → 可用高度 110mm
-    // 1pt = 0.353mm（印刷分辨率）
+    // 1pt = 0.353mm（印刷分辨率），浏览器默认行高 1.2
     const R = 0.353
-    const titleH  = 13 * R + 4       // 标题行: 13pt + 上下各2mm ≈ 8.6mm
-    const metaH   = 9  * R + 2       // 日期行: 9pt  + 上下各1mm ≈ 5.2mm
-    const hdrH    = 8.5* R + 2.5     // 列标题行: 8.5pt + 1mm+1.5mm ≈ 5.5mm
-    const rowH    = hdrH              // 数据行与列标题行同高 ≈ 5.5mm
-    const remarkH = rowH              // 备注行同高 ≈ 5.5mm
+    const LH = 1.2
+    const titleH  = 13 * R * LH + 4  // 标题行: 13pt × 1.2 + 上下各2mm ≈ 9.5mm
+    const metaH   = 9  * R * LH + 2  // 日期行: 9pt × 1.2 + 上下各1mm ≈ 5.8mm
+    const hdrH    = 8.5* R * LH + 2.5 // 列标题行: 8.5pt × 1.2 + 1mm+1.5mm ≈ 6.1mm
+    const rowH    = hdrH              // 数据行与列标题行同高
+    const remarkH = rowH              // 备注行同高
     const sigH    = 7                 // 签名栏 div ≈ 7mm
-    const overhead = titleH + metaH + hdrH * 2 + remarkH + sigH + 2 // +2mm 边框余量
+    const overhead = titleH + metaH + hdrH * 2 + remarkH + sigH + 3 // +3mm 边框余量
     const ROWS_PER_PAGE = Math.max(1, Math.floor((110 - overhead) / rowH))
-    // 实际计算约 13 行/页
+    // 实际计算约 12 行/页
 
     // 分割数据
     const chunks = []
     if (items.length === 0) chunks.push([])
     else for (let i = 0; i < items.length; i += ROWS_PER_PAGE) chunks.push(items.slice(i, i + ROWS_PER_PAGE))
 
-    // 空白填充行（11列）
-    const emptyRow = `<tr>${'<td></td>'.repeat(11)}</tr>`
+    // 空白填充行（11列）—— 用 &nbsp; 保证行高与数据行一致
+    const emptyRow = `<tr>${'<td>&nbsp;</td>'.repeat(11)}</tr>`
 
     const makePage = (chunk, isLast) => {
       const dataRows = chunk.map(item => `<tr>
@@ -593,9 +594,9 @@ const handlePrint = async (row) => {
           </tfoot>
         </table>
         <div class="sig-line">
-          <span>${sig3}：________________</span>
-          <span>${sig1}：________________</span>
-          <span>${sig2}：________________</span>
+          <span>${sig3}：</span>
+          <span>${sig1}：</span>
+          <span>${sig2}：</span>
         </div>
       </div>`
     }
@@ -618,7 +619,8 @@ const handlePrint = async (row) => {
   .meta-flex { display: flex; justify-content: space-around; }
   .meta-flex span { flex: 1; text-align: center; }
   .foot-remark { background: white; }
-  .sig-line { display: flex; justify-content: space-around; font-size: 9pt; margin-top: 1.5mm; padding: 0 2mm; }
+  .sig-line { display: flex; justify-content: flex-start; font-size: 9pt; margin-top: 1.5mm; padding: 0 2mm; }
+  .sig-line span { flex: 1; text-align: left; }
 </style></head><body>
 ${pages}
 </body></html>`
