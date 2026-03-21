@@ -625,10 +625,13 @@ const handlePrint = async (row) => {
 ${pages}
 </body></html>`
 
-    const win = window.open('', '_blank', 'width=950,height=680')
-    win.document.write(html)
-    win.document.close()
-    win.onload = () => { win.print() }
+    const iframe = document.createElement('iframe')
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;'
+    document.body.appendChild(iframe)
+    iframe.contentDocument.write(html)
+    iframe.contentDocument.close()
+    iframe.contentWindow.onafterprint = () => document.body.removeChild(iframe)
+    iframe.contentWindow.print()
   } catch (e) {
     ElMessage.error('打印失败，请重试')
   }
