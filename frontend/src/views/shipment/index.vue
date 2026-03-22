@@ -123,7 +123,7 @@
           <span>发货明细</span>
           <el-button type="primary" size="small" :icon="Plus" @click="addItem">添加明细</el-button>
         </div>
-        <el-table :data="formData.items" border size="small" style="width: 100%">
+        <el-table :data="formData.items" border size="small" style="width: 100%" max-height="400">
           <el-table-column label="产品名称" min-width="160">
             <template #default="{ row, $index }">
               <el-select v-model="row.materialId" placeholder="输入物料名称搜索" filterable clearable size="small" remote
@@ -174,7 +174,7 @@
               <el-input v-model="row.detailRemark" size="small" />
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="120" align="center">
+          <el-table-column label="操作" width="120" align="center" fixed="right">
             <template #default="{ $index }">
               <el-button size="small" type="danger" :icon="Delete" @click="removeItem($index)" circle />
             </template>
