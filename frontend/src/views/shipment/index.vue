@@ -248,8 +248,8 @@ const loadCustomers = async () => {
 }
 
 const loadProcesses = async () => {
-  const res = await request.get('/processes')
-  processList.value = res.data
+  const res = await request.get('/processes/all')
+  processList.value = Array.isArray(res) ? res : (res.data || [])
 }
 
 const loadMaterials = async (customerId) => {
