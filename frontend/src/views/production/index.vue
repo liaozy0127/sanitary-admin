@@ -43,12 +43,7 @@
                 <el-table-column prop="receiptType" label="收货类型" width="100" />
                 <el-table-column prop="unit" label="单位" width="80" />
                 <el-table-column prop="plannedQty" label="排产数量" width="90" align="right" />
-                <el-table-column prop="actualQty" label="入库数量" width="90" align="right" />
-                <el-table-column prop="unwareHousedQty" label="未入库" width="80" align="right" />
-                <el-table-column prop="outsourcePrice" label="委外单价" width="90" align="right" />
-                <el-table-column prop="platingPrice" label="电镀单价" width="90" align="right" />
-                <el-table-column prop="platingAmount" label="电镀金额" width="90" align="right" />
-                <el-table-column prop="customerOrderNo" label="客户单号" width="120" />
+                <el-table-column prop="platingPrice" label="单价" width="90" align="right" />
                 <el-table-column prop="productionType" label="排产方式" width="90" />
                 <el-table-column prop="detailRemark" label="明细备注" min-width="120" />
               </el-table>
@@ -132,7 +127,11 @@
           </el-table-column>
           <el-table-column label="收货类型" width="100">
             <template #default="{ row }">
-              <el-input v-model="row.receiptType" size="small" />
+              <el-select v-model="row.receiptType" size="small" style="width:100%">
+                <el-option value="正常" label="正常" />
+                <el-option value="返工" label="返工" />
+                <el-option value="不良数" label="不良数" />
+              </el-select>
             </template>
           </el-table-column>
           <el-table-column label="单位" width="80">
@@ -146,39 +145,10 @@
                 controls-position="right" />
             </template>
           </el-table-column>
-          <el-table-column label="入库数量" width="100">
-            <template #default="{ row }">
-              <el-input-number v-model="row.actualQty" :min="0" :precision="0" size="small" style="width:100%"
-                controls-position="right" />
-            </template>
-          </el-table-column>
-          <el-table-column label="未入库" width="80">
-            <template #default="{ row }">
-              <el-input-number v-model="row.unwareHousedQty" :min="0" :precision="0" size="small" style="width:100%"
-                controls-position="right" />
-            </template>
-          </el-table-column>
-          <el-table-column label="委外单价" width="90">
-            <template #default="{ row }">
-              <el-input-number v-model="row.outsourcePrice" :min="0" :precision="2" size="small" style="width:100%"
-                controls-position="right" />
-            </template>
-          </el-table-column>
-          <el-table-column label="电镀单价" width="90">
+          <el-table-column label="单价" width="90">
             <template #default="{ row }">
               <el-input-number v-model="row.platingPrice" :min="0" :precision="2" size="small" style="width:100%"
                 controls-position="right" />
-            </template>
-          </el-table-column>
-          <el-table-column label="电镀金额" width="90">
-            <template #default="{ row }">
-              <el-input-number v-model="row.platingAmount" :min="0" :precision="2" size="small" style="width:100%"
-                controls-position="right" />
-            </template>
-          </el-table-column>
-          <el-table-column label="客户单号" width="120">
-            <template #default="{ row }">
-              <el-input v-model="row.customerOrderNo" size="small" />
             </template>
           </el-table-column>
           <el-table-column label="排产方式" width="90">
@@ -331,10 +301,9 @@ const onItemMaterialChange = async (id, index) => {
   const row = formData.items[index]
   if (!row) return
   // 先重置单价和工艺
-  row.unitPrice = 0
+  row.platingPrice = 0
   row.processId = null
   row.processName = ''
-  if (typeof calcItemAmount === 'function') calcItemAmount(row)
   if (!id) return
   // 从当前行搜索结果找物料信息
   const material = (row._matOptions || []).find(m => m.id === id)
@@ -342,10 +311,9 @@ const onItemMaterialChange = async (id, index) => {
     row.materialName = material.name
     row.materialCode = material.code || ''
     row.spec = material.spec || ''
-    // 带出默认单价
+    // 带出默认单价填充电镀单价
     if (material.defaultPrice && Number(material.defaultPrice) > 0) {
-      row.unitPrice = Number(material.defaultPrice)
-      if (typeof calcItemAmount === 'function') calcItemAmount(row)
+      row.platingPrice = Number(material.defaultPrice)
     }
   }
   // 自动带出工艺：查该客户+物料最近收货单里的工艺
@@ -394,10 +362,9 @@ const searchMaterial = async (query, index) => {
 const addItem = () => {
   formData.items.push({
     materialId: null, materialName: '', materialCode: '', spec: '',
-    processId: null, processName: '', receiptType: '', unit: '个', _matOptions: [...defaultMatOptions.value], _matLoading: false,
-    plannedQty: 0, actualQty: 0, unwareHousedQty: 0,
-    outsourcePrice: 0, platingPrice: 0, platingAmount: 0,
-    customerOrderNo: '', productionType: '', detailRemark: ''
+    processId: null, processName: '', receiptType: '正常', unit: '个', _matOptions: [...defaultMatOptions.value], _matLoading: false,
+    plannedQty: 0, platingPrice: 0,
+    productionType: '自制', detailRemark: ''
   })
 }
 

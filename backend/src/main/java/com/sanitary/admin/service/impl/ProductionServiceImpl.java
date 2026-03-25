@@ -212,14 +212,9 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
                     item.setReceiptType(getCellString(row, 7));
                     item.setUnit(getCellString(row, 8));
                     item.setPlannedQty(parseQty(getCellString(row, 9)));
-                    item.setActualQty(parseQty(getCellString(row, 10)));
-                    item.setUnwareHousedQty(parseQty(getCellString(row, 11)));
-                    item.setOutsourcePrice(parsePrice(getCellString(row, 12)));
-                    item.setPlatingAmount(parsePrice(getCellString(row, 13)));
-                    item.setPlatingPrice(parsePrice(getCellString(row, 14)));
-                    item.setDetailRemark(getCellString(row, 15));
-                    item.setCustomerOrderNo(getCellString(row, 16));
-                    item.setProductionType(getCellString(row, 17));
+                    item.setPlatingPrice(parsePrice(getCellString(row, 11)));
+                    item.setProductionType(getCellString(row, 12));
+                    item.setDetailRemark(getCellString(row, 13));
 
                     itemsMap.get(productionNo).add(item);
 
@@ -333,7 +328,7 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
         XSSFWorkbook wb = new XSSFWorkbook();
         Sheet sheet = wb.createSheet("排产单");
         String[] headers = {"排产单号","排产日期","客户名称","备注","物料编码","物料名称","型号规格","工艺名称",
-            "收货类型","单位","排产数量","入库数量","未入库","委外单价","电镀金额","电镀单价","客户单号","排产方式","明细备注"};
+            "收货类型","单位","排产数量","单价","排产方式","明细备注"};
         ExcelExportUtil.writeTitleRow(sheet, wb, "排产单", headers.length);
         ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
 
@@ -344,7 +339,7 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
         CellStyle n0 = ExcelExportUtil.numStyle(wb, false);
         CellStyle n1 = ExcelExportUtil.numStyle(wb, true);
 
-        BigDecimal totalPlanned = BigDecimal.ZERO, totalActual = BigDecimal.ZERO;
+        BigDecimal totalPlanned = BigDecimal.ZERO;
 
         int rowIdx = 2;
         int detailCount = 0;
@@ -371,16 +366,10 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
                 ExcelExportUtil.setCell(row, 8, item.getReceiptType(), s);
                 ExcelExportUtil.setCell(row, 9, item.getUnit(), s);
                 ExcelExportUtil.setCell(row, 10, item.getPlannedQty(), ns);
-                ExcelExportUtil.setCell(row, 11, item.getActualQty(), ns);
-                ExcelExportUtil.setCell(row, 12, item.getUnwareHousedQty(), ns);
-                ExcelExportUtil.setCell(row, 13, item.getOutsourcePrice(), ns);
-                ExcelExportUtil.setCell(row, 14, item.getPlatingAmount(), ns);
-                ExcelExportUtil.setCell(row, 15, item.getPlatingPrice(), ns);
-                ExcelExportUtil.setCell(row, 16, item.getCustomerOrderNo(), s);
-                ExcelExportUtil.setCell(row, 17, item.getProductionType(), s);
-                ExcelExportUtil.setCell(row, 18, item.getDetailRemark(), s);
+                ExcelExportUtil.setCell(row, 11, item.getPlatingPrice(), ns);
+                ExcelExportUtil.setCell(row, 12, item.getProductionType(), s);
+                ExcelExportUtil.setCell(row, 13, item.getDetailRemark(), s);
                 if (item.getPlannedQty() != null) totalPlanned = totalPlanned.add(item.getPlannedQty());
-                if (item.getActualQty() != null) totalActual = totalActual.add(item.getActualQty());
                 detailCount++;
             }
         }
@@ -391,8 +380,7 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
         ExcelExportUtil.setCell(sumRow, 0, "合计", sumS);
         for (int i = 1; i <= 9; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
         ExcelExportUtil.setCell(sumRow, 10, totalPlanned, sumN);
-        ExcelExportUtil.setCell(sumRow, 11, totalActual, sumN);
-        for (int i = 12; i < headers.length; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
+        for (int i = 11; i < headers.length; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
 
         sheet.createFreezePane(0, 2);
         ExcelExportUtil.autoSize(sheet, headers.length);
