@@ -6,13 +6,28 @@
       </template>
       <el-form ref="formRef" :model="formData" label-width="120px" v-loading="loading">
 
-        <!-- 公司基本信息 -->
-        <div class="section-title">公司基本信息</div>
-        <el-form-item label="工厂名称">
-          <el-input v-model="formData.factoryName" placeholder="旧版工厂名称（兼容）" />
+        <!-- 排产单设置 -->
+        <div class="section-title">排产单打印</div>
+        <el-form-item label="排产单标题">
+          <el-input v-model="formData.printTitleProduction" placeholder="排产单打印文档主标题" />
+        </el-form-item>
+        <el-form-item label="签名栏第1位">
+          <el-input v-model="formData.printSignature3Label" placeholder="打印最左位，如 生产班长" />
+        </el-form-item>
+        <el-form-item label="签名栏第2位">
+          <el-input v-model="formData.printSignature1Label" placeholder="打印中间位，如 收货单位" />
+        </el-form-item>
+        <el-form-item label="签名栏第3位">
+          <el-input v-model="formData.printSignature2Label" placeholder="打印最右位，如 仓管员" />
+        </el-form-item>
+
+        <!-- 发货单设置 -->
+        <div class="section-title">发货单打印</div>
+        <el-form-item label="发货单标题">
+          <el-input v-model="formData.printTitleDelivery" placeholder="发货单打印文档主标题" />
         </el-form-item>
         <el-form-item label="公司名称">
-          <el-input v-model="formData.printCompanyName" placeholder="发货单上显示的公司名称" />
+          <el-input v-model="formData.printCompanyName" placeholder="发货单表头显示的公司名称" />
         </el-form-item>
         <el-form-item label="电话/传真">
           <el-input v-model="formData.printCompanyPhone" placeholder="如 0750-2766036" />
@@ -26,36 +41,24 @@
         <el-form-item label="联系人2">
           <el-input v-model="formData.printContact2" placeholder="如 仓管：13672842611" />
         </el-form-item>
-
-        <!-- 排产单设置 -->
-        <div class="section-title">签名栏设置（排产单 / 发货单共用）</div>
-        <el-form-item label="排产单标题">
-          <el-input v-model="formData.printTitleProduction" placeholder="排产单打印文档主标题" />
+        <el-form-item label="签名栏第1位">
+          <el-input v-model="formData.printDeliverySig1Label" placeholder="如 制单人" />
         </el-form-item>
-        <el-form-item label="签名栏1">
-          <el-input v-model="formData.printSignature1Label" placeholder="排产单：生产班长；发货单：收货单位" />
+        <el-form-item label="签名栏第2位">
+          <el-input v-model="formData.printDeliverySig2Label" placeholder="如 仓管员" />
         </el-form-item>
-        <el-form-item label="签名栏2">
-          <el-input v-model="formData.printSignature2Label" placeholder="如 仓管" />
-        </el-form-item>
-        <el-form-item label="签名栏3">
-          <el-input v-model="formData.printSignature3Label" placeholder="排产单第3栏，如 签名" />
-        </el-form-item>
-
-        <!-- 发货单设置 -->
-        <div class="section-title">发货单打印</div>
-        <el-form-item label="发货单标题">
-          <el-input v-model="formData.printTitleDelivery" placeholder="发货单打印文档主标题" />
-        </el-form-item>
-        <el-form-item label="制单人标签">
-          <el-input v-model="formData.printMakerLabel" placeholder="如 制单人" />
-        </el-form-item>
-        <el-form-item label="制单人">
-          <el-input v-model="formData.makerName" placeholder="打印单据上的制单人签名" />
+        <el-form-item label="签名栏第3位">
+          <el-input v-model="formData.printDeliverySig3Label" placeholder="如 收货单位" />
         </el-form-item>
         <el-form-item label="发货单备注">
           <el-input v-model="formData.printDeliveryRemark" type="textarea" :rows="4"
-            placeholder="发货单左侧竖排备注内容，多行用换行分隔" />
+            placeholder="发货单底部备注内容，多行用换行分隔" />
+        </el-form-item>
+
+        <!-- 其他 -->
+        <div class="section-title">其他</div>
+        <el-form-item label="工厂名称">
+          <el-input v-model="formData.factoryName" placeholder="旧版工厂名称（兼容）" />
         </el-form-item>
 
         <el-form-item>
@@ -89,6 +92,9 @@ const formData = reactive({
   printSignature2Label: '',
   printSignature3Label: '',
   printMakerLabel: '',
+  printDeliverySig1Label: '',
+  printDeliverySig2Label: '',
+  printDeliverySig3Label: '',
   printDeliveryRemark: ''
 })
 

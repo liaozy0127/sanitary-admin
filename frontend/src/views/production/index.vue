@@ -554,7 +554,7 @@ const handlePrint = async (row) => {
         <td>${item.spec || ''}</td>
         <td>${item.processName || ''}</td>
         <td style="text-align:right">${item.plannedQty != null ? item.plannedQty : ''}</td>
-        <td style="text-align:center">${item.productionType || ''}</td>
+        <td style="text-align:center">${item.receiptType || ''}</td>
         <td></td><td></td><td></td><td></td>
         <td>${item.detailRemark || ''}</td>
       </tr>`).join('')
@@ -594,9 +594,9 @@ const handlePrint = async (row) => {
           </tfoot>
         </table>
         <div class="sig-line">
-          <span>${sig3}：</span>
-          <span>${sig1}：</span>
-          <span>${sig2}：</span>
+          <span>${sig3}</span>
+          <span>${sig1}</span>
+          <span>${sig2}</span>
         </div>
       </div>`
     }

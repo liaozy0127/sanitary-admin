@@ -472,10 +472,9 @@ const handlePrint = async (row) => {
     const items = detail.items || []
 
     const docTitle = config.printTitleDelivery || '致恒（致越）金属表面加工厂送货单'
-    const sig1Label = config.printSignature1Label || '收货单位'
-    const sig2Label = config.printSignature2Label || '仓管员'
-    const makerLabel = config.printMakerLabel || '制单人'
-    const makerName = config.makerName || detail.operator || ''
+    const delSig1 = config.printDeliverySig1Label || '制单人'
+    const sig1Label = config.printDeliverySig3Label || '收货单位'
+    const sig2Label = config.printDeliverySig2Label || '仓管员'
     const deliveryRemark = config.printDeliveryRemark || '1. 货到当场验收，签收后概不负责\n2. 如有质量问题，3天内退货\n3. 本单据一式三联（客户、财务、仓库各一联）'
     const companyPhone = config.printCompanyPhone || ''
     const contact1 = config.printContact1 || ''
@@ -592,9 +591,9 @@ const handlePrint = async (row) => {
           </tfoot>
         </table>
         <div class="sig-line">
-          <span>${makerLabel}：${makerName}</span>
-          <span>${sig2Label}：</span>
-          <span>${sig1Label}：</span>
+          <span>${delSig1}</span>
+          <span>${sig2Label}</span>
+          <span>${sig1Label}</span>
         </div>
       </div>`
     }

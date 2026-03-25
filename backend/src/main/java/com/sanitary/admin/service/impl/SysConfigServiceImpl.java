@@ -31,6 +31,9 @@ public class SysConfigServiceImpl extends ServiceImpl<SysConfigMapper, SysConfig
         result.put("printSignature2Label",   getConfigValue("print.signature_2_label", "仓管员"));
         result.put("printSignature3Label",   getConfigValue("print.signature_3_label", "签名"));
         result.put("printMakerLabel",        getConfigValue("print.maker_label", "制单人"));
+        result.put("printDeliverySig1Label", getConfigValue("print.delivery_sig1_label", "制单人"));
+        result.put("printDeliverySig2Label", getConfigValue("print.delivery_sig2_label", "仓管员"));
+        result.put("printDeliverySig3Label", getConfigValue("print.delivery_sig3_label", "收货单位"));
         result.put("printDeliveryRemark",    getConfigValue("print.delivery_remark", "1. 货到当场验收，签收后概不负责\n2. 如有质量问题，3天内退货\n3. 本单据一式三联（客户、财务、仓库各一联）"));
         return result;
     }
@@ -50,8 +53,11 @@ public class SysConfigServiceImpl extends ServiceImpl<SysConfigMapper, SysConfig
         keyMap.put("printSignature1Label", "print.signature_1_label");
         keyMap.put("printSignature2Label", "print.signature_2_label");
         keyMap.put("printSignature3Label", "print.signature_3_label");
-        keyMap.put("printMakerLabel",      "print.maker_label");
-        keyMap.put("printDeliveryRemark",  "print.delivery_remark");
+        keyMap.put("printMakerLabel",       "print.maker_label");
+        keyMap.put("printDeliverySig1Label","print.delivery_sig1_label");
+        keyMap.put("printDeliverySig2Label","print.delivery_sig2_label");
+        keyMap.put("printDeliverySig3Label","print.delivery_sig3_label");
+        keyMap.put("printDeliveryRemark",   "print.delivery_remark");
         for (Map.Entry<String, String> entry : keyMap.entrySet()) {
             if (config.containsKey(entry.getKey())) {
                 setConfigValue(entry.getValue(), config.get(entry.getKey()));
