@@ -55,12 +55,6 @@
             placeholder="发货单底部备注内容，多行用换行分隔" />
         </el-form-item>
 
-        <!-- 其他 -->
-        <div class="section-title">其他</div>
-        <el-form-item label="工厂名称">
-          <el-input v-model="formData.factoryName" placeholder="旧版工厂名称（兼容）" />
-        </el-form-item>
-
         <el-form-item>
           <el-button type="primary" :loading="saving" @click="handleSave">保存</el-button>
         </el-form-item>
@@ -79,7 +73,6 @@ const saving = ref(false)
 const formRef = ref(null)
 
 const formData = reactive({
-  factoryName: '',
   makerName: '',
   printTitleProduction: '',
   printTitleDelivery: '',
