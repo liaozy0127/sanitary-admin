@@ -184,6 +184,7 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                 si.setProcessId(pid != 0L ? pid : null);
                 si.setProcessName(ri.getProcessName());
                 si.setReceiptQty(BigDecimal.ZERO);
+                si.setReworkQty(BigDecimal.ZERO);
                 si.setShipmentQty(BigDecimal.ZERO);
                 si.setDefectiveQty(BigDecimal.ZERO);
                 si.setGoodsAmount(BigDecimal.ZERO);
@@ -193,7 +194,12 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                 si.setUnitPrice(BigDecimal.ZERO);
                 return si;
             });
-            item.setReceiptQty(item.getReceiptQty().add(ri.getQuantity() != null ? ri.getQuantity() : BigDecimal.ZERO));
+            BigDecimal riQty = ri.getQuantity() != null ? ri.getQuantity() : BigDecimal.ZERO;
+            item.setReceiptQty(item.getReceiptQty().add(riQty));
+            // Accumulate rework qty separately (these are free)
+            if ("返工".equals(ri.getReceiptSource())) {
+                item.setReworkQty(item.getReworkQty().add(riQty));
+            }
             // Use unit_price from receipt item if not set yet; skip rework rows (their price should be 0)
             if (!"返工".equals(ri.getReceiptSource()) && item.getUnitPrice().compareTo(BigDecimal.ZERO) == 0
                     && ri.getUnitPrice() != null && ri.getUnitPrice().compareTo(BigDecimal.ZERO) > 0) {
@@ -213,6 +219,7 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                 newItem.setProcessId(pid != 0L ? pid : null);
                 newItem.setProcessName(si.getProcessName());
                 newItem.setReceiptQty(BigDecimal.ZERO);
+                newItem.setReworkQty(BigDecimal.ZERO);
                 newItem.setShipmentQty(BigDecimal.ZERO);
                 newItem.setDefectiveQty(BigDecimal.ZERO);
                 newItem.setGoodsAmount(BigDecimal.ZERO);
@@ -227,7 +234,7 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
             BigDecimal amt = si.getAmount() != null ? si.getAmount() : BigDecimal.ZERO;
             item.setShipmentQty(item.getShipmentQty().add(goodsQty).add(defQty));
             item.setDefectiveQty(item.getDefectiveQty().add(defQty));
-            item.setGoodsAmount(item.getGoodsAmount().add(amt));
+            // goodsAmount and shipmentAmount will be recalculated after rework deduction; accumulate raw amount here
             item.setShipmentAmount(item.getShipmentAmount().add(amt));
             if (item.getUnitPrice().compareTo(BigDecimal.ZERO) == 0 && si.getUnitPrice() != null
                     && si.getUnitPrice().compareTo(BigDecimal.ZERO) > 0) {
@@ -300,6 +307,12 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
             item.setPrevBalanceQty(prevBal);
             // currBalanceQty = prevBal + receiptQty - shipmentQty
             item.setCurrBalanceQty(prevBal.add(item.getReceiptQty()).subtract(item.getShipmentQty()));
+            // goodsAmount: billable goods qty = goodsQty_shipped - rework_qty (capped at 0), then × unitPrice
+            // reworkQty is guaranteed non-null; we only deduct from goods shipments (exclude defective)
+            BigDecimal goodsShipQty = item.getShipmentQty().subtract(item.getDefectiveQty());
+            BigDecimal reworkDeduction = item.getReworkQty() != null ? item.getReworkQty() : BigDecimal.ZERO;
+            BigDecimal billableQty = goodsShipQty.subtract(reworkDeduction).max(BigDecimal.ZERO);
+            item.setGoodsAmount(billableQty.multiply(item.getUnitPrice()).setScale(2, java.math.RoundingMode.HALF_UP));
             itemsToSave.add(item);
         }
 

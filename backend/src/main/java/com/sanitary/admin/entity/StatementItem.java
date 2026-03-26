@@ -18,6 +18,7 @@ public class StatementItem {
     private String processName;
     private BigDecimal prevBalanceQty;
     private BigDecimal receiptQty;
+    private BigDecimal reworkQty;     // 本月返工收货数量（免费，已从计费中扣除）
     private BigDecimal shipmentQty;
     private BigDecimal defectiveQty;  // 原件退回数量
     private BigDecimal currBalanceQty;

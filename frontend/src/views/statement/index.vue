@@ -50,6 +50,12 @@
                 <el-table-column prop="receiptQty" label="本月收货" width="90" align="right">
                   <template #default="{ row: item }">{{ fmtQty(item.receiptQty) }}</template>
                 </el-table-column>
+                <el-table-column prop="reworkQty" label="其中返工" width="90" align="right">
+                  <template #default="{ row: item }">
+                    <span v-if="item.reworkQty && Number(item.reworkQty) > 0" style="color:#E6A23C">{{ fmtQty(item.reworkQty) }}</span>
+                    <span v-else>-</span>
+                  </template>
+                </el-table-column>
                 <el-table-column prop="shipmentQty" label="发货合计" width="90" align="right">
                   <template #default="{ row: item }">{{ fmtQty(item.shipmentQty) }}</template>
                 </el-table-column>
