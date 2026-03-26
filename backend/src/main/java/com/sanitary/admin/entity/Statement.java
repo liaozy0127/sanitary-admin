@@ -28,6 +28,7 @@ public class Statement {
     private BigDecimal receiptQty;
     private BigDecimal shipmentQty;
     private BigDecimal receiptAmount;
+    private BigDecimal goodsAmount;   // 良品金额（已扣除返工）
     private BigDecimal shipmentAmount;
     private String remark;
 

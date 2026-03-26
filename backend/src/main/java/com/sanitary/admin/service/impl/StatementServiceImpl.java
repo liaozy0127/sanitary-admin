@@ -144,7 +144,9 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
             updateById(existing);
             // Re-generate items
             statementItemService.deleteByStatementId(existing.getId());
-            buildAndSaveItems(existing, customerId, ym, allReceiptItems, allShipmentItems);
+            BigDecimal existingGoodsAmount = buildAndSaveItems(existing, customerId, ym, allReceiptItems, allShipmentItems);
+            existing.setGoodsAmount(existingGoodsAmount);
+            updateById(existing);
             return existing;
         }
 
@@ -159,7 +161,9 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         statement.setReceiptAmount(receiptAmount);
         statement.setShipmentAmount(shipmentAmount);
         save(statement);
-        buildAndSaveItems(statement, customerId, ym, allReceiptItems, allShipmentItems);
+        BigDecimal newGoodsAmount = buildAndSaveItems(statement, customerId, ym, allReceiptItems, allShipmentItems);
+        statement.setGoodsAmount(newGoodsAmount);
+        updateById(statement);
         return statement;
     }
 
@@ -167,7 +171,7 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         return (a != null ? a : BigDecimal.ZERO).add(b != null ? b : BigDecimal.ZERO);
     }
 
-    private void buildAndSaveItems(Statement stmt, Long customerId, YearMonth ym,
+    private BigDecimal buildAndSaveItems(Statement stmt, Long customerId, YearMonth ym,
                                    List<ReceiptItem> receiptItems, List<ShipmentItem> shipmentItems) {
         // Group by materialId + "_" + processId
         Map<String, StatementItem> itemMap = new LinkedHashMap<>();
@@ -319,6 +323,10 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         if (!itemsToSave.isEmpty()) {
             statementItemService.saveItems(stmt.getId(), stmt.getStatementNo(), itemsToSave);
         }
+        // Return total goodsAmount for this statement
+        return itemsToSave.stream()
+            .map(i -> i.getGoodsAmount() != null ? i.getGoodsAmount() : BigDecimal.ZERO)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     @Override
