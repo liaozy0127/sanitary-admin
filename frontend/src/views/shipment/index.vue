@@ -518,8 +518,8 @@ const handlePrint = async (row) => {
       }
     }
 
-    // 空白填充行（11列）—— &nbsp; 保证行高一致
-    const emptyRow = `<tr>${'<td>&nbsp;</td>'.repeat(11)}</tr>`
+    // 空白填充行（10列）—— &nbsp; 保证行高一致
+    const emptyRow = `<tr>${'<td>&nbsp;</td>'.repeat(10)}</tr>`
 
     const remarkLines = deliveryRemark.split('\n').join('<br>')
 
@@ -535,7 +535,6 @@ const handlePrint = async (row) => {
         <td style="text-align:right">${item.defectiveQty != null ? item.defectiveQty : ''}</td>
         <td></td>
         <td>${item.detailRemark || ''}</td>
-        <td style="text-align:right">${item.quantity != null ? item.quantity : ''}</td>
       </tr>`).join('')
 
       const fillTarget = isLast ? ROWS_PER_PAGE - 1 : ROWS_PER_PAGE
@@ -545,26 +544,28 @@ const handlePrint = async (row) => {
         <td colspan="6" style="text-align:right;font-weight:bold;">合计</td>
         <td style="text-align:right;font-weight:bold;">${totalGoodQty || ''}</td>
         <td style="text-align:right;font-weight:bold;">${totalDefectiveQty || ''}</td>
-        <td colspan="3"></td>
+        <td colspan="2"></td>
       </tr>` : ''
 
       return `<div class="page${isLast ? ' last' : ''}">
+        <div class="stamp-side">控　戳</div>
+        <div class="page-body">
         <table class="pt">
           <thead>
-            <tr><th colspan="11" class="title-cell">${docTitle}</th></tr>
-            <tr><td colspan="11" class="info-cell">
+            <tr><th colspan="10" class="title-cell">${docTitle}</th></tr>
+            <tr><td colspan="10" class="info-cell">
               <div class="info-flex">
                 <span>电话/传真：${companyPhone}</span>
                 <span>${contact1}</span>
                 <span>${contact2}</span>
               </div>
             </td></tr>
-            <tr><td colspan="11" class="info-cell">
+            <tr><td colspan="10" class="info-cell">
               <div class="info-flex">
                 <span>地址：${companyAddress}</span>
               </div>
             </td></tr>
-            <tr><td colspan="11" class="meta-cell">
+            <tr><td colspan="10" class="meta-cell">
               <div class="meta-flex">
                 <span>客户：${detail.customerName || ''}</span>
                 <span>发货日期：${detail.shipmentDate || ''}</span>
@@ -581,13 +582,12 @@ const handlePrint = async (row) => {
               <th style="width:9%">良品数量</th>
               <th style="width:7%">不良品</th>
               <th style="width:8%">原件退回</th>
-              <th style="width:8%">备注</th>
-              <th style="width:9%">合计</th>
+              <th style="width:17%">备注</th>
             </tr>
           </thead>
           <tbody>${dataRows}${padRows}${totalRow}</tbody>
           <tfoot>
-            <tr><td colspan="11" class="foot-remark">${remarkLines}</td></tr>
+            <tr><td colspan="10" class="foot-remark">${remarkLines}</td></tr>
           </tfoot>
         </table>
         <div class="sig-line">
@@ -595,6 +595,8 @@ const handlePrint = async (row) => {
           <span>${sig2Label}</span>
           <span>${sig1Label}</span>
         </div>
+        </div>
+        <div class="stamp-side">控　戳</div>
       </div>`
     }
 
@@ -606,8 +608,10 @@ const handlePrint = async (row) => {
   @page { size: 241mm 120mm; margin: 5mm; }
   * { box-sizing: border-box; }
   body { font-family: SimSun, "宋体", serif; font-size: 9pt; margin: 0; }
-  .page { page-break-after: always; }
-  .page.last { page-break-after: auto; }
+  .page { display: flex; align-items: stretch; gap: 2mm; min-height: 108mm; page-break-after: always; }
+  .page.last { page-break-after: auto; min-height: 0; }
+  .stamp-side { flex: 0 0 10mm; border: 0.5pt dashed #999; display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; font-size: 7pt; color: #bbb; letter-spacing: 1.5mm; }
+  .page-body { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   .pt { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
   .pt th, .pt td { border: 0.5pt solid #0066CC; padding: 1mm 1.5mm; }
   .pt th { text-align: center; font-weight: bold; background: #f0f6ff; }
