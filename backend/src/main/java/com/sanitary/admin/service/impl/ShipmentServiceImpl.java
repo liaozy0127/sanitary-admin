@@ -9,6 +9,7 @@ import com.sanitary.admin.entity.Process;
 import com.sanitary.admin.entity.Shipment;
 import com.sanitary.admin.entity.ShipmentItem;
 import com.sanitary.admin.mapper.CustomerMapper;
+import com.sanitary.admin.mapper.InventoryMapper;
 import com.sanitary.admin.mapper.MaterialMapper;
 import com.sanitary.admin.mapper.ProcessMapper;
 import com.sanitary.admin.mapper.ShipmentMapper;
@@ -42,6 +43,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
 
     private final GenerateNoUtil generateNoUtil;
     private final InventoryService inventoryService;
+    private final InventoryMapper inventoryMapper;
     private final ShipmentItemService shipmentItemService;
     private final CustomerMapper customerMapper;
     private final MaterialMapper materialMapper;
@@ -102,6 +104,9 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                     shipment.getShipmentNo(),
                     shipment.getShipmentDate()
                 );
+                // 发货时优先消耗返工库存（扣到0为止）
+                Long effectivePid = item.getProcessId() != null ? item.getProcessId() : 0L;
+                inventoryMapper.incrementReworkQty(item.getMaterialId(), shipment.getCustomerId(), effectivePid, shipTotal.negate());
             }
         }
 
@@ -155,6 +160,9 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                 shipment.getShipmentNo(),
                 shipment.getShipmentDate()
             );
+            // 恢复旧发货消耗的返工库存
+            Long effectivePid = oldItem.getProcessId() != null ? oldItem.getProcessId() : 0L;
+            inventoryMapper.incrementReworkQty(oldItem.getMaterialId(), shipment.getCustomerId(), effectivePid, shipTotal);
         }
 
         // 更新新库存
@@ -180,6 +188,9 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                     shipment.getShipmentNo(),
                     shipment.getShipmentDate()
                 );
+                // 发货时优先消耗返工库存（扣到0为止）
+                Long effectivePid = item.getProcessId() != null ? item.getProcessId() : 0L;
+                inventoryMapper.incrementReworkQty(item.getMaterialId(), shipment.getCustomerId(), effectivePid, shipTotal.negate());
             }
         }
         
@@ -219,6 +230,9 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                 shipment.getShipmentNo(),
                 shipment.getShipmentDate()
             );
+            // 恢复该发货消耗的返工库存
+            Long effectivePid = item.getProcessId() != null ? item.getProcessId() : 0L;
+            inventoryMapper.incrementReworkQty(item.getMaterialId(), shipment.getCustomerId(), effectivePid, shipTotal);
         }
         
         // 再删除主表记录

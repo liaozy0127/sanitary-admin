@@ -335,25 +335,55 @@ sanitary-admin 是一个面向卫浴/五金电镀加工厂的**生产管理系�
 
 **库存维度**：`material_id + customer_id + process_id`（三维唯一键）
 
+**库存字段**：
+- `quantity`：库存总数（当前在库总量）
+- `rework_qty`：其中返工（当前库存中返工件数量）
+
 **库存变更触发点**：
-| 单据 | 触发动作 | 库存变化 |
-|------|---------|---------|
-| 收货单（正常模式）| 保存 | +quantity |
-| 发货单 | 保存 | -quantity（含废品数量）|
-| 返工单完成 | 状态变更 | 视类型增减 |
+| 单据 | 触发动作 | 库存变化 | 返工库存变化 |
+|------|---------|---------|-------------|
+| 收货单（正常）| 保存 | +quantity | 不变 |
+| 收货单（返工）| 保存 | +quantity | +quantity |
+| 发货单 | 保存 | -quantity | 优先消耗（扣到0为止）|
+| 返工单完成 | 状态变更 | 视类型增减 | 视类型增减 |
 
 > ⚠️ **历史导入不触发库存**：导入时使用 `mode=history` 参数，跳过库存更新
+
+**返工库存处理流程**：
+
+```
+业务场景：客户送来返工件，工厂处理后再发货
+
+1. 返工收货（receipt_source = '返工'）：
+   - 库存总数 +quantity
+   - 返工库存 +quantity（标记为返工件）
+   - 单价应为 0（不计费）
+
+2. 发货出库：
+   - 库存总数 -(quantity + defective_qty)
+   - 返工库存优先消耗（扣到0为止）
+   - 注：发货时不区分返工品还是良品，按 FIFO 先进先出原则优先消耗返工库存
+
+3. 库存展示：
+   - 库存总数：当前在库总量
+   - 其中返工：当前库存中返工件的数量
+
+4. 对账单返工扣减：
+   - 本月收货中 receipt_source='返工' 的数量计入 rework_qty
+   - 良品数量 = 发货合计 - 退回数量 - 返工数量
+   - 良品金额 = 良品数量 × 单价
+```
 
 **接口**：
 - `GET /api/inventory` — 查询库存列表（支持 keyword、customerId 筛选）
 - `GET /api/inventory/log` — 查询库存流水
-- `POST /api/inventory/rebuild` — 全量重建库存（从所有收货单/发货单重新计算）
+- `POST /api/inventory/rebuild` — 全量重建库存（从所有收货单/发货单重新计算，同时重建返工库存）
 
 **库存重建规则（`POST /api/inventory/rebuild`）**：
-- 清空 inventory 表，从收货单和发货单全量重新聚合计算
-- 聚合收货：按 `(material_id, customer_id, COALESCE(process_id,0))` 分组，`SUM(quantity)`，仅含 `status=1` 的已确认收货单
-- 聚合发货：按同维度分组，`SUM(quantity + COALESCE(defective_qty,0))`（良品+废品均扣库存），仅含 `status=1` 的已确认发货单
-- 最终库存 = 收货合计 - 发货合计
+- 清空 inventory 表，按时间顺序遍历所有收货单/发货单明细重新计算
+- 收货时：累加 quantity 到库存总数；若为返工收货，同时累加 rework_qty
+- 发货时：扣减 quantity 和 rework_qty（优先消耗返工库存）
+- 最终库存 = Σ收货 - Σ发货
 - **每次重建结果应无负库存**（≤5条为历史数据录入误差，可接受）
 
 **期初库存补录（`scripts/init_opening_stock.py`）**：
@@ -397,13 +427,18 @@ HAVING needed_init_qty > 0
 - 物料（material_id/code/name）、工艺（process_id/name）
 - 上月结余数量（prev_balance_qty）
 - 本月收货合计（receipt_qty）
-- 本月发货合计（shipment_qty）—— 良品 + 原件退回的总量
-- 原件退回数量（defective_qty）—— 发货中的废品/退回数量
+- 本月发货合计（shipment_qty）
+- 原件退回数量（defective_qty）
+- 返工数量（rework_qty）—— 发货中返工来源的数量
 - 本月结余数量（curr_balance_qty）
 - 单价（unit_price）
 - 良品金额（goods_amount）—— 良品数量 × 单价
-- 发货合计金额（shipment_amount）
 - 备注
+
+**核心计算公式**：
+- 良品数量 = 发货合计 - 退回数量 - 返工数量
+- 良品金额 = 良品数量 × 单价
+- 本月结余 = 上月结余 + 本月收货 - 本月发货
 
 **接口**：
 - `GET /api/statements` — 分页查询
@@ -413,6 +448,7 @@ HAVING needed_init_qty > 0
 - `PUT /api/statements/{id}/confirm` — 确认对账单
 - `DELETE /api/statements/{id}` — 删除（含明细）
 - `POST /api/statements/import` — **从老系统 Excel 导入历史对账单（含物料明细）**
+- `GET /api/statements/export` — 导出对账单 Excel
 - `GET /api/statement-items?statementId=xxx` — 查询某单明细
 
 **对账单生成逻辑（`generate` 接口）**：
@@ -423,8 +459,8 @@ HAVING needed_init_qty > 0
    - `receipt_qty` = `SUM(receipt_item.quantity)`
    - `shipment_qty` = `SUM(shipment_item.quantity + defective_qty)`（良品+退回合计）
    - `defective_qty` = `SUM(shipment_item.defective_qty)`
-   - `goods_amount` = `SUM(shipment_item.amount)`（良品金额）
-   - `shipment_amount` = `goods_amount`
+   - `rework_qty` = 关联收货单 `receipt_source='返工'` 的发货数量
+   - `goods_amount` = 良品数量 × 单价
    - `unit_price` = 来自 receipt_item 或 shipment_item，fallback 到 material.default_price
    - `prev_balance_qty` = 月初前（`< monthStart`）所有收货合计 − 所有发货合计（直接聚合历史数据，**不依赖上个月对账单的 curr_balance_qty**）
    - `curr_balance_qty` = `prev_balance_qty + receipt_qty - shipment_qty`
@@ -666,8 +702,10 @@ HAVING needed_init_qty > 0
 
 **对账单**（主从表）：
 
-主单列：对账单号、对账月份、客户名称、收货合计数量、收货合计金额、发货合计数量、发货合计金额、状态、备注
-明细列：物料编码、物料名称、工艺名称、上月结余数量、本月收货合计、原件退回数量、本月发货合计、本月结余数量、单价、良品金额、发货合计金额、备注
+主单列：对账单号、对账月份、客户名称
+明细列：物料编码、物料名称、工艺名称、上月结余、本月收货、发货合计、良品数量、返工数量、本月结余、单价、良品金额、备注
+
+> **核心公式**：良品数量 = 发货合计 - 退回数量 - 返工数量
 
 **库存**（单表）：
 
@@ -678,9 +716,10 @@ HAVING needed_init_qty > 0
 | C | 型号规格 | spec |
 | D | 客户名称 | customer_name |
 | E | 工艺名称 | process_name |
-| F | 库存数量 | quantity（数字）|
-| G | 最后收货时间 | last_receive_time |
-| H | 最后发货时间 | last_ship_time |
+| F | 库存总数 | quantity（数字）|
+| G | 其中返工 | rework_qty（数字）|
+| H | 最后收货时间 | last_receive_time |
+| I | 最后发货时间 | last_ship_time |
 
 #### 3.5.5 前端导出交互
 
@@ -844,4 +883,4 @@ HAVING needed_init_qty > 0
 
 ---
 
-*文档版本：v1.6 | 最后更新：2026-03-20*
+*文档版本：v1.7 | 最后更新：2026-03-26*

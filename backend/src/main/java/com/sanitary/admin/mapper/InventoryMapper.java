@@ -17,6 +17,10 @@ public interface InventoryMapper extends BaseMapper<Inventory> {
     @Update("UPDATE inventory SET quantity = quantity + #{changeQty}, update_time = NOW() WHERE material_id = #{materialId} AND customer_id = #{customerId} AND process_id = #{processId}")
     int incrementQuantity(@Param("materialId") Long materialId, @Param("customerId") Long customerId, @Param("processId") Long processId, @Param("changeQty") BigDecimal changeQty);
 
+    /** 更新返工库存：收货(+qty)，发货时降至0但不低于0 */
+    @Update("UPDATE inventory SET rework_qty = GREATEST(0, rework_qty + #{changeQty}), update_time = NOW() WHERE material_id = #{materialId} AND customer_id = #{customerId} AND process_id = #{processId}")
+    int incrementReworkQty(@Param("materialId") Long materialId, @Param("customerId") Long customerId, @Param("processId") Long processId, @Param("changeQty") BigDecimal changeQty);
+
     /**
      * 聚合收货明细：按(material_id, customer_id, process_id)汇总收货数量及维度信息
      */
@@ -58,7 +62,7 @@ public interface InventoryMapper extends BaseMapper<Inventory> {
     @Select("SELECT " +
             "  ri.id, ri.material_id, r.customer_id, COALESCE(ri.process_id, 0) AS process_id, " +
             "  ri.material_code, ri.material_name, r.customer_name, ri.spec, ri.process_name, " +
-            "  ri.quantity, r.id AS order_id, r.receipt_no AS order_no, r.receipt_date AS order_date " +
+            "  ri.quantity, ri.receipt_source, r.id AS order_id, r.receipt_no AS order_no, r.receipt_date AS order_date " +
             "FROM receipt_item ri " +
             "JOIN receipt r ON r.id = ri.receipt_id " +
             "WHERE ri.deleted = 0 AND r.deleted = 0 AND r.status = 1 AND ri.material_id IS NOT NULL " +

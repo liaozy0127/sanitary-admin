@@ -53,19 +53,15 @@
                 <el-table-column prop="shipmentQty" label="发货合计" width="90" align="right">
                   <template #default="{ row: item }">{{ fmtQty(item.shipmentQty) }}</template>
                 </el-table-column>
-                <el-table-column label="其中良品" width="90" align="right">
+                <el-table-column label="良品数量" width="90" align="right">
                   <template #default="{ row: item }">
                     {{ fmtQty(Math.max(0, (Number(item.shipmentQty)||0) - (Number(item.defectiveQty)||0) - (Number(item.reworkQty)||0))) }}
                   </template>
                 </el-table-column>
-                <el-table-column label="其中返工" width="90" align="right">
+                <el-table-column label="返工数量" width="90" align="right">
                   <template #default="{ row: item }">
-                    <span v-if="item.reworkQty && Number(item.reworkQty) > 0">{{ fmtQty(item.reworkQty) }}</span>
-                    <span v-else>-</span>
+                    {{ fmtQty(item.reworkQty || 0) }}
                   </template>
-                </el-table-column>
-                <el-table-column prop="defectiveQty" label="退回数量" width="90" align="right">
-                  <template #default="{ row: item }">{{ fmtQty(item.defectiveQty) }}</template>
                 </el-table-column>
                 <el-table-column prop="currBalanceQty" label="本月结余" width="90" align="right">
                   <template #default="{ row: item }">{{ fmtQty(item.currBalanceQty) }}</template>
@@ -81,7 +77,8 @@
               <div v-if="row.items && row.items.length" class="items-summary">
                 合计：收货 <b>{{ sumField(row.items, 'receiptQty') }}</b> &nbsp;|&nbsp;
                 发货合计 <b>{{ sumField(row.items, 'shipmentQty') }}</b> &nbsp;|&nbsp;
-                退回 <b>{{ sumField(row.items, 'defectiveQty') }}</b> &nbsp;|&nbsp;
+                良品数量 <b>{{ row.items.reduce((a,i) => a + Math.max(0,(Number(i.shipmentQty)||0)-(Number(i.defectiveQty)||0)-(Number(i.reworkQty)||0)), 0).toLocaleString() }}</b> &nbsp;|&nbsp;
+                返工数量 <b>{{ sumField(row.items, 'reworkQty') }}</b> &nbsp;|&nbsp;
                 良品金额 <b>¥{{ sumField(row.items, 'goodsAmount') }}</b>
               </div>
             </div>

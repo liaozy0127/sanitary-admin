@@ -290,18 +290,24 @@ shipment_item 明细表：
 | material_name | VARCHAR(200) | 物料名称（冗余）|
 | process_id | BIGINT | 工艺 ID |
 | process_name | VARCHAR(100) | 工艺名称（冗余）|
-| prev_balance_qty | DECIMAL(12,2) | 上月结余数量（col3）|
-| receipt_qty | DECIMAL(12,2) | 本月收货合计（col5）|
-| shipment_qty | DECIMAL(12,2) | 本月发货合计（col8，良品+退回）|
-| defective_qty | DECIMAL(12,2) | 原件退回数量（col7）|
-| curr_balance_qty | DECIMAL(12,2) | 本月结余数量（col9）|
-| unit_price | DECIMAL(10,4) | 单价（col10）|
-| goods_amount | DECIMAL(12,2) | 良品金额（col11）|
-| shipment_amount | DECIMAL(12,2) | 发货合计金额（col12）|
-| remark | VARCHAR(500) | 备注（col13）|
+| prev_balance_qty | DECIMAL(12,2) | 上月结余数量 |
+| receipt_qty | DECIMAL(12,2) | 本月收货合计 |
+| shipment_qty | DECIMAL(12,2) | 本月发货合计 |
+| defective_qty | DECIMAL(12,2) | 原件退回数量 |
+| rework_qty | DECIMAL(12,2) | 返工数量（本月收货中返工来源的数量）|
+| curr_balance_qty | DECIMAL(12,2) | 本月结余数量 |
+| unit_price | DECIMAL(10,4) | 单价 |
+| goods_amount | DECIMAL(12,2) | 良品金额 |
+| remark | VARCHAR(500) | 备注 |
 | deleted | TINYINT | 逻辑删除 |
 | create_time | DATETIME | |
 | update_time | DATETIME | |
+
+> **核心计算公式**：
+> - 良品数量 = 发货合计 - 退回数量 - 返工数量
+> - 良品金额 = 良品数量 × 单价
+> - 本月结余 = 上月结余 + 本月收货 - 本月发货
+> - 返工数量 = 本月收货明细中 `receipt_source='返工'` 的数量合计
 
 > **老系统 Excel 列映射**（用于 `POST /api/statements/import`）：
 > - col0: 产品代码，col1: 产品名称，col2: 工艺要求
@@ -329,13 +335,16 @@ shipment_item 明细表：
 | customer_name | VARCHAR(200) | 冗余字段 |
 | spec | VARCHAR(200) | 冗余字段 |
 | process_name | VARCHAR(100) | 冗余字段 |
-| quantity | DECIMAL(12,2) | 当前库存数量 |
+| quantity | DECIMAL(12,2) | 当前库存总数 |
+| rework_qty | DECIMAL(12,2) | 其中返工库存数量 |
 | last_receive_time | DATETIME | 最后收货时间 |
 | last_ship_time | DATETIME | 最后发货时间 |
 
 > **唯一键**：(material_id, customer_id, process_id)
 
 > **并发安全**：库存更新使用原子 SQL `UPDATE inventory SET quantity = quantity + ? WHERE ...`，不使用 SELECT + UPDATE 模式。
+
+> **返工库存追踪**：`rework_qty` 记录当前库存中返工品的数量。返工收货时增加，发货时优先消耗返工库存（扣到0为止）。
 
 #### inventory_log（库存流水表）
 | 字段 | 类型 | 说明 |
@@ -589,28 +598,162 @@ ReceiptServiceImpl.importExcel()
 
 ```
 1. 清空 inventory 表（DELETE ALL）
-2. aggregateReceiptQty()：
-   SELECT material_id, customer_id, COALESCE(process_id,0), SUM(quantity)
-   FROM receipt_item JOIN receipt
-   WHERE deleted=0 AND status=1
-   GROUP BY (material_id, customer_id, COALESCE(process_id,0))
-   -- 字符串维度字段用 MAX() 取一个值（不参与 GROUP BY）
+2. 按时间顺序处理所有收货单明细：
+   a. 对每条收货明细，累加 quantity 到库存
+   b. 若 receipt_source = '返工'，同时累加到 rework_qty
 
-3. aggregateShipmentQty()：
-   SELECT material_id, customer_id, COALESCE(process_id,0),
-          SUM(quantity + COALESCE(defective_qty,0))   -- 良品+退回均扣库存
-   FROM shipment_item JOIN shipment
-   WHERE deleted=0 AND status=1
-   GROUP BY (material_id, customer_id, COALESCE(process_id,0))
+3. 按时间顺序处理所有发货单明细：
+   a. 对每条发货明细，扣减 quantity + defective_qty
+   b. 同时扣减 rework_qty（优先消耗返工库存，扣到0为止）
 
-4. 合并两个 Map：inventory.quantity = receipt_qty - ship_qty
-5. 批量 INSERT inventory（upsert）
-6. 返回统计：receiptGroups / shipmentGroups / inventoryRecords
+4. 批量 INSERT inventory（quantity + rework_qty）
+5. 同时重建库存流水（inventory_log）
+6. 返回统计：receiptLogs / inventoryRecords / shipmentLogs
 
 注意：重建后负库存 ≤ 5 条（历史数据录入误差，非系统问题）
 ```
 
-### 5.5 对账单生成流程（`POST /api/statements/generate`）
+### 5.5 返工库存处理流程
+
+> **业务背景**：客户送来返工件（之前发货后发现有质量问题退回），工厂处理后重新发货。返工件不再重复收费，需在对账单中扣减。
+
+#### 5.5.1 数据流总览
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           返工处理完整流程                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  1. 返工收货（receipt_item.receipt_source = '返工'）                         │
+│     ┌──────────────┐      ┌──────────────┐      ┌──────────────┐          │
+│     │ 库存总数 +N  │      │ 返工库存 +N  │      │ 库存流水记录  │          │
+│     │ (quantity)   │      │ (rework_qty) │      │ (changeType=1)│          │
+│     └──────────────┘      └──────────────┘      └──────────────┘          │
+│                                                                             │
+│  2. 发货出库（shipment_item）                                                │
+│     ┌──────────────┐      ┌──────────────┐      ┌──────────────┐          │
+│     │ 库存总数 -M  │      │ 返工库存 -M  │      │ 库存流水记录  │          │
+│     │ (quantity)   │      │ (rework_qty) │      │ (changeType=2)│          │
+│     │ 优先消耗返工 │      │ 扣到0为止    │      │              │          │
+│     └──────────────┘      └──────────────┘      └──────────────┘          │
+│                                                                             │
+│  3. 对账单生成（statement_item）                                             │
+│     ┌──────────────────────────────────────────────────────────────┐      │
+│     │ rework_qty = 本月收货中 receipt_source='返工' 的数量合计      │      │
+│     │ 良品数量 = 发货合计 - 退回数量 - 返工数量                       │      │
+│     │ 良品金额 = 良品数量 × 单价                                     │      │
+│     └──────────────────────────────────────────────────────────────┘      │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 5.5.2 库存变更触发点
+
+| 单据类型 | 触发动作 | 库存总数变化 | 返工库存变化 | 代码位置 |
+|---------|---------|-------------|-------------|---------|
+| 收货单（正常）| 新增/更新/删除 | +quantity | 不变 | `ReceiptServiceImpl:91-106` |
+| 收货单（返工）| 新增/更新/删除 | +quantity | +quantity | `ReceiptServiceImpl:108-112` |
+| 发货单 | 新增/更新/删除 | -quantity | 优先消耗（扣到0为止）| `ShipmentServiceImpl:91-109` |
+| 库存重建 | 全量 | 重新计算 | 重新计算 | `InventoryServiceImpl:351-489` |
+
+> **注意**：更新（`updateReceipt/updateShipment`）和删除（`deleteReceipt/deleteShipment`）操作都需要先冲销旧的 rework_qty，再应用新的变化，与新增逻辑完全对称。
+
+#### 5.5.3 详细流程说明
+
+**1. 返工收货入库**
+
+```
+触发条件：receipt_item.receipt_source = '返工'
+
+执行步骤：
+1. 更新库存总数：inventory.quantity += receipt_item.quantity
+2. 更新返工库存：inventory.rework_qty += receipt_item.quantity
+3. 记录库存流水：
+   - change_type = 1 (收货)
+   - change_qty = +quantity
+   - order_type = 'receipt'
+```
+
+**2. 发货出库（含返工消耗）**
+
+```
+触发条件：shipment_item 保存
+
+执行步骤：
+1. 计算发货总量：totalQty = quantity + defective_qty
+2. 更新库存总数：inventory.quantity -= totalQty
+3. 优先消耗返工库存：
+   - inventory.rework_qty = GREATEST(0, rework_qty - totalQty)
+   - 注：发货时不区分是良品还是返工品，按 FIFO 先进先出原则优先消耗返工库存
+4. 记录库存流水：
+   - change_type = 2 (发货)
+   - change_qty = -totalQty
+   - order_type = 'shipment'
+```
+
+**3. 库存重建（POST /api/inventory/rebuild）**
+
+```
+执行步骤：
+1. 清空 inventory 和 inventory_log 表
+2. 按时间顺序处理所有收货明细：
+   - 累加 quantity 到库存总数
+   - 若 receipt_source = '返工'，同时累加到 rework_qty
+3. 按时间顺序处理所有发货明细：
+   - 扣减 quantity（含 defective_qty）
+   - 优先消耗 rework_qty（扣到0为止）
+4. 批量 INSERT 最终库存快照
+5. 返回统计：{ inventoryRecords, receiptLogs, shipmentLogs }
+```
+
+**4. 对账单返工扣减**
+
+```
+计算逻辑（StatementServiceImpl.buildAndSaveItems）：
+1. 累计本月收货中返工来源数量：
+   rework_qty = SUM(receipt_item.quantity WHERE receipt_source='返工')
+2. 计算良品数量：
+   goodsShipQty = shipment_qty - defective_qty
+   billableQty = MAX(0, goodsShipQty - rework_qty)
+3. 计算良品金额：
+   goods_amount = billableQty × unit_price
+
+核心公式：
+- 良品数量 = 发货合计 - 退回数量 - 返工数量
+- 良品金额 = 良品数量 × 单价
+```
+
+#### 5.5.4 关键代码位置
+
+| 功能 | 文件 | 行号 | 说明 |
+|-----|------|-----|------|
+| 返工收货库存更新 | `ReceiptServiceImpl.java` | 108-112 | `incrementReworkQty()` |
+| 发货库存更新 | `ShipmentServiceImpl.java` | 91-109 | 发货出库+返工消耗 |
+| 库存重建 | `InventoryServiceImpl.java` | 351-489 | 全量重建 inventory |
+| 对账单返工扣减 | `StatementServiceImpl.java` | 204-206, 314-319 | 累计返工数量+计算良品金额 |
+| 库存返工字段 | `InventoryMapper.java` | 21-22 | `incrementReworkQty()` SQL |
+
+#### 5.5.5 数据库字段
+
+**inventory 表**：
+- `quantity`：库存总数（当前在库总量）
+- `rework_qty`：其中返工库存数量（当前库存中返工件数量）
+
+**statement_item 表**：
+- `rework_qty`：本月收货中返工来源的数量（用于良品金额计算扣减，从 receipt_item.receipt_source='返工' 统计）
+- `goods_amount`：良品金额 = (发货合计 - 退回 - 返工) × 单价
+
+**statement 表**：
+- `goods_amount`：所有明细行 goods_amount 的汇总（generate 方法实时计算；importExcel 导入时从 Excel col11 汇总）
+
+#### 5.5.6 业务规则
+
+1. **返工收货不计费**：收货来源为"返工"的明细，其单价应为 0 或不参与金额统计
+2. **FIFO 消耗原则**：发货时优先消耗返工库存，确保返工件先出库
+3. **返工库存不低于0**：使用 `GREATEST(0, rework_qty - delta)` 保证不会出现负数
+4. **对账单幂等性**：重新生成对账单时，会删除旧明细重建，保证返工数量正确计算
+
+### 5.6 对账单生成流程（`POST /api/statements/generate`）
 
 ```
 入参：customerId, statementMonth (YYYY-MM)
@@ -1073,4 +1216,4 @@ body {
 
 ---
 
-*文档版本：v1.6 | 最后更新：2026-03-19*
+*文档版本：v1.7 | 最后更新：2026-03-26*

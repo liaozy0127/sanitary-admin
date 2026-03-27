@@ -22,6 +22,7 @@ public class Inventory {
     private String spec;
     private String processName;
     private BigDecimal quantity;
+    private BigDecimal reworkQty;     // 其中返工库存数量
     private LocalDateTime lastReceiveTime;
     private LocalDateTime lastShipTime;
 

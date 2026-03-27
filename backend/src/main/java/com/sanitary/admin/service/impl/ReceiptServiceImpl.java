@@ -8,6 +8,7 @@ import com.sanitary.admin.entity.Material;
 import com.sanitary.admin.entity.Receipt;
 import com.sanitary.admin.entity.ReceiptItem;
 import com.sanitary.admin.mapper.CustomerMapper;
+import com.sanitary.admin.mapper.InventoryMapper;
 import com.sanitary.admin.mapper.MaterialMapper;
 import com.sanitary.admin.mapper.ReceiptMapper;
 import com.sanitary.admin.mapper.ProcessMapper;
@@ -49,6 +50,7 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
     private final CustomerMapper customerMapper;
     private final ProcessMapper processMapper;
     private final InventoryService inventoryService;
+    private final InventoryMapper inventoryMapper;
     private final ReceiptItemService receiptItemService;
 
     @Override
@@ -102,6 +104,12 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
                     receipt.getReceiptNo(),
                     receipt.getReceiptDate()
                 );
+                // 返工收货：实时增加返工库存
+                if ("返工".equals(item.getReceiptSource()) && item.getQuantity() != null
+                        && item.getQuantity().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                    Long effectivePid = item.getProcessId() != null ? item.getProcessId() : 0L;
+                    inventoryMapper.incrementReworkQty(item.getMaterialId(), receipt.getCustomerId(), effectivePid, item.getQuantity());
+                }
                 // 同步更新物料默认单价（非返工来源且单价>0时覆盖，保持价格最新）
                 syncMaterialPrice(item);
             }
@@ -153,8 +161,15 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
                 receipt.getReceiptNo(),
                 receipt.getReceiptDate()
             );
+            // 冲销旧返工库存
+            if ("返工".equals(oldItem.getReceiptSource()) && oldItem.getQuantity() != null
+                    && oldItem.getQuantity().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                Long effectivePid = oldItem.getProcessId() != null ? oldItem.getProcessId() : 0L;
+                inventoryMapper.incrementReworkQty(oldItem.getMaterialId(), receipt.getCustomerId(), effectivePid,
+                        oldItem.getQuantity().negate());
+            }
         }
-        
+
         // 更新新库存
         if (receipt.getItems() != null && !receipt.getItems().isEmpty()) {
             for (ReceiptItem item : receipt.getItems()) {
@@ -174,6 +189,12 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
                     receipt.getReceiptNo(),
                     receipt.getReceiptDate()
                 );
+                // 新返工收货：增加返工库存
+                if ("返工".equals(item.getReceiptSource()) && item.getQuantity() != null
+                        && item.getQuantity().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                    Long effectivePid = item.getProcessId() != null ? item.getProcessId() : 0L;
+                    inventoryMapper.incrementReworkQty(item.getMaterialId(), receipt.getCustomerId(), effectivePid, item.getQuantity());
+                }
                 // 同步更新物料默认单价（非返工来源且单价>0时覆盖，保持价格最新）
                 syncMaterialPrice(item);
             }
@@ -211,6 +232,13 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
                 receipt.getReceiptNo(),
                 receipt.getReceiptDate()
             );
+            // 冲销返工库存
+            if ("返工".equals(item.getReceiptSource()) && item.getQuantity() != null
+                    && item.getQuantity().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                Long effectivePid = item.getProcessId() != null ? item.getProcessId() : 0L;
+                inventoryMapper.incrementReworkQty(item.getMaterialId(), receipt.getCustomerId(), effectivePid,
+                        item.getQuantity().negate());
+            }
         }
         
         // 再删除主表记录

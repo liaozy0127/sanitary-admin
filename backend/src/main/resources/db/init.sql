@@ -311,6 +311,7 @@ CREATE TABLE IF NOT EXISTS `statement` (
     `receipt_amount` DECIMAL(12,2) DEFAULT 0 COMMENT '本月收货金额',
     `shipment_amount` DECIMAL(12,2) DEFAULT 0 COMMENT '本月发货金额',
     `remark` VARCHAR(500),
+    `goods_amount` DECIMAL(14,2) DEFAULT 0 COMMENT '良品金额汇总（仅良品数量×单价，不含返工）',
     `deleted` TINYINT NOT NULL DEFAULT 0,
     `create_time` DATETIME,
     `update_time` DATETIME
@@ -330,6 +331,7 @@ CREATE TABLE IF NOT EXISTS `statement_item` (
     `receipt_qty` DECIMAL(12,2) DEFAULT 0,
     `shipment_qty` DECIMAL(12,2) DEFAULT 0,
     `defective_qty` DECIMAL(12,2) DEFAULT 0 COMMENT '原件退回数量',
+    `rework_qty` DECIMAL(12,2) DEFAULT 0 COMMENT '本月返工收货数量（免费，已从计费中扣除）',
     `curr_balance_qty` DECIMAL(12,2) DEFAULT 0,
     `unit_price` DECIMAL(10,4) DEFAULT 0,
     `goods_amount` DECIMAL(12,2) DEFAULT 0 COMMENT '良品金额',
@@ -351,7 +353,8 @@ CREATE TABLE IF NOT EXISTS `inventory` (
     `customer_name` VARCHAR(200),
     `spec` VARCHAR(200),
     `process_name` VARCHAR(100),
-    `quantity` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    `quantity` DECIMAL(12,2) NOT NULL DEFAULT 0.00 COMMENT '库存总数',
+    `rework_qty` DECIMAL(12,2) DEFAULT 0.00 COMMENT '其中返工库存数量',
     `last_receive_time` DATETIME,
     `last_ship_time` DATETIME,
     `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -396,3 +399,35 @@ INSERT INTO `sys_menu` (`id`, `menu_name`, `menu_path`, `menu_icon`, `parent_id`
 (41, '库存查询', '/inventory', 'Box', 40, 1, 2, 1),
 (42, '月度报表', '/report', 'TrendCharts', 40, 2, 2, 1)
 ON DUPLICATE KEY UPDATE `menu_name` = VALUES(`menu_name`);
+
+-- ===== 系统配置表 =====
+CREATE TABLE IF NOT EXISTS `sys_config` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `config_key` VARCHAR(100) NOT NULL COMMENT '配置键',
+    `config_value` VARCHAR(500) DEFAULT NULL COMMENT '配置值',
+    `remark` VARCHAR(200) DEFAULT NULL COMMENT '备注',
+    `create_time` DATETIME,
+    `update_time` DATETIME,
+    UNIQUE KEY `config_key` (`config_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统配置表';
+
+-- 打印配置初始数据（可按实际工厂信息修改）
+INSERT INTO `sys_config` (`config_key`, `config_value`, `remark`) VALUES
+('print.factory_name',    '广州某某电镀有限公司',                                  '打印单据工厂名称'),
+('print.maker_name',      '张三',                                                   '打印单据制单人'),
+('print.title_production','请修改为实际排产单标题',                                  NULL),
+('print.title_delivery',  '请修改为实际送货单标题',                                  NULL),
+('print.company_name',    '请修改为实际公司名称',                                    NULL),
+('print.company_phone',   '',                                                        NULL),
+('print.company_address', '',                                                        NULL),
+('print.contact_1',       '',                                                        NULL),
+('print.contact_2',       '',                                                        NULL),
+('print.signature_1_label','仓管：',                                                 NULL),
+('print.signature_2_label','生产班长：',                                              NULL),
+('print.signature_3_label','签名：',                                                  NULL),
+('print.maker_label',     '制单人',                                                   NULL),
+('print.delivery_remark', '备注：1. 每批产品不良品请在15天内退回返工，否则视为合格品计算。', NULL),
+('print.delivery_sig1_label','制单人：',                                              NULL),
+('print.delivery_sig2_label','仓管员：',                                              NULL),
+('print.delivery_sig3_label','收货单位：',                                            NULL)
+ON DUPLICATE KEY UPDATE `config_key` = `config_key`;

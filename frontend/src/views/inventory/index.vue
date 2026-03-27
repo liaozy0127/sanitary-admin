@@ -39,10 +39,17 @@
         <el-table-column prop="materialName" label="物料名称" min-width="160" />
         <el-table-column prop="spec" label="规格" width="120" />
         <el-table-column prop="processName" label="工艺" width="100" />
-        <el-table-column prop="quantity" label="当前库存" width="110" align="right">
+        <el-table-column prop="quantity" label="库存总数" width="110" align="right">
           <template #default="{ row }">
             <span :style="{ color: Number(row.quantity) < 0 ? '#f56c6c' : Number(row.quantity) === 0 ? '#909399' : '#67c23a', fontWeight: 'bold' }">
               {{ Number(row.quantity || 0).toFixed(2) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="reworkQty" label="其中返工" width="100" align="right">
+          <template #default="{ row }">
+            <span :style="{ color: Number(row.reworkQty) > 0 ? '#E6A23C' : '#909399', fontWeight: Number(row.reworkQty) > 0 ? 'bold' : 'normal' }">
+              {{ Number(row.reworkQty || 0).toFixed(2) }}
             </span>
           </template>
         </el-table-column>

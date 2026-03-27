@@ -355,6 +355,7 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
 
         // key: "materialId_customerId_processId" -> 运行中库存数量（用于流水 beforeQty/afterQty）
         java.util.HashMap<String, BigDecimal> runningQty = new java.util.HashMap<>();
+        java.util.HashMap<String, BigDecimal> reworkRunningQty = new java.util.HashMap<>();
 
         // 2. 按时间顺序处理收货明细，生成收货流水
         List<Map<String, Object>> receiptItems = this.baseMapper.listAllReceiptItems();
@@ -369,6 +370,11 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
             BigDecimal beforeQty = runningQty.getOrDefault(key, BigDecimal.ZERO);
             BigDecimal afterQty = beforeQty.add(changeQty);
             runningQty.put(key, afterQty);
+
+            // 追踪返工库存
+            if ("返工".equals(str(row.get("receipt_source")))) {
+                reworkRunningQty.merge(key, changeQty, BigDecimal::add);
+            }
 
             LocalDate orderDate = toLocalDate(row.get("order_date"));
             LocalDateTime createTime = orderDate != null ? orderDate.atStartOfDay() : LocalDateTime.now();
@@ -395,6 +401,10 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
             BigDecimal beforeQty = runningQty.getOrDefault(key, BigDecimal.ZERO);
             BigDecimal afterQty = beforeQty.subtract(totalQty);
             runningQty.put(key, afterQty);
+
+            // 发货时优先消耗返工库存（扣到0为止）
+            BigDecimal currentRework = reworkRunningQty.getOrDefault(key, BigDecimal.ZERO);
+            reworkRunningQty.put(key, currentRework.subtract(totalQty).max(BigDecimal.ZERO));
 
             LocalDate orderDate = toLocalDate(row.get("order_date"));
             LocalDateTime createTime = orderDate != null ? orderDate.atStartOfDay() : LocalDateTime.now();
@@ -441,6 +451,7 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
             inv.setCustomerId(customerId);
             inv.setProcessId(processId);
             inv.setQuantity(qty);
+            inv.setReworkQty(reworkRunningQty.getOrDefault(key, BigDecimal.ZERO));
             inv.setCreateTime(LocalDateTime.now());
             inv.setUpdateTime(LocalDateTime.now());
 
