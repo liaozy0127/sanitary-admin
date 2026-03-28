@@ -36,8 +36,8 @@
 
       <el-table v-loading="tableLoading" :data="tableData" stripe border>
         <el-table-column type="index" label="#" width="60" align="center" />
-        <el-table-column prop="username" label="用户名" min-width="120" />
-        <el-table-column prop="email" label="邮箱" min-width="180" />
+        <el-table-column prop="username" label="用户名" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="email" label="邮箱" min-width="180" show-overflow-tooltip />
         <el-table-column prop="role" label="角色" width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="row.role === 'admin' ? 'danger' : 'primary'" size="small">

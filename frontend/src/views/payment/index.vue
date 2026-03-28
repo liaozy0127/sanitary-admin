@@ -33,14 +33,14 @@
         <el-table-column type="index" label="#" width="50" align="center" />
         <el-table-column prop="paymentNo" label="收款单号" width="160" />
         <el-table-column prop="paymentDate" label="收款日期" width="110" />
-        <el-table-column prop="customerName" label="客户名称" min-width="140" />
+        <el-table-column prop="customerName" label="客户名称" min-width="140" show-overflow-tooltip />
         <el-table-column prop="amount" label="收款金额" width="120" align="right">
           <template #default="{ row }">
             <span style="font-weight: bold; color: #409EFF;">{{ Number(row.amount).toFixed(2) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="paymentMethod" label="收款方式" width="120" />
-        <el-table-column prop="referenceNo" label="参考单号" width="140" />
+        <el-table-column prop="referenceNo" label="参考单号" width="140" show-overflow-tooltip />
         <el-table-column prop="remark" label="备注" min-width="100" show-overflow-tooltip />
         <el-table-column label="操作" width="170" align="center" fixed="right">
           <template #default="{ row }">
@@ -125,7 +125,7 @@ const editId = ref(null)
 const customerList = ref([])
 
 const searchForm = reactive({ customerId: null, dateRange: [] })
-const pagination = reactive({ page: 1, size: 20, total: 0 })
+const pagination = reactive({ page: 1, size: 10, total: 0 })
 const today = new Date().toISOString().split('T')[0]
 
 const formData = reactive({

@@ -31,9 +31,9 @@
       <el-table v-loading="tableLoading" :data="tableData" stripe border>
         <el-table-column type="index" label="#" width="60" align="center" />
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="roleName" label="角色名称" min-width="120" />
-        <el-table-column prop="roleCode" label="角色编码" min-width="120" />
-        <el-table-column prop="description" label="描述" min-width="150" />
+        <el-table-column prop="roleName" label="角色名称" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="roleCode" label="角色编码" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="description" label="描述" min-width="150" show-overflow-tooltip />
         <el-table-column prop="status" label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'danger'" size="small">

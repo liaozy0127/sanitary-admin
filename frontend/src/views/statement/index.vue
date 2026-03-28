@@ -42,7 +42,7 @@
               <el-table :data="row.items || []" border size="small" style="width: 100%"
                 v-loading="row._itemsLoading" element-loading-text="加载明细中...">
                 <el-table-column prop="materialCode" label="产品代码" width="110" />
-                <el-table-column prop="materialName" label="产品名称" min-width="160" />
+                <el-table-column prop="materialName" label="产品名称" min-width="160" show-overflow-tooltip />
                 <el-table-column prop="processName" label="工艺要求" width="100" />
                 <el-table-column prop="prevBalanceQty" label="上月结余" width="90" align="right">
                   <template #default="{ row: item }">{{ fmtQty(item.prevBalanceQty) }}</template>
@@ -72,7 +72,7 @@
                 <el-table-column prop="goodsAmount" label="良品金额" width="100" align="right">
                   <template #default="{ row: item }">{{ fmtAmt(item.goodsAmount) }}</template>
                 </el-table-column>
-                <el-table-column prop="remark" label="备注" min-width="120" />
+                <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
               </el-table>
               <div v-if="row.items && row.items.length" class="items-summary">
                 合计：收货 <b>{{ sumField(row.items, 'receiptQty') }}</b> &nbsp;|&nbsp;
@@ -88,7 +88,7 @@
         <el-table-column type="index" label="#" width="50" align="center" />
         <el-table-column prop="statementNo" label="对账单号" width="170" />
         <el-table-column prop="statementMonth" label="对账月份" width="110" />
-        <el-table-column prop="customerName" label="客户名称" min-width="140" />
+        <el-table-column prop="customerName" label="客户名称" min-width="140" show-overflow-tooltip />
         <el-table-column label="收货数量" width="100" align="right">
           <template #default="{ row }">{{ fmtQty(row.receiptQty) }}</template>
         </el-table-column>
@@ -195,7 +195,7 @@ const importFileList = ref([])
 const searchForm = reactive({ customerId: null, statementMonth: '' })
 const generateForm = reactive({ customerId: null, statementMonth: '' })
 const importForm = reactive({ customerId: null, statementMonth: '', initInventory: false })
-const pagination = reactive({ page: 1, size: 20, total: 0 })
+const pagination = reactive({ page: 1, size: 10, total: 0 })
 
 // ---- 格式化工具 ----
 const fmtQty = (v) => (v == null ? '-' : Number(v).toLocaleString())

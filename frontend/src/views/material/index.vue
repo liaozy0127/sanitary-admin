@@ -50,9 +50,9 @@
       <el-table v-loading="loading" :data="tableData" stripe border style="width: 100%" max-height="calc(100vh - 230px)">
         <el-table-column type="index" label="#" width="50" align="center" />
         <el-table-column prop="materialCode" label="物料代码" width="120" />
-        <el-table-column prop="materialName" label="物料名称" min-width="120" />
-        <el-table-column prop="spec" label="规格型号" width="130" />
-        <el-table-column prop="customerName" label="所属客户" width="120" />
+        <el-table-column prop="materialName" label="物料名称" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="spec" label="规格型号" width="130" show-overflow-tooltip />
+        <el-table-column prop="customerName" label="所属客户" width="120" show-overflow-tooltip />
         <el-table-column prop="defaultPrice" label="默认单价" width="90" align="right">
           <template #default="{ row }">
             {{ row.defaultPrice ? '¥' + Number(row.defaultPrice).toFixed(4) : '-' }}
@@ -168,7 +168,7 @@ const editId = ref(null)
 const customerOptions = ref([])
 
 const searchForm = reactive({ keyword: '', customerId: null })
-const pagination = reactive({ page: 1, size: 20, total: 0 })
+const pagination = reactive({ page: 1, size: 10, total: 0 })
 
 const formData = reactive({
   materialCode: '', materialName: '', spec: '',

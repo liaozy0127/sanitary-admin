@@ -34,9 +34,9 @@
 
       <el-table v-loading="loading" :data="tableData" stripe border style="width: 100%" max-height="calc(100vh - 300px)">
         <el-table-column type="index" label="#" width="50" align="center" />
-        <el-table-column prop="customerName" label="客户名称" min-width="140" />
+        <el-table-column prop="customerName" label="客户名称" min-width="140" show-overflow-tooltip />
         <el-table-column prop="materialCode" label="物料代码" width="120" />
-        <el-table-column prop="materialName" label="物料名称" min-width="160" />
+        <el-table-column prop="materialName" label="物料名称" min-width="160" show-overflow-tooltip />
         <el-table-column prop="spec" label="规格" width="120" />
         <el-table-column prop="processName" label="工艺" width="100" />
         <el-table-column prop="quantity" label="库存总数" width="110" align="right">
@@ -59,7 +59,7 @@
 
       <div class="pagination-wrap">
         <el-pagination v-model:current-page="pagination.page" v-model:page-size="pagination.size"
-          :page-sizes="[20, 50, 100, 200]" :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]" :total="pagination.total"
           layout="total, sizes, prev, pager, next, jumper"
           @size-change="fetchList" @current-change="fetchList" />
       </div>
@@ -82,8 +82,8 @@
 
       <el-table v-loading="logLoading" :data="logData" stripe border style="width: 100%" max-height="400px">
         <el-table-column type="index" label="#" width="50" align="center" />
-        <el-table-column prop="customerName" label="客户" width="130" />
-        <el-table-column prop="materialName" label="物料" min-width="140" />
+        <el-table-column prop="customerName" label="客户" width="130" show-overflow-tooltip />
+        <el-table-column prop="materialName" label="物料" min-width="140" show-overflow-tooltip />
         <el-table-column prop="processName" label="工艺" width="100" />
         <el-table-column prop="changeType" label="类型" width="100" align="center">
           <template #default="{ row }">
@@ -111,7 +111,7 @@
 
       <div class="pagination-wrap">
         <el-pagination v-model:current-page="logPagination.page" v-model:page-size="logPagination.size"
-          :page-sizes="[20, 50, 100]" :total="logPagination.total"
+          :page-sizes="[10, 20, 50, 100]" :total="logPagination.total"
           layout="total, sizes, prev, pager, next"
           @size-change="fetchLog" @current-change="fetchLog" />
       </div>
@@ -134,9 +134,9 @@ const logLoading = ref(false)
 const logData = ref([])
 
 const searchForm = reactive({ customerId: null, keyword: '' })
-const pagination = reactive({ page: 1, size: 20, total: 0 })
+const pagination = reactive({ page: 1, size: 10, total: 0 })
 const logFilter = reactive({ changeType: null })
-const logPagination = reactive({ page: 1, size: 20, total: 0 })
+const logPagination = reactive({ page: 1, size: 10, total: 0 })
 
 const fetchList = async () => {
   loading.value = true

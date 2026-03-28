@@ -40,7 +40,7 @@
           <template #default="{ row }">
             <div class="expand-area">
               <el-table :data="row.items || []" border size="small" style="width: 100%">
-                <el-table-column prop="materialName" label="产品名称" min-width="150" />
+                <el-table-column prop="materialName" label="产品名称" min-width="150" show-overflow-tooltip />
                 <el-table-column prop="spec" label="型号规格" width="120" />
                 <el-table-column prop="processName" label="工艺" width="100" />
                 <el-table-column prop="quantity" label="良品数量" width="90" align="right" />
@@ -51,7 +51,7 @@
                     {{ item.amount ? Number(item.amount).toFixed(2) : '0.00' }}
                   </template>
                 </el-table-column>
-                <el-table-column prop="detailRemark" label="明细备注" min-width="120" />
+                <el-table-column prop="detailRemark" label="明细备注" min-width="120" show-overflow-tooltip />
               </el-table>
             </div>
           </template>
@@ -59,9 +59,9 @@
         <el-table-column type="index" label="#" width="50" align="center" />
         <el-table-column prop="shipmentNo" label="发货单号" width="160" />
         <el-table-column prop="shipmentDate" label="发货日期" width="110" />
-        <el-table-column prop="customerName" label="客户名称" min-width="120" />
-        <el-table-column prop="operator" label="制单人" width="90" />
-        <el-table-column prop="remark" label="备注" min-width="120" />
+        <el-table-column prop="customerName" label="客户名称" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="operator" label="制单人" width="90" show-overflow-tooltip />
+        <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
         <el-table-column prop="status" label="状态" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'danger'" size="small">
@@ -226,7 +226,7 @@ const defaultMatOptions = ref([])  // 当前客户默认前100条物料
 const expandedRowIds = ref(new Set())
 
 const searchForm = reactive({ keyword: '', customerId: null, dateRange: [] })
-const pagination = reactive({ page: 1, size: 20, total: 0 })
+const pagination = reactive({ page: 1, size: 10, total: 0 })
 
 const today = new Date().toISOString().split('T')[0]
 const formData = reactive({

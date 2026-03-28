@@ -40,7 +40,7 @@
       <el-table v-loading="loading" :data="tableData" stripe border style="width: 100%" max-height="calc(100vh - 230px)">
         <el-table-column type="index" label="#" width="50" align="center" />
         <el-table-column prop="customerCode" label="客户代码" width="100" />
-        <el-table-column prop="customerName" label="客户名称" min-width="150" />
+        <el-table-column prop="customerName" label="客户名称" min-width="150" show-overflow-tooltip />
         <el-table-column prop="customerType" label="客户类型" width="80" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.customerType" :type="row.customerType === '现金' ? 'success' : 'warning'" size="small">
@@ -175,7 +175,7 @@ const formRef = ref(null)
 const editId = ref(null)
 
 const searchForm = reactive({ keyword: '', customerType: '' })
-const pagination = reactive({ page: 1, size: 20, total: 0 })
+const pagination = reactive({ page: 1, size: 10, total: 0 })
 
 const formData = reactive({
   customerCode: '', customerName: '', customerType: '现金',

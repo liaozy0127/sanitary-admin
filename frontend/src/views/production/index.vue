@@ -37,7 +37,7 @@
           <template #default="{ row }">
             <div class="expand-area">
               <el-table :data="row.items || []" border size="small" style="width: 100%">
-                <el-table-column prop="materialName" label="产品名称" min-width="150" />
+                <el-table-column prop="materialName" label="产品名称" min-width="150" show-overflow-tooltip />
                 <el-table-column prop="spec" label="型号规格" width="120" />
                 <el-table-column prop="processName" label="工艺" width="100" />
                 <el-table-column prop="receiptType" label="收货类型" width="100" />
@@ -45,7 +45,7 @@
                 <el-table-column prop="plannedQty" label="排产数量" width="90" align="right" />
                 <el-table-column prop="platingPrice" label="单价" width="90" align="right" />
                 <el-table-column prop="productionType" label="排产方式" width="90" />
-                <el-table-column prop="detailRemark" label="明细备注" min-width="120" />
+                <el-table-column prop="detailRemark" label="明细备注" min-width="120" show-overflow-tooltip />
               </el-table>
             </div>
           </template>
@@ -53,8 +53,8 @@
         <el-table-column type="index" label="#" width="50" align="center" />
         <el-table-column prop="productionNo" label="排产单号" width="160" />
         <el-table-column prop="productionDate" label="排产日期" width="110" />
-        <el-table-column prop="customerName" label="客户名称" min-width="120" />
-        <el-table-column prop="remark" label="备注" min-width="120" />
+        <el-table-column prop="customerName" label="客户名称" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
         <el-table-column label="操作" width="250" align="center" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" :icon="Edit" @click="openDialog(row)">编辑</el-button>
@@ -216,7 +216,7 @@ const importFile = ref(null)
 const expandedRowIds = ref(new Set())
 
 const searchForm = reactive({ keyword: '', customerId: null })
-const pagination = reactive({ page: 1, size: 20, total: 0 })
+const pagination = reactive({ page: 1, size: 10, total: 0 })
 
 const today = new Date().toISOString().split('T')[0]
 const formData = reactive({
