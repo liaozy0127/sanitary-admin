@@ -146,6 +146,19 @@
               </el-select>
             </template>
           </el-table-column>
+          <el-table-column label="库存" width="90" align="right">
+            <template #default="{ row }">
+              <template v-if="row._invLoading">
+                <el-icon class="is-loading"><Loading /></el-icon>
+              </template>
+              <template v-else-if="row.materialId">
+                <el-tooltip :content="`总库存：${row._invQty ?? '-'}　返工：${row._invRework ?? '-'}`" placement="top">
+                  <span :class="getInvClass(row)">{{ getInvRemain(row) }}</span>
+                </el-tooltip>
+              </template>
+              <template v-else><span style="color:#ccc">—</span></template>
+            </template>
+          </el-table-column>
           <el-table-column label="良品数量" width="100">
             <template #default="{ row }">
               <el-input-number v-model="row.quantity" :min="0" :precision="0" size="small" style="width:100%"
@@ -193,7 +206,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, Edit, Delete, View, Printer } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Edit, Delete, View, Printer, Loading } from '@element-plus/icons-vue'
 import { exportShipments } from '@/api/shipment'
 import { getPrintConfig } from '@/api/config'
 import request from '@/utils/request'
@@ -339,11 +352,15 @@ const onItemMaterialChange = async (id, index) => {
       }
     } catch (e) { /* 查不到工艺不影响录入 */ }
   }
+  // 查询当前库存（选完物料/工艺后）
+  await loadItemInventory(row)
 }
 
 const onItemProcessChange = (id, index) => {
   const process = processList.value.find(p => p.id === id)
   formData.items[index].processName = process?.name || ''
+  // 工艺变化后重新查库存（不同工艺对应不同库存记录）
+  loadItemInventory(formData.items[index])
 }
 
 
@@ -376,12 +393,47 @@ const calcItemAmount = (item) => {
   item.amount = (qty * price).toFixed(2)
 }
 
+// 查询该行的当前库存（选物料/工艺后调用）
+const loadItemInventory = async (row) => {
+  if (!row.materialId || !formData.customerId) {
+    row._invQty = null; row._invRework = null; return
+  }
+  row._invLoading = true
+  try {
+    const res = await request.get('/inventory/query', {
+      params: { materialId: row.materialId, customerId: formData.customerId, processId: row.processId || undefined }
+    })
+    const data = res.data || res
+    row._invQty = Number(data.quantity) || 0
+    row._invRework = Number(data.reworkQty) || 0
+  } catch (e) {
+    row._invQty = null; row._invRework = null
+  } finally {
+    row._invLoading = false
+  }
+}
+
+// 库存剩余 = (当前库存 + 原已发量) - 本行填写数量
+// 新增时 _origShipQty=0；编辑时 _origShipQty=打开弹窗时该行原有发货量
+const getInvRemain = (row) => {
+  if (row._invQty == null) return '—'
+  const ship = (Number(row.quantity) || 0) + (Number(row.defectiveQty) || 0)
+  return row._invQty + (row._origShipQty || 0) - ship
+}
+
+// 剩余库存不足时标红
+const getInvClass = (row) => {
+  if (row._invQty == null) return ''
+  const ship = (Number(row.quantity) || 0) + (Number(row.defectiveQty) || 0)
+  return row._invQty + (row._origShipQty || 0) - ship < 0 ? 'inv-insufficient' : 'inv-ok'
+}
+
 const addItem = () => {
   formData.items.push({
     materialId: null, materialName: '', materialCode: '', spec: '',
     processId: null, processName: '', _matOptions: [...defaultMatOptions.value], _matLoading: false,
     quantity: 0, defectiveQty: 0, unitPrice: 0, amount: '0.00',
-    detailRemark: ''
+    detailRemark: '', _invQty: null, _invRework: null, _invLoading: false, _origShipQty: 0
   })
 }
 
@@ -419,7 +471,15 @@ const openDialog = async (row) => {
     try {
       const res = await request.get('/shipment-items', { params: { shipmentId: row.id } })
       const rawItems = Array.isArray(res) ? res : (res.data || [])
-      formData.items = rawItems.map(item => ({ ...item, _matOptions: item.materialId ? [{ id: item.materialId, name: item.materialName, code: item.materialCode, spec: item.spec }] : [], _matLoading: false }))
+      formData.items = rawItems.map(item => ({
+        ...item,
+        _matOptions: item.materialId ? [{ id: item.materialId, name: item.materialName, code: item.materialCode, spec: item.spec }] : [],
+        _matLoading: false,
+        _invQty: null, _invRework: null, _invLoading: false,
+        _origShipQty: (Number(item.quantity) || 0) + (Number(item.defectiveQty) || 0)
+      }))
+      // 异步加载每行库存
+      formData.items.forEach(item => loadItemInventory(item))
     } catch (e) {
       formData.items = []
     }
@@ -689,4 +749,6 @@ const handleExport = async () => {
 
 /* 操作列按钮并排 */
 :deep(.el-table .cell) { white-space: nowrap; }
+.inv-ok { color: #67c23a; font-weight: 600; }
+.inv-insufficient { color: #f56c6c; font-weight: 600; }
 </style>

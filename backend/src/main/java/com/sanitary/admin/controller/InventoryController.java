@@ -1,5 +1,6 @@
 package com.sanitary.admin.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.sanitary.admin.common.Result;
 import com.sanitary.admin.entity.Inventory;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.servlet.http.HttpServletResponse;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,6 +22,24 @@ import java.util.Map;
 public class InventoryController {
 
     private final InventoryService inventoryService;
+
+    /** 按物料+客户+工艺精确查询当前库存，供发货单录入时参考 */
+    @GetMapping("/query")
+    public Result<Map<String, Object>> query(
+            @RequestParam Long materialId,
+            @RequestParam Long customerId,
+            @RequestParam(required = false) Long processId) {
+        Long effectiveProcessId = (processId != null) ? processId : 0L;
+        Inventory inv = inventoryService.getOne(
+            new LambdaQueryWrapper<Inventory>()
+                .eq(Inventory::getMaterialId, materialId)
+                .eq(Inventory::getCustomerId, customerId)
+                .eq(Inventory::getProcessId, effectiveProcessId), false);
+        Map<String, Object> result = new HashMap<>();
+        result.put("quantity", inv != null ? inv.getQuantity() : BigDecimal.ZERO);
+        result.put("reworkQty", inv != null ? inv.getReworkQty() : BigDecimal.ZERO);
+        return Result.success(result);
+    }
 
     @GetMapping
     public Result<IPage<Inventory>> list(
