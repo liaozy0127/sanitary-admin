@@ -48,11 +48,7 @@ public class ProductionController {
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody Production production) {
         production.setId(id);
-        productionService.updateById(production);
-        if (production.getItems() != null) {
-            productionItemService.deleteByProductionId(id);
-            productionItemService.saveItems(id, production.getProductionNo(), production.getItems());
-        }
+        productionService.updateProduction(production);
         return Result.success();
     }
 

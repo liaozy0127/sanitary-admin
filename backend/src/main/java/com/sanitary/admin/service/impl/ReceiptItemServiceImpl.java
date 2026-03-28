@@ -34,6 +34,7 @@ public class ReceiptItemServiceImpl extends ServiceImpl<ReceiptItemMapper, Recei
     public void saveItems(Long receiptId, String receiptNo, List<ReceiptItem> items) {
         if (items == null || items.isEmpty()) return;
         for (ReceiptItem item : items) {
+            item.setId(null);  // 清空旧 id，防止与软删除记录主键冲突
             item.setReceiptId(receiptId);
             item.setReceiptNo(receiptNo);
             if (item.getQuantity() == null) item.setQuantity(BigDecimal.ZERO);

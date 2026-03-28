@@ -210,6 +210,8 @@ const materialList = ref([])
 const processList = ref([])
 const defaultMatOptions = ref([])  // 当前客户默认前100条物料
 
+const expandedRowIds = ref(new Set())
+
 const searchForm = reactive({ keyword: '', customerId: null, dateRange: [] })
 const pagination = reactive({ page: 1, size: 20, total: 0 })
 
@@ -237,6 +239,12 @@ const fetchList = async () => {
     const res = await request.get('/shipments', { params })
     tableData.value = res.data.records
     pagination.total = res.data.total
+    // 刷新后重新加载已展开行的明细（新 row 对象不含 items）
+    if (expandedRowIds.value.size > 0) {
+      tableData.value.forEach(row => {
+        if (expandedRowIds.value.has(row.id)) loadItems(row)
+      })
+    }
   } finally {
     loading.value = false
   }
@@ -269,9 +277,11 @@ const loadItems = async (row) => {
 }
 
 const onExpandChange = async (row, expandedRows) => {
-  // 只在展开时加载，且未加载过
-  if (expandedRows.some(r => r.id === row.id) && (!row.items || row.items.length === 0)) {
-    await loadItems(row)
+  if (expandedRows.some(r => r.id === row.id)) {
+    expandedRowIds.value.add(row.id)
+    if (!row.items || row.items.length === 0) await loadItems(row)
+  } else {
+    expandedRowIds.value.delete(row.id)
   }
 }
 
@@ -408,7 +418,8 @@ const openDialog = async (row) => {
     // Load items
     try {
       const res = await request.get('/shipment-items', { params: { shipmentId: row.id } })
-      formData.items = res.data || []
+      const rawItems = Array.isArray(res) ? res : (res.data || [])
+      formData.items = rawItems.map(item => ({ ...item, _matOptions: item.materialId ? [{ id: item.materialId, name: item.materialName, code: item.materialCode, spec: item.spec }] : [], _matLoading: false }))
     } catch (e) {
       formData.items = []
     }

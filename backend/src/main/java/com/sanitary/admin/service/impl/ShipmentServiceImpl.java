@@ -138,7 +138,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
             shipmentItemService.saveItems(shipment.getId(), shipment.getShipmentNo(), shipment.getItems());
         }
         
-        // 冲销旧库存（反向操作）
+        // 冲销旧库存（归还库存，用 changeType=1 绕过库存不足检查）
         for (ShipmentItem oldItem : oldItems) {
             BigDecimal totalQty = oldItem.getQuantity() != null ? oldItem.getQuantity() : BigDecimal.ZERO;
             BigDecimal defQty = oldItem.getDefectiveQty() != null ? oldItem.getDefectiveQty() : BigDecimal.ZERO;
@@ -153,9 +153,9 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                 shipment.getCustomerName(),
                 oldItem.getSpec(),
                 oldItem.getProcessName(),
-                shipTotal.negate(), // 反向冲销，数量取负
-                2,  // changeType: 2=发货(出库)
-                "shipment",  // orderType
+                shipTotal,  // 正数归还库存
+                1,  // changeType: 1=收货(入库)，绕过发货库存不足检查
+                "shipment",
                 shipment.getId(),
                 shipment.getShipmentNo(),
                 shipment.getShipmentDate()
@@ -208,7 +208,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
         // 先删除明细
         shipmentItemService.deleteByShipmentId(id);
         
-        // 冲销库存（反向操作）
+        // 冲销库存（归还库存，用 changeType=1 绕过库存不足检查）
         for (ShipmentItem item : items) {
             BigDecimal totalQty = item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO;
             BigDecimal defQty = item.getDefectiveQty() != null ? item.getDefectiveQty() : BigDecimal.ZERO;
@@ -223,9 +223,9 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                 shipment.getCustomerName(),
                 item.getSpec(),
                 item.getProcessName(),
-                shipTotal.negate(), // 反向冲销，数量取负
-                2,  // changeType: 2=发货(出库)
-                "shipment",  // orderType
+                shipTotal,  // 正数归还库存
+                1,  // changeType: 1=收货(入库)，绕过发货库存不足检查
+                "shipment",
                 shipment.getId(),
                 shipment.getShipmentNo(),
                 shipment.getShipmentDate()

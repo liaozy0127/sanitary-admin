@@ -34,6 +34,7 @@ public class ProductionItemServiceImpl extends ServiceImpl<ProductionItemMapper,
     public void saveItems(Long productionId, String productionNo, List<ProductionItem> items) {
         if (items == null || items.isEmpty()) return;
         for (ProductionItem item : items) {
+            item.setId(null);  // 清空旧 id，防止与软删除记录主键冲突
             item.setProductionId(productionId);
             item.setProductionNo(productionNo);
             if (item.getPlannedQty() == null) item.setPlannedQty(BigDecimal.ZERO);

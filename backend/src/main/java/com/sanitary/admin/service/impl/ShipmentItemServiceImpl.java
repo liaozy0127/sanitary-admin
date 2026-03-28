@@ -34,6 +34,7 @@ public class ShipmentItemServiceImpl extends ServiceImpl<ShipmentItemMapper, Shi
     public void saveItems(Long shipmentId, String shipmentNo, List<ShipmentItem> items) {
         if (items == null || items.isEmpty()) return;
         for (ShipmentItem item : items) {
+            item.setId(null);  // 清空旧 id，防止与软删除记录主键冲突
             item.setShipmentId(shipmentId);
             item.setShipmentNo(shipmentNo);
             if (item.getQuantity() == null) item.setQuantity(BigDecimal.ZERO);
