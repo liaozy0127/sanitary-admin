@@ -537,7 +537,7 @@ const handlePrint = async (row) => {
       </tr>` : ''
 
       return `<div class="page${isLast ? ' last' : ''}">
-        <div class="stamp-side">控　戳</div>
+        <div class="stamp-side"></div>
         <div class="page-body">
         <table class="pt">
           <thead>
@@ -568,7 +568,7 @@ const handlePrint = async (row) => {
           <span>${sig2}</span>
         </div>
         </div>
-        <div class="stamp-side">控　戳</div>
+        <div class="stamp-side"></div>
       </div>`
     }
 
@@ -582,7 +582,7 @@ const handlePrint = async (row) => {
   body { font-family: SimSun, "宋体", serif; font-size: 9pt; margin: 0; }
   .page { display: flex; align-items: stretch; gap: 2mm; min-height: 108mm; page-break-after: always; }
   .page.last { page-break-after: auto; min-height: 0; }
-  .stamp-side { flex: 0 0 10mm; border: 0.5pt dashed #999; display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; font-size: 7pt; color: #bbb; letter-spacing: 1.5mm; }
+  .stamp-side { flex: 0 0 10mm; }
   .page-body { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   .pt { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
   .pt th, .pt td { border: 0.5pt solid #0066CC; padding: 1mm 1.5mm; }
