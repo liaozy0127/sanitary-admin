@@ -35,7 +35,10 @@ public class ProcessController {
 
     @PostMapping
     public Result<Void> create(@RequestBody @Valid Process process) {
-        processService.save(process);
+        String msg = processService.checkAndCreate(process);
+        if (msg != null) {
+            return Result.error(400, msg);
+        }
         return Result.success();
     }
 

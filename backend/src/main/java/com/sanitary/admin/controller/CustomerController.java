@@ -41,7 +41,10 @@ public class CustomerController {
 
     @PostMapping
     public Result<Void> create(@RequestBody @Valid Customer customer) {
-        customerService.save(customer);
+        String msg = customerService.checkAndCreate(customer);
+        if (msg != null) {
+            return Result.error(400, msg);
+        }
         return Result.success();
     }
 

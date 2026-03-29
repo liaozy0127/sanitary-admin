@@ -34,7 +34,7 @@ public class ProcessServiceImpl extends ServiceImpl<ProcessMapper, Process> impl
             wrapper.and(w -> w.like(Process::getProcessName, keyword)
                     .or().like(Process::getProcessCode, keyword));
         }
-        wrapper.orderByAsc(Process::getPriorityNo).orderByDesc(Process::getCreateTime);
+        wrapper.orderByDesc(Process::getUpdateTime);
         return page(new Page<>(page, size), wrapper);
     }
 
@@ -54,6 +54,28 @@ public class ProcessServiceImpl extends ServiceImpl<ProcessMapper, Process> impl
                 })
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public String checkAndCreate(Process process) {
+        String code = process.getProcessCode() == null ? "" : process.getProcessCode().trim();
+        // 查找所有（含软删除）相同编码的记录
+        Process existing = baseMapper.findByCodeIgnoreDeleted(code);
+        if (existing != null) {
+            if (existing.getDeleted() == null || existing.getDeleted() == 0) {
+                // 活跃记录已存在
+                return "工艺代码「" + code + "」已存在，请勿重复添加";
+            } else {
+                // 软删除记录，恢复并覆盖字段
+                process.setId(existing.getId());
+                process.setCreateTime(existing.getCreateTime());
+                baseMapper.restoreAndUpdate(process);
+                return null;
+            }
+        }
+        save(process);
+        return null;
+    }
+
 
     @Override
     public Map<String, Object> importFromExcel(MultipartFile file) {

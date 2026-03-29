@@ -74,6 +74,29 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
     }
 
     @Override
+    public String checkAndCreate(Material material) {
+        String code = material.getMaterialCode() == null ? "" : material.getMaterialCode().trim();
+        // 查找所有（含软删除）相同编码的记录
+        Material existing = baseMapper.findByCodeIgnoreDeleted(code);
+        if (existing != null) {
+            if (existing.getDeleted() == null || existing.getDeleted() == 0) {
+                // 活跃记录已存在
+                return "物料代码「" + code + "」已存在，请勿重复添加";
+            } else {
+                // 软删除记录，恢复并覆盖字段
+                material.setId(existing.getId());
+                material.setCreateTime(existing.getCreateTime());
+                baseMapper.restoreAndUpdate(material);
+                return null;
+            }
+        }
+        material.setStatus(1);
+        save(material);
+        return null;
+    }
+
+
+    @Override
     public Map<String, Object> importFromExcel(MultipartFile file) {
         // 老系统物料档案列映射:
         // col 0: 物料代码, col 1: 物料名称, col 2: 规格型号,

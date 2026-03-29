@@ -38,7 +38,10 @@ public class MaterialController {
 
     @PostMapping
     public Result<Void> create(@RequestBody @Valid Material material) {
-        materialService.save(material);
+        String msg = materialService.checkAndCreate(material);
+        if (msg != null) {
+            return Result.error(400, msg);
+        }
         return Result.success();
     }
 

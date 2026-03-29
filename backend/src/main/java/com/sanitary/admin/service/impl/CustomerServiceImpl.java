@@ -79,6 +79,28 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     }
 
     @Override
+    public String checkAndCreate(Customer customer) {
+        String code = customer.getCustomerCode() == null ? "" : customer.getCustomerCode().trim();
+        // 查找所有（含软删除）相同编码的记录
+        Customer existing = baseMapper.findByCodeIgnoreDeleted(code);
+        if (existing != null) {
+            if (existing.getDeleted() == null || existing.getDeleted() == 0) {
+                // 活跃记录已存在
+                return "客户代码「" + code + "」已存在，请勿重复添加";
+            } else {
+                // 软删除记录，恢复并覆盖字段
+                customer.setId(existing.getId());
+                customer.setCreateTime(existing.getCreateTime());
+                baseMapper.restoreAndUpdate(customer);
+                return null;
+            }
+        }
+        save(customer);
+        return null;
+    }
+
+
+    @Override
     public Map<String, Object> importFromExcel(MultipartFile file) {
         int success = 0;
         int fail = 0;
