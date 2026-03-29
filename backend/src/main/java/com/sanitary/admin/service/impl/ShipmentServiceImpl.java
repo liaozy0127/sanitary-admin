@@ -104,9 +104,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                     shipment.getShipmentNo(),
                     shipment.getShipmentDate()
                 );
-                // 发货时优先消耗返工库存（扣到0为止）
-                Long effectivePid = item.getProcessId() != null ? item.getProcessId() : 0L;
-                inventoryMapper.incrementReworkQty(item.getMaterialId(), shipment.getCustomerId(), effectivePid, shipTotal.negate());
+                // 注意：发货不操作返工库存，返工库存仅在收货来源为"返工"时设置
             }
         }
 
@@ -160,9 +158,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                 shipment.getShipmentNo(),
                 shipment.getShipmentDate()
             );
-            // 恢复旧发货消耗的返工库存
-            Long effectivePid = oldItem.getProcessId() != null ? oldItem.getProcessId() : 0L;
-            inventoryMapper.incrementReworkQty(oldItem.getMaterialId(), shipment.getCustomerId(), effectivePid, shipTotal);
+            // 注意：发货不操作返工库存，冲销时也不需要操作
         }
 
         // 更新新库存
@@ -188,9 +184,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                     shipment.getShipmentNo(),
                     shipment.getShipmentDate()
                 );
-                // 发货时优先消耗返工库存（扣到0为止）
-                Long effectivePid = item.getProcessId() != null ? item.getProcessId() : 0L;
-                inventoryMapper.incrementReworkQty(item.getMaterialId(), shipment.getCustomerId(), effectivePid, shipTotal.negate());
+                // 注意：发货不操作返工库存
             }
         }
         
@@ -230,9 +224,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                 shipment.getShipmentNo(),
                 shipment.getShipmentDate()
             );
-            // 恢复该发货消耗的返工库存
-            Long effectivePid = item.getProcessId() != null ? item.getProcessId() : 0L;
-            inventoryMapper.incrementReworkQty(item.getMaterialId(), shipment.getCustomerId(), effectivePid, shipTotal);
+            // 注意：发货不操作返工库存，删除时也不需要操作
         }
         
         // 再删除主表记录

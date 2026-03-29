@@ -433,6 +433,12 @@ const resetForm = () => {
 
 const handleSubmit = async () => {
   await formRef.value.validate()
+  // 校验明细数量不能全部为0
+  const hasValidQty = formData.items.some(item => (Number(item.plannedQty) || 0) > 0)
+  if (!hasValidQty) {
+    ElMessage.warning('请至少填写一条排产数量大于0的明细')
+    return
+  }
   submitLoading.value = true
   try {
     const payload = { ...formData, items: formData.items }

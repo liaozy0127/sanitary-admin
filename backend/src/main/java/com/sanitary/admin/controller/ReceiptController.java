@@ -55,10 +55,7 @@ public class ReceiptController {
 
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
-        Receipt receipt = new Receipt();
-        receipt.setId(id);
-        receipt.setStatus(0);
-        receiptService.updateById(receipt);
+        receiptService.deleteReceipt(id);
         return Result.success();
     }
 

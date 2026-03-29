@@ -64,10 +64,7 @@ public class ShipmentController {
 
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
-        Shipment shipment = new Shipment();
-        shipment.setId(id);
-        shipment.setStatus(0);
-        shipmentService.updateById(shipment);
+        shipmentService.deleteShipment(id);
         return Result.success();
     }
 

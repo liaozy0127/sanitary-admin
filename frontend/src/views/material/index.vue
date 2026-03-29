@@ -112,7 +112,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="所属客户">
+            <el-form-item label="所属客户" prop="customerId">
               <el-select
                 v-model="formData.customerId"
                 placeholder="请选择客户"
@@ -177,7 +177,8 @@ const formData = reactive({
 
 const rules = {
   materialCode: [{ required: true, message: '请输入物料代码', trigger: 'blur' }],
-  materialName: [{ required: true, message: '请输入物料名称', trigger: 'blur' }]
+  materialName: [{ required: true, message: '请输入物料名称', trigger: 'blur' }],
+  customerId: [{ required: true, message: '请选择所属客户', trigger: 'change' }]
 }
 
 const fetchList = async () => {

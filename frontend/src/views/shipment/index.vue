@@ -62,18 +62,11 @@
         <el-table-column prop="customerName" label="客户名称" min-width="120" show-overflow-tooltip />
         <el-table-column prop="operator" label="制单人" width="90" show-overflow-tooltip />
         <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="status" label="状态" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'danger'" size="small">
-              {{ row.status === 1 ? '正常' : '作废' }}
-            </el-tag>
-          </template>
-        </el-table-column>
         <el-table-column label="操作" width="250" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" type="primary" :icon="Edit" @click="openDialog(row)" :disabled="row.status === 0">编辑</el-button>
+            <el-button size="small" type="primary" :icon="Edit" @click="openDialog(row)">编辑</el-button>
             <el-button size="small" type="success" :icon="Printer" @click="handlePrint(row)">打印</el-button>
-            <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(row)">作废</el-button>
+            <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -502,6 +495,12 @@ const resetForm = () => {
 
 const handleSubmit = async () => {
   await formRef.value.validate()
+  // 校验明细数量不能全部为0
+  const hasValidQty = formData.items.some(item => (Number(item.quantity) || 0) > 0 || (Number(item.defectiveQty) || 0) > 0)
+  if (!hasValidQty) {
+    ElMessage.warning('请至少填写一条良品数量或废品数量大于0的明细')
+    return
+  }
   submitLoading.value = true
   try {
     const payload = { ...formData, items: formData.items }
@@ -520,9 +519,9 @@ const handleSubmit = async () => {
 }
 
 const handleDelete = async (row) => {
-  await ElMessageBox.confirm(`确定作废发货单「${row.shipmentNo}」？`, '确认', { type: 'warning' })
+  await ElMessageBox.confirm(`确定删除发货单「${row.shipmentNo}」？`, '确认', { type: 'warning' })
   await request.delete(`/shipments/${row.id}`)
-  ElMessage.success('已作废')
+  ElMessage.success('已删除')
   fetchList()
 }
 

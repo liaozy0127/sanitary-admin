@@ -72,17 +72,10 @@
         <el-table-column prop="receiptDate" label="收货日期" width="110" />
         <el-table-column prop="customerName" label="客户名称" min-width="120" show-overflow-tooltip />
         <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="status" label="状态" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'danger'" size="small">
-              {{ row.status === 1 ? '正常' : '作废' }}
-            </el-tag>
-          </template>
-        </el-table-column>
         <el-table-column label="操作" width="170" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" type="primary" :icon="Edit" @click="openDialog(row)" :disabled="row.status === 0">编辑</el-button>
-            <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(row)">作废</el-button>
+            <el-button size="small" type="primary" :icon="Edit" @click="openDialog(row)">编辑</el-button>
+            <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -482,6 +475,12 @@ const resetForm = () => {
 
 const handleSubmit = async () => {
   await formRef.value.validate()
+  // 校验明细数量不能全部为0
+  const hasValidQty = formData.items.some(item => (Number(item.quantity) || 0) > 0)
+  if (!hasValidQty) {
+    ElMessage.warning('请至少填写一条收货数量大于0的明细')
+    return
+  }
   submitLoading.value = true
   try {
     const payload = { ...formData, items: formData.items }
@@ -500,9 +499,9 @@ const handleSubmit = async () => {
 }
 
 const handleDelete = async (row) => {
-  await ElMessageBox.confirm(`确定作废收货单「${row.receiptNo}」？`, '确认', { type: 'warning' })
+  await ElMessageBox.confirm(`确定删除收货单「${row.receiptNo}」？`, '确认', { type: 'warning' })
   await deleteReceipt(row.id)
-  ElMessage.success('已作废')
+  ElMessage.success('已删除')
   fetchList()
 }
 

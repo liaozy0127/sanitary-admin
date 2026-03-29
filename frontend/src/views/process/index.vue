@@ -37,7 +37,6 @@
         <el-table-column prop="processName" label="工艺名称" min-width="120" show-overflow-tooltip />
         <el-table-column prop="processCategory" label="工艺类别" width="100" show-overflow-tooltip />
         <el-table-column prop="processNature" label="工艺性质" width="100" show-overflow-tooltip />
-        <el-table-column prop="priorityNo" label="优先编号" width="80" align="center" />
         <el-table-column prop="status" label="状态" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small" style="cursor:pointer" @click="toggleStatus(row)">{{ row.status === 1 ? '启用' : '禁用' }}</el-tag>
@@ -98,16 +97,6 @@
               <el-input v-model="formData.thicknessReq" placeholder="请输入厚度要求" />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="优先编号">
-              <el-input-number v-model="formData.priorityNo" :min="0" style="width:100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="缺省报价">
-              <el-switch v-model="formData.defaultQuote" :active-value="1" :inactive-value="0" />
-            </el-form-item>
-          </el-col>
           <el-col :span="24">
             <el-form-item label="备注">
               <el-input v-model="formData.remark" type="textarea" :rows="2" placeholder="请输入备注" />
@@ -143,7 +132,7 @@ const pagination = reactive({ page: 1, size: 10, total: 0 })
 
 const formData = reactive({
   processCode: '', processName: '', processCategory: '', processNature: '',
-  thicknessReq: '', defaultQuote: 0, priorityNo: 0, remark: '', status: 1
+  thicknessReq: '', remark: '', status: 1
 })
 
 const rules = {
@@ -188,7 +177,7 @@ const resetForm = () => {
   formRef.value?.resetFields()
   Object.assign(formData, {
     processCode: '', processName: '', processCategory: '', processNature: '',
-    thicknessReq: '', defaultQuote: 0, priorityNo: 0, remark: '', status: 1
+    thicknessReq: '', remark: '', status: 1
   })
 }
 

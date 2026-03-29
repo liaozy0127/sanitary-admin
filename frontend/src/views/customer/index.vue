@@ -109,16 +109,6 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="业务员">
-              <el-input v-model="formData.salesperson" placeholder="请输入业务员" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="地址">
-              <el-input v-model="formData.address" placeholder="请输入地址" />
-            </el-form-item>
-          </el-col>
         </el-row>
 
         <!-- 联系信息 -->
@@ -132,6 +122,16 @@
           <el-col :span="12">
             <el-form-item label="联系电话">
               <el-input v-model="formData.contactPhone" placeholder="请输入联系电话" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="业务员">
+              <el-input v-model="formData.salesperson" placeholder="请输入业务员" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="地址">
+              <el-input v-model="formData.address" placeholder="请输入地址" />
             </el-form-item>
           </el-col>
         </el-row>
