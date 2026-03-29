@@ -90,7 +90,7 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="备注">
-              <el-input v-model="formData.remark" placeholder="备注" />
+              <el-input v-model="formData.remark" placeholder="备注" :maxlength="500" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -114,7 +114,7 @@
           </el-table-column>
           <el-table-column label="型号规格" width="120">
             <template #default="{ row }">
-              <el-input v-model="row.spec" size="small" />
+              <el-input v-model="row.spec" size="small" :maxlength="200" />
             </template>
           </el-table-column>
           <el-table-column label="工艺" width="120">
@@ -136,7 +136,7 @@
           </el-table-column>
           <el-table-column label="单位" width="80">
             <template #default="{ row }">
-              <el-input v-model="row.unit" size="small" />
+              <el-input v-model="row.unit" size="small" :maxlength="50" />
             </template>
           </el-table-column>
           <el-table-column label="排产数量" width="100">
@@ -153,12 +153,12 @@
           </el-table-column>
           <el-table-column label="排产方式" width="90">
             <template #default="{ row }">
-              <el-input v-model="row.productionType" size="small" />
+              <el-input v-model="row.productionType" size="small" :maxlength="50" />
             </template>
           </el-table-column>
           <el-table-column label="明细备注" min-width="120">
             <template #default="{ row }">
-              <el-input v-model="row.detailRemark" size="small" />
+              <el-input v-model="row.detailRemark" size="small" :maxlength="500" />
             </template>
           </el-table-column>
           <el-table-column label="操作" width="120" align="center" fixed="right">

@@ -93,12 +93,12 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="客户代码" prop="customerCode">
-              <el-input v-model="formData.customerCode" placeholder="请输入客户代码" />
+              <el-input v-model="formData.customerCode" placeholder="请输入客户代码" :maxlength="20" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="客户名称" prop="customerName">
-              <el-input v-model="formData.customerName" placeholder="请输入客户名称" />
+              <el-input v-model="formData.customerName" placeholder="请输入客户名称" :maxlength="100" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -116,22 +116,22 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="联系人">
-              <el-input v-model="formData.contactPerson" placeholder="请输入联系人" />
+              <el-input v-model="formData.contactPerson" placeholder="请输入联系人" :maxlength="50" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="联系电话">
-              <el-input v-model="formData.contactPhone" placeholder="请输入联系电话" />
+              <el-input v-model="formData.contactPhone" placeholder="请输入联系电话" :maxlength="20" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="业务员">
-              <el-input v-model="formData.salesperson" placeholder="请输入业务员" />
+              <el-input v-model="formData.salesperson" placeholder="请输入业务员" :maxlength="50" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
             <el-form-item label="地址">
-              <el-input v-model="formData.address" placeholder="请输入地址" />
+              <el-input v-model="formData.address" placeholder="请输入地址" :maxlength="200" show-word-limit />
             </el-form-item>
           </el-col>
         </el-row>
@@ -141,12 +141,12 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="税号">
-              <el-input v-model="formData.taxNo" placeholder="请输入税号" />
+              <el-input v-model="formData.taxNo" placeholder="请输入税号" :maxlength="50" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
             <el-form-item label="备注">
-              <el-input v-model="formData.remark" type="textarea" :rows="2" placeholder="请输入备注" />
+              <el-input v-model="formData.remark" type="textarea" :rows="2" placeholder="请输入备注" :maxlength="500" show-word-limit />
             </el-form-item>
           </el-col>
         </el-row>

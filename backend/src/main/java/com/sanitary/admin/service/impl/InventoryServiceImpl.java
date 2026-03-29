@@ -159,24 +159,41 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
 
     @Override
     public IPage<Inventory> pageList(int page, int size, Long customerId, String keyword) {
-        LambdaQueryWrapper<Inventory> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.gt(Inventory::getQuantity, BigDecimal.ZERO); // 只显示有库存的
+        // 使用关联查询获取最新的客户、物料、工艺信息
+        IPage<Map<String, Object>> mapPage = this.baseMapper.pageListWithJoin(new Page<>(page, size), customerId, keyword);
 
-        if (customerId != null) {
-            queryWrapper.eq(Inventory::getCustomerId, customerId);
+        // 转换为 Inventory 对象（兼容前端）
+        IPage<Inventory> result = new Page<>(page, size, mapPage.getTotal());
+        List<Inventory> records = new ArrayList<>();
+        for (Map<String, Object> map : mapPage.getRecords()) {
+            Inventory inv = new Inventory();
+            inv.setId(toLong(map.get("id")));
+            inv.setMaterialId(toLong(map.get("material_id")));
+            inv.setCustomerId(toLong(map.get("customer_id")));
+            inv.setProcessId(toLong(map.get("process_id")));
+            inv.setMaterialCode(str(map.get("material_code")));
+            inv.setMaterialName(str(map.get("material_name")));
+            inv.setCustomerName(str(map.get("customer_name")));
+            inv.setSpec(str(map.get("spec")));
+            inv.setProcessName(str(map.get("process_name")));
+            inv.setQuantity(toBigDecimal(map.get("quantity")));
+            inv.setReworkQty(toBigDecimal(map.get("rework_qty")));
+            inv.setLastReceiveTime(toLocalDateTime(map.get("last_receive_time")));
+            inv.setLastShipTime(toLocalDateTime(map.get("last_ship_time")));
+            inv.setCreateTime(toLocalDateTime(map.get("create_time")));
+            inv.setUpdateTime(toLocalDateTime(map.get("update_time")));
+            records.add(inv);
         }
+        result.setRecords(records);
+        return result;
+    }
 
-        if (keyword != null && !keyword.trim().isEmpty()) {
-            queryWrapper.and(wrapper -> wrapper.like(Inventory::getMaterialCode, keyword)
-                    .or()
-                    .like(Inventory::getMaterialName, keyword)
-                    .or()
-                    .like(Inventory::getCustomerName, keyword));
-        }
-
-        queryWrapper.orderByDesc(Inventory::getCreateTime);
-
-        return this.page(new Page<>(page, size), queryWrapper);
+    private LocalDateTime toLocalDateTime(Object v) {
+        if (v == null) return null;
+        if (v instanceof LocalDateTime) return (LocalDateTime) v;
+        if (v instanceof java.sql.Timestamp) return ((java.sql.Timestamp) v).toLocalDateTime();
+        try { return LocalDateTime.parse(v.toString().replace(" ", "T")); }
+        catch (Exception e) { return null; }
     }
 
     @Override

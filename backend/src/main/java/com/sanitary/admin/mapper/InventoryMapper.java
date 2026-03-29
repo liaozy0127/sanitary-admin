@@ -1,6 +1,8 @@
 package com.sanitary.admin.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sanitary.admin.entity.Inventory;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -20,6 +22,32 @@ public interface InventoryMapper extends BaseMapper<Inventory> {
     /** 更新返工库存：收货(+qty)，发货时降至0但不低于0 */
     @Update("UPDATE inventory SET rework_qty = GREATEST(0, rework_qty + #{changeQty}), update_time = NOW() WHERE material_id = #{materialId} AND customer_id = #{customerId} AND process_id = #{processId}")
     int incrementReworkQty(@Param("materialId") Long materialId, @Param("customerId") Long customerId, @Param("processId") Long processId, @Param("changeQty") BigDecimal changeQty);
+
+    /**
+     * 分页查询库存（关联客户、物料、工艺表获取最新信息）
+     */
+    @Select("<script>" +
+            "SELECT i.id, i.material_id, i.customer_id, i.process_id, " +
+            "  COALESCE(m.material_code, i.material_code) AS material_code, " +
+            "  COALESCE(m.material_name, i.material_name) AS material_name, " +
+            "  COALESCE(c.customer_name, i.customer_name) AS customer_name, " +
+            "  COALESCE(m.spec, i.spec) AS spec, " +
+            "  COALESCE(p.process_name, i.process_name) AS process_name, " +
+            "  i.quantity, i.rework_qty, i.last_receive_time, i.last_ship_time, i.create_time, i.update_time " +
+            "FROM inventory i " +
+            "LEFT JOIN material m ON m.id = i.material_id " +
+            "LEFT JOIN customer c ON c.id = i.customer_id " +
+            "LEFT JOIN process p ON p.id = i.process_id " +
+            "WHERE i.quantity &gt; 0 " +
+            "<if test='customerId != null'> AND i.customer_id = #{customerId} </if>" +
+            "<if test='keyword != null and keyword != \"\"'> " +
+            "  AND (COALESCE(m.material_code, i.material_code) LIKE CONCAT('%', #{keyword}, '%') " +
+            "       OR COALESCE(m.material_name, i.material_name) LIKE CONCAT('%', #{keyword}, '%') " +
+            "       OR COALESCE(c.customer_name, i.customer_name) LIKE CONCAT('%', #{keyword}, '%')) " +
+            "</if>" +
+            "ORDER BY i.update_time DESC" +
+            "</script>")
+    IPage<Map<String, Object>> pageListWithJoin(Page<?> page, @Param("customerId") Long customerId, @Param("keyword") String keyword);
 
     /**
      * 聚合收货明细：按(material_id, customer_id, process_id)汇总收货数量及维度信息

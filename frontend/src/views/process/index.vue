@@ -74,32 +74,32 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="工艺代码" prop="processCode">
-              <el-input v-model="formData.processCode" placeholder="请输入工艺代码" />
+              <el-input v-model="formData.processCode" placeholder="请输入工艺代码" :maxlength="20" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="工艺名称" prop="processName">
-              <el-input v-model="formData.processName" placeholder="请输入工艺名称" />
+              <el-input v-model="formData.processName" placeholder="请输入工艺名称" :maxlength="100" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="工艺类别">
-              <el-input v-model="formData.processCategory" placeholder="请输入工艺类别" />
+              <el-input v-model="formData.processCategory" placeholder="请输入工艺类别" :maxlength="50" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="工艺性质">
-              <el-input v-model="formData.processNature" placeholder="请输入工艺性质" />
+              <el-input v-model="formData.processNature" placeholder="请输入工艺性质" :maxlength="50" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="厚度要求">
-              <el-input v-model="formData.thicknessReq" placeholder="请输入厚度要求" />
+              <el-input v-model="formData.thicknessReq" placeholder="请输入厚度要求" :maxlength="100" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
             <el-form-item label="备注">
-              <el-input v-model="formData.remark" type="textarea" :rows="2" placeholder="请输入备注" />
+              <el-input v-model="formData.remark" type="textarea" :rows="2" placeholder="请输入备注" :maxlength="500" show-word-limit />
             </el-form-item>
           </el-col>
         </el-row>

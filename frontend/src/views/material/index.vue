@@ -98,17 +98,17 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="物料代码" prop="materialCode">
-              <el-input v-model="formData.materialCode" placeholder="请输入物料代码" />
+              <el-input v-model="formData.materialCode" placeholder="请输入物料代码" :maxlength="50" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="物料名称" prop="materialName">
-              <el-input v-model="formData.materialName" placeholder="请输入物料名称" />
+              <el-input v-model="formData.materialName" placeholder="请输入物料名称" :maxlength="200" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="24">
             <el-form-item label="规格型号">
-              <el-input v-model="formData.spec" placeholder="请输入规格型号" />
+              <el-input v-model="formData.spec" placeholder="请输入规格型号" :maxlength="200" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -132,7 +132,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="计量单位">
-              <el-input v-model="formData.unit" placeholder="如：个、米、套" />
+              <el-input v-model="formData.unit" placeholder="如：个、米、套" :maxlength="20" />
             </el-form-item>
           </el-col>
           <el-col :span="12">

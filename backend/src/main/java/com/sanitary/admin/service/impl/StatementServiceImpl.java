@@ -1,6 +1,7 @@
 package com.sanitary.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sanitary.admin.entity.Customer;
@@ -64,15 +65,49 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
 
     @Override
     public Page<Statement> pageList(int page, int size, Long customerId, String statementMonth) {
-        LambdaQueryWrapper<Statement> wrapper = new LambdaQueryWrapper<>();
-        if (customerId != null) {
-            wrapper.eq(Statement::getCustomerId, customerId);
+        // 使用关联查询获取最新的客户名称
+        IPage<Map<String, Object>> mapPage = this.baseMapper.pageListWithJoin(new Page<>(page, size), customerId, statementMonth);
+
+        // 转换为 Statement 对象（兼容前端）
+        Page<Statement> result = new Page<>(page, size, mapPage.getTotal());
+        List<Statement> records = new ArrayList<>();
+        for (Map<String, Object> map : mapPage.getRecords()) {
+            Statement stmt = new Statement();
+            stmt.setId(toLong(map.get("id")));
+            stmt.setStatementNo(str(map.get("statement_no")));
+            stmt.setStatementMonth(str(map.get("statement_month")));
+            stmt.setCustomerId(toLong(map.get("customer_id")));
+            stmt.setCustomerName(str(map.get("customer_name")));
+            stmt.setReceiptQty(toBigDecimal(map.get("receipt_qty")));
+            stmt.setShipmentQty(toBigDecimal(map.get("shipment_qty")));
+            stmt.setReceiptAmount(toBigDecimal(map.get("receipt_amount")));
+            stmt.setGoodsAmount(toBigDecimal(map.get("goods_amount")));
+            stmt.setShipmentAmount(toBigDecimal(map.get("shipment_amount")));
+            stmt.setRemark(str(map.get("remark")));
+            records.add(stmt);
         }
-        if (StringUtils.hasText(statementMonth)) {
-            wrapper.eq(Statement::getStatementMonth, statementMonth);
-        }
-        wrapper.orderByDesc(Statement::getStatementMonth).orderByDesc(Statement::getId);
-        return page(new Page<>(page, size), wrapper);
+        result.setRecords(records);
+        return result;
+    }
+
+    private Long toLong(Object v) {
+        if (v == null) return null;
+        if (v instanceof Long) return (Long) v;
+        if (v instanceof Number) return ((Number) v).longValue();
+        try { return Long.parseLong(v.toString()); }
+        catch (Exception e) { return null; }
+    }
+
+    private BigDecimal toBigDecimal(Object v) {
+        if (v == null) return null;
+        if (v instanceof BigDecimal) return (BigDecimal) v;
+        if (v instanceof Number) return new BigDecimal(v.toString());
+        try { return new BigDecimal(v.toString()); }
+        catch (Exception e) { return null; }
+    }
+
+    private String str(Object v) {
+        return v == null ? null : v.toString();
     }
 
     @Override
