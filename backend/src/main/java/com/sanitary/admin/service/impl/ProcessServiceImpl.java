@@ -169,7 +169,7 @@ public class ProcessServiceImpl extends ServiceImpl<ProcessMapper, Process> impl
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w.like(Process::getProcessName, keyword).or().like(Process::getProcessCode, keyword));
         }
-        wrapper.orderByAsc(Process::getPriorityNo).last("LIMIT 50000");
+        wrapper.orderByDesc(Process::getUpdateTime).last("LIMIT 50000");
         List<Process> list = this.list(wrapper);
 
         XSSFWorkbook wb = new XSSFWorkbook();

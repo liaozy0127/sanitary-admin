@@ -473,7 +473,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
         if (customerId != null) wrapper.eq(Shipment::getCustomerId, customerId);
         if (StringUtils.hasText(startDate)) wrapper.ge(Shipment::getShipmentDate, startDate);
         if (StringUtils.hasText(endDate)) wrapper.le(Shipment::getShipmentDate, endDate);
-        wrapper.orderByDesc(Shipment::getShipmentDate).last("LIMIT 5000");
+        wrapper.orderByDesc(Shipment::getShipmentDate).orderByDesc(Shipment::getId).last("LIMIT 5000");
         List<Shipment> shipments = this.list(wrapper);
 
         List<Long> ids = shipments.stream().map(Shipment::getId).collect(java.util.stream.Collectors.toList());

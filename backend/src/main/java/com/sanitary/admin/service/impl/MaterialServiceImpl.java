@@ -234,13 +234,12 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
     }
 
     @Override
-    public void exportExcel(HttpServletResponse response, String keyword, Long customerId, Integer status) {
+    public void exportExcel(HttpServletResponse response, String keyword, Long customerId) {
         LambdaQueryWrapper<Material> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w.like(Material::getMaterialName, keyword).or().like(Material::getMaterialCode, keyword));
         }
         if (customerId != null) wrapper.eq(Material::getCustomerId, customerId);
-        if (status != null) wrapper.eq(Material::getStatus, status);
         wrapper.orderByDesc(Material::getCreateTime).last("LIMIT 50000");
         List<Material> list = this.list(wrapper);
 

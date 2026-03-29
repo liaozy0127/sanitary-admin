@@ -75,8 +75,7 @@ public class MaterialController {
     @GetMapping("/export")
     public void export(HttpServletResponse response,
                        @RequestParam(required = false) String keyword,
-                       @RequestParam(required = false) Long customerId,
-                       @RequestParam(required = false) Integer status) {
-        materialService.exportExcel(response, keyword, customerId, status);
+                       @RequestParam(required = false) Long customerId) {
+        materialService.exportExcel(response, keyword, customerId);
     }
 }

@@ -191,7 +191,7 @@ public class PaymentServiceImpl extends ServiceImpl<PaymentMapper, Payment> impl
         if (customerId != null) wrapper.eq(Payment::getCustomerId, customerId);
         if (org.springframework.util.StringUtils.hasText(startDate)) wrapper.ge(Payment::getPaymentDate, startDate);
         if (org.springframework.util.StringUtils.hasText(endDate)) wrapper.le(Payment::getPaymentDate, endDate);
-        wrapper.orderByDesc(Payment::getPaymentDate).last("LIMIT 50000");
+        wrapper.orderByDesc(Payment::getPaymentDate).orderByDesc(Payment::getId).last("LIMIT 50000");
         List<Payment> list = this.list(wrapper);
 
         XSSFWorkbook wb = new XSSFWorkbook();

@@ -565,7 +565,7 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
         }
         if (customerId != null) wrapper.eq(Inventory::getCustomerId, customerId);
         wrapper.gt(Inventory::getQuantity, 0)
-               .orderByDesc(Inventory::getQuantity)
+               .orderByDesc(Inventory::getUpdateTime)
                .last("LIMIT 50000");
         List<Inventory> list = this.list(wrapper);
 

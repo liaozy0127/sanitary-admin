@@ -316,7 +316,7 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
         if (customerId != null) wrapper.eq(Production::getCustomerId, customerId);
         if (StringUtils.hasText(startDate)) wrapper.ge(Production::getProductionDate, startDate);
         if (StringUtils.hasText(endDate)) wrapper.le(Production::getProductionDate, endDate);
-        wrapper.orderByDesc(Production::getProductionDate).last("LIMIT 5000");
+        wrapper.orderByDesc(Production::getProductionDate).orderByDesc(Production::getId).last("LIMIT 5000");
         List<Production> productions = this.list(wrapper);
 
         List<Long> ids = productions.stream().map(Production::getId).collect(java.util.stream.Collectors.toList());

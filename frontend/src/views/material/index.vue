@@ -223,6 +223,8 @@ const openDialog = (row) => {
 
 const resetForm = () => {
   formRef.value?.resetFields()
+  // 先清空所有属性，防止编辑时 Object.assign 带入的残留字段
+  Object.keys(formData).forEach(key => delete formData[key])
   Object.assign(formData, {
     materialCode: '', materialName: '', spec: '',
     customerId: null, customerName: '', defaultPrice: 0, unit: '个', status: 1

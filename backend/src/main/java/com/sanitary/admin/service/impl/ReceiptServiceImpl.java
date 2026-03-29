@@ -548,7 +548,7 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
         if (customerId != null) wrapper.eq(Receipt::getCustomerId, customerId);
         if (StringUtils.hasText(startDate)) wrapper.ge(Receipt::getReceiptDate, startDate);
         if (StringUtils.hasText(endDate)) wrapper.le(Receipt::getReceiptDate, endDate);
-        wrapper.orderByDesc(Receipt::getReceiptDate).last("LIMIT 5000");
+        wrapper.orderByDesc(Receipt::getReceiptDate).orderByDesc(Receipt::getId).last("LIMIT 5000");
         List<Receipt> receipts = this.list(wrapper);
 
         List<Long> ids = receipts.stream().map(Receipt::getId).collect(java.util.stream.Collectors.toList());
