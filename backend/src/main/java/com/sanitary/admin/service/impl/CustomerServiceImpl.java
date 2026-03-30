@@ -41,7 +41,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (StringUtils.hasText(customerType)) {
             wrapper.eq(Customer::getCustomerType, customerType);
         }
-        wrapper.orderByDesc(Customer::getCreateTime);
+        wrapper.orderByDesc(Customer::getUpdateTime).orderByDesc(Customer::getId);
         return page(new Page<>(page, size), wrapper);
     }
 
@@ -198,7 +198,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (StringUtils.hasText(customerType)) {
             wrapper.eq(Customer::getCustomerType, customerType);
         }
-        wrapper.orderByDesc(Customer::getCreateTime).last("LIMIT 50000");
+        wrapper.orderByDesc(Customer::getUpdateTime).orderByDesc(Customer::getId).last("LIMIT 50000");
         List<Customer> list = this.list(wrapper);
 
         XSSFWorkbook wb = new XSSFWorkbook();

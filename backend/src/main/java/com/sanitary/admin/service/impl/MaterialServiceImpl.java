@@ -42,7 +42,7 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
         if (customerId != null) {
             wrapper.eq(Material::getCustomerId, customerId);
         }
-        wrapper.orderByDesc(Material::getCreateTime);
+        wrapper.orderByDesc(Material::getUpdateTime).orderByDesc(Material::getId);
         return page(new Page<>(page, size), wrapper);
     }
 
@@ -240,7 +240,7 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
             wrapper.and(w -> w.like(Material::getMaterialName, keyword).or().like(Material::getMaterialCode, keyword));
         }
         if (customerId != null) wrapper.eq(Material::getCustomerId, customerId);
-        wrapper.orderByDesc(Material::getCreateTime).last("LIMIT 50000");
+        wrapper.orderByDesc(Material::getUpdateTime).orderByDesc(Material::getId).last("LIMIT 50000");
         List<Material> list = this.list(wrapper);
 
         XSSFWorkbook wb = new XSSFWorkbook();

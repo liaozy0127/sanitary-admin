@@ -128,7 +128,7 @@ public class ReworkServiceImpl extends ServiceImpl<ReworkMapper, Rework> impleme
         if (customerId != null) wrapper.eq(Rework::getCustomerId, customerId);
         if (StringUtils.hasText(startDate)) wrapper.ge(Rework::getReworkDate, startDate);
         if (StringUtils.hasText(endDate)) wrapper.le(Rework::getReworkDate, endDate);
-        wrapper.orderByDesc(Rework::getReworkDate).last("LIMIT 5000");
+        wrapper.orderByDesc(Rework::getReworkDate).orderByDesc(Rework::getId).last("LIMIT 5000");
         List<Rework> reworks = this.list(wrapper);
 
         List<Long> ids = reworks.stream().map(Rework::getId).collect(java.util.stream.Collectors.toList());

@@ -21,7 +21,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         if (StringUtils.hasText(username)) {
             wrapper.like(SysUser::getUsername, username);
         }
-        wrapper.orderByDesc(SysUser::getCreateTime);
+        wrapper.orderByDesc(SysUser::getUpdateTime).orderByDesc(SysUser::getId);
         Page<SysUser> page = this.page(new Page<>(pageNum, pageSize), wrapper);
         return PageResult.of(page.getTotal(), page.getRecords());
     }

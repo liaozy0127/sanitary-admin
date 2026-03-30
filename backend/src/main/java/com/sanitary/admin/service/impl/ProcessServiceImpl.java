@@ -34,7 +34,7 @@ public class ProcessServiceImpl extends ServiceImpl<ProcessMapper, Process> impl
             wrapper.and(w -> w.like(Process::getProcessName, keyword)
                     .or().like(Process::getProcessCode, keyword));
         }
-        wrapper.orderByDesc(Process::getUpdateTime);
+        wrapper.orderByDesc(Process::getUpdateTime).orderByDesc(Process::getId);
         return page(new Page<>(page, size), wrapper);
     }
 
@@ -169,7 +169,7 @@ public class ProcessServiceImpl extends ServiceImpl<ProcessMapper, Process> impl
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w.like(Process::getProcessName, keyword).or().like(Process::getProcessCode, keyword));
         }
-        wrapper.orderByDesc(Process::getUpdateTime).last("LIMIT 50000");
+        wrapper.orderByDesc(Process::getUpdateTime).orderByDesc(Process::getId).last("LIMIT 50000");
         List<Process> list = this.list(wrapper);
 
         XSSFWorkbook wb = new XSSFWorkbook();

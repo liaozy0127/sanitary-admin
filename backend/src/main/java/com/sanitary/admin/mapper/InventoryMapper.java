@@ -45,7 +45,7 @@ public interface InventoryMapper extends BaseMapper<Inventory> {
             "       OR COALESCE(m.material_name, i.material_name) LIKE CONCAT('%', #{keyword}, '%') " +
             "       OR COALESCE(c.customer_name, i.customer_name) LIKE CONCAT('%', #{keyword}, '%')) " +
             "</if>" +
-            "ORDER BY i.update_time DESC" +
+            "ORDER BY i.update_time DESC, i.id DESC" +
             "</script>")
     IPage<Map<String, Object>> pageListWithJoin(Page<?> page, @Param("customerId") Long customerId, @Param("keyword") String keyword);
 

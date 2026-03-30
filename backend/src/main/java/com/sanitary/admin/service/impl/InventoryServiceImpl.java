@@ -221,7 +221,7 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
             queryWrapper.le(InventoryLog::getCreateTime, endDate + " 23:59:59");
         }
 
-        queryWrapper.orderByDesc(InventoryLog::getCreateTime);
+        queryWrapper.orderByDesc(InventoryLog::getCreateTime).orderByDesc(InventoryLog::getId);
 
         return inventoryLogMapper.selectPage(new Page<>(page, size), queryWrapper);
     }
@@ -565,7 +565,7 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
         }
         if (customerId != null) wrapper.eq(Inventory::getCustomerId, customerId);
         wrapper.gt(Inventory::getQuantity, 0)
-               .orderByDesc(Inventory::getUpdateTime)
+               .orderByDesc(Inventory::getUpdateTime).orderByDesc(Inventory::getId)
                .last("LIMIT 50000");
         List<Inventory> list = this.list(wrapper);
 
