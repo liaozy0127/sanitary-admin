@@ -28,8 +28,6 @@
         <div class="table-header">
           <span>收货单列表</span>
           <div>
-            <el-button type="success" :icon="Download" @click="handleDownloadTemplate">下载模板</el-button>
-            <el-button type="warning" :icon="Upload" @click="showImportDialog = true">批量导入</el-button>
             <el-button type="success" :loading="exporting" @click="handleExport">导出 Excel</el-button>
             <el-button type="primary" :icon="Plus" @click="openDialog()">新增收货</el-button>
           </div>
@@ -191,25 +189,13 @@
       </template>
     </el-dialog>
 
-    <!-- 批量导入弹窗 -->
-    <el-dialog v-model="showImportDialog" title="批量导入收货单" width="500px">
-      <el-upload class="upload-area" drag accept=".xlsx,.xls" :auto-upload="false" :on-change="handleFileChange" :limit="1">
-        <el-icon class="el-icon--upload"><Upload /></el-icon>
-        <div class="el-upload__text">拖拽文件到此处，或 <em>点击上传</em></div>
-        <template #tip><div class="el-upload__tip">只支持 .xlsx .xls 格式</div></template>
-      </el-upload>
-      <template #footer>
-        <el-button @click="showImportDialog = false">取消</el-button>
-        <el-button type="primary" :loading="importLoading" @click="handleImport">开始导入</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, Edit, Delete, Download, Upload, View } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Edit, Delete, View } from '@element-plus/icons-vue'
 import { getReceiptList, createReceipt, updateReceipt, deleteReceipt, downloadTemplate, importReceipts, exportReceipts } from '@/api/receipt'
 import { getCustomerAll } from '@/api/customer'
 import { getProcessAll } from '@/api/process'
@@ -321,6 +307,15 @@ const onCustomerChange = async (id) => {
     item.materialId = null
     item.materialName = ''
     item.materialCode = ''
+    item.spec = ''
+    item.processId = null
+    item.processName = ''
+    item.receiptSource = '正常'
+    item.quantity = 0
+    item.unitPrice = 0
+    item.amount = '0.00'
+    item.customerOrderNo = ''
+    item.detailRemark = ''
   })
   if (id) {
     try {
@@ -401,18 +396,17 @@ const searchMaterial = async (query, index) => {
   if (!formData.customerId) return
   const row = formData.items[index]
   if (!row) return
-  // 无关键词时直接用默认列表
-  if (!query || !query.trim()) {
-    row._matOptions.splice(0, row._matOptions.length, ...defaultMatOptions.value)
-    return
-  }
   row._matLoading = true
   try {
     const res = await request.get('/materials/search', {
-      params: { keyword: query.trim(), customerId: formData.customerId }
+      params: { keyword: (query || '').trim(), customerId: formData.customerId }
     })
     const list = Array.isArray(res) ? res : (res.data || [])
     row._matOptions.splice(0, row._matOptions.length, ...list)
+    // 同步更新默认列表缓存（无关键词时）
+    if (!query || !query.trim()) {
+      defaultMatOptions.value = list
+    }
   } catch (e) {
     row._matOptions.splice(0, row._matOptions.length)
   } finally {

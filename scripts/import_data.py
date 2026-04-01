@@ -9,7 +9,7 @@ import time
 from datetime import datetime
 
 BASE_URL = "http://localhost:8080"
-DATA_DIR = "/Users/admin/IdeaProjects/sanitary-admin/old-system-file"
+DATA_DIR = "/Users/admin/IdeaProjects/sanitary-admin/old-system-file-20260401"
 
 def login():
     resp = requests.post(f"{BASE_URL}/api/auth/login", json={"username": "admin", "password": "admin123"})
@@ -21,7 +21,7 @@ def login():
 
 def import_customers(headers):
     print("\n📦 开始导入客户档案...")
-    wb = xlrd.open_workbook(f"{DATA_DIR}/客户档案.xls")
+    wb = xlrd.open_workbook(f"{DATA_DIR}/客户档案20260401.xls")
     sheet = wb.sheets()[0]
     
     success, skip, fail = 0, 0, 0
@@ -73,7 +73,7 @@ def import_customers(headers):
 
 def import_processes(headers):
     print("\n📦 开始导入工艺数据...")
-    wb = xlrd.open_workbook(f"{DATA_DIR}/工艺数据.xls")
+    wb = xlrd.open_workbook(f"{DATA_DIR}/工艺设置20260401.xls")
     sheet = wb.sheets()[0]
     
     success, skip, fail = 0, 0, 0
@@ -115,8 +115,8 @@ def import_processes(headers):
     return success, skip, fail, fail_details
 
 def import_materials(headers):
-    print("\n📦 开始导入物料档案（共23165条，批量处理）...")
-    
+    print("\n📦 开始导入物料档案（共24009条，批量处理）...")
+
     # 先获取客户名称→ID映射
     resp = requests.get(f"{BASE_URL}/api/customers/all", headers=headers, timeout=30)
     customer_map = {}
@@ -130,8 +130,8 @@ def import_materials(headers):
             for c in cdata.get("records", []):
                 customer_map[c.get("customerName", "")] = c.get("id")
     print(f"  已加载 {len(customer_map)} 个客户映射")
-    
-    wb = xlrd.open_workbook(f"{DATA_DIR}/物料档案.xls")
+
+    wb = xlrd.open_workbook(f"{DATA_DIR}/物料档案20260401.xls")
     sheet = wb.sheets()[0]
     
     success, skip, fail = 0, 0, 0

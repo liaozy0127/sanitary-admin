@@ -79,7 +79,7 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
     @Override
     @Transactional
     public Receipt createReceipt(Receipt receipt) {
-        receipt.setReceiptNo(generateNoUtil.generate("RH", "receipt", "receipt_no"));
+        receipt.setReceiptNo(generateNoUtil.generate("SH", "receipt", "receipt_no"));
         if (receipt.getStatus() == null) {
             receipt.setStatus(1);
         }

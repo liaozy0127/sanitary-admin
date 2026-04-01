@@ -618,8 +618,8 @@ const handlePrint = async (row) => {
       }
     }
 
-    // 空白填充行（10列）—— &nbsp; 保证行高一致
-    const emptyRow = `<tr>${'<td>&nbsp;</td>'.repeat(10)}</tr>`
+    // 空白填充行（11列）—— &nbsp; 保证行高一致
+    const emptyRow = `<tr>${'<td>&nbsp;</td>'.repeat(11)}</tr>`
 
     const remarkLines = deliveryRemark.split('\n').join('<br>')
 
@@ -633,6 +633,7 @@ const handlePrint = async (row) => {
         <td style="text-align:center">${item.productionType || ''}</td>
         <td style="text-align:right">${item.quantity != null ? item.quantity : ''}</td>
         <td style="text-align:right">${item.defectiveQty != null ? item.defectiveQty : ''}</td>
+        <td style="text-align:right">${item.unitPrice != null ? item.unitPrice : ''}</td>
         <td></td>
         <td>${item.detailRemark || ''}</td>
       </tr>`).join('')
@@ -644,7 +645,7 @@ const handlePrint = async (row) => {
         <td colspan="6" style="text-align:right;font-weight:bold;">合计</td>
         <td style="text-align:right;font-weight:bold;">${totalGoodQty || ''}</td>
         <td style="text-align:right;font-weight:bold;">${totalDefectiveQty || ''}</td>
-        <td colspan="2"></td>
+        <td colspan="3"></td>
       </tr>` : ''
 
       return `<div class="page${isLast ? ' last' : ''}">
@@ -652,20 +653,20 @@ const handlePrint = async (row) => {
         <div class="page-body">
         <table class="pt">
           <thead>
-            <tr><th colspan="10" class="title-cell">${docTitle}</th></tr>
-            <tr><td colspan="10" class="info-cell">
+            <tr><th colspan="11" class="title-cell">${docTitle}</th></tr>
+            <tr><td colspan="11" class="info-cell">
               <div class="info-flex">
                 <span>电话/传真：${companyPhone}</span>
                 <span>${contact1}</span>
                 <span>${contact2}</span>
               </div>
             </td></tr>
-            <tr><td colspan="10" class="info-cell">
+            <tr><td colspan="11" class="info-cell">
               <div class="info-flex">
                 <span>地址：${companyAddress}</span>
               </div>
             </td></tr>
-            <tr><td colspan="10" class="meta-cell">
+            <tr><td colspan="11" class="meta-cell">
               <div class="meta-flex">
                 <span>客户：${detail.customerName || ''}</span>
                 <span>发货日期：${detail.shipmentDate || ''}</span>
@@ -674,20 +675,21 @@ const handlePrint = async (row) => {
             </td></tr>
             <tr>
               <th style="width:5%">序号</th>
-              <th style="width:20%">品名</th>
+              <th style="width:18%">品名</th>
               <th style="width:10%">规格</th>
               <th style="width:5%">单位</th>
-              <th style="width:12%">工艺要求</th>
-              <th style="width:7%">类型</th>
-              <th style="width:9%">良品数量</th>
-              <th style="width:7%">不良品</th>
-              <th style="width:8%">原件退回</th>
+              <th style="width:11%">工艺要求</th>
+              <th style="width:6%">类型</th>
+              <th style="width:8%">良品数量</th>
+              <th style="width:6%">不良品</th>
+              <th style="width:7%">单价</th>
+              <th style="width:7%">原件退回</th>
               <th style="width:17%">备注</th>
             </tr>
           </thead>
           <tbody>${dataRows}${padRows}${totalRow}</tbody>
           <tfoot>
-            <tr><td colspan="10" class="foot-remark">${remarkLines}</td></tr>
+            <tr><td colspan="11" class="foot-remark">${remarkLines}</td></tr>
           </tfoot>
         </table>
         <div class="sig-line">

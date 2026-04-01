@@ -25,7 +25,6 @@
         <div class="table-header">
           <span>对账单列表</span>
           <div>
-            <el-button type="warning" :icon="Upload" @click="showImportDialog = true">历史导入</el-button>
             <el-button type="success" :icon="Refresh" :loading="generateAllLoading" @click="handleGenerateAll">批量初始化</el-button>
             <el-button type="success" :loading="exporting" @click="handleExport">导出 Excel</el-button>
             <el-button type="primary" :icon="Plus" @click="showGenerateDialog = true">生成对账单</el-button>
@@ -135,48 +134,13 @@
       </template>
     </el-dialog>
 
-    <!-- 历史导入弹窗 -->
-    <el-dialog v-model="showImportDialog" title="导入历史对账单" width="520px">
-      <el-form :model="importForm" label-width="110px">
-        <el-form-item label="对账单文件" required>
-          <el-upload drag accept=".xlsx,.xls" :auto-upload="false"
-            :on-change="handleFileChange" :limit="1" :file-list="importFileList">
-            <el-icon class="el-icon--upload"><Upload /></el-icon>
-            <div class="el-upload__text">拖拽文件到此处，或 <em>点击上传</em></div>
-            <template #tip><div class="el-upload__tip">支持 .xlsx .xls 格式（老系统对账单格式）</div></template>
-          </el-upload>
-        </el-form-item>
-        <el-form-item label="客户" required>
-          <el-select v-model="importForm.customerId" placeholder="选择客户（Excel无客户列，需手动指定）"
-            style="width:100%" filterable>
-            <el-option v-for="c in customerList" :key="c.id" :label="c.name" :value="c.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="对账月份" required>
-          <el-date-picker v-model="importForm.statementMonth" type="month" value-format="YYYY-MM"
-            style="width:100%" placeholder="选择月份" />
-        </el-form-item>
-        <el-form-item label="初始化库存">
-          <el-checkbox v-model="importForm.initInventory">
-            将上月结余数量导入库存（仅在库存为空时生效）
-          </el-checkbox>
-        </el-form-item>
-        <el-alert v-if="importForm.initInventory" type="warning" :closable="false" style="margin-top:4px" show-icon>
-          勾选后将把 Excel「上月结余」列写入库存表（仅首次初始化，已有库存数据时自动跳过）。
-        </el-alert>
-      </el-form>
-      <template #footer>
-        <el-button @click="showImportDialog = false">取消</el-button>
-        <el-button type="primary" :loading="importLoading" @click="handleImport">开始导入</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, Delete, Upload } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Delete } from '@element-plus/icons-vue'
 import { getStatementList, generateStatement, deleteStatement, exportStatements } from '@/api/statement'
 import { getCustomerAll } from '@/api/customer'
 import request from '@/utils/request'
@@ -188,6 +152,7 @@ const generateAllLoading = ref(false)
 const tableData = ref([])
 const customerList = ref([])
 const showGenerateDialog = ref(false)
+const expandedRowIds = ref(new Set())
 const showImportDialog = ref(false)
 const importFile = ref(null)
 const importFileList = ref([])
@@ -217,6 +182,12 @@ const fetchList = async () => {
     })
     tableData.value = res.data.records
     pagination.total = res.data.total
+    // 刷新后重新加载已展开行的明细（新 row 对象不含 items）
+    if (expandedRowIds.value.size > 0) {
+      tableData.value.forEach(row => {
+        if (expandedRowIds.value.has(row.id)) loadItems(row)
+      })
+    }
   } finally { loading.value = false }
 }
 
@@ -233,9 +204,7 @@ const resetSearch = () => {
 }
 
 // ---- 展开行自动加载明细 ----
-const onExpandChange = async (row, expandedRows) => {
-  if (!expandedRows.some(r => r.id === row.id)) return  // 收起时不处理
-  if (row.items && row.items.length > 0) return  // 已加载
+const loadItems = async (row) => {
   row._itemsLoading = true
   try {
     const res = await request.get('/statement-items', { params: { statementId: row.id } })
@@ -245,6 +214,16 @@ const onExpandChange = async (row, expandedRows) => {
   } finally {
     row._itemsLoading = false
   }
+}
+
+const onExpandChange = async (row, expandedRows) => {
+  if (!expandedRows.some(r => r.id === row.id)) {
+    expandedRowIds.value.delete(row.id)
+    return
+  }
+  expandedRowIds.value.add(row.id)
+  if (row.items && row.items.length > 0) return  // 已加载
+  await loadItems(row)
 }
 
 // ---- 生成对账单 ----
