@@ -15,10 +15,13 @@ public class MaterialProcessPriceServiceImpl extends ServiceImpl<MaterialProcess
         implements MaterialProcessPriceService {
 
     @Override
-    public Page<MaterialProcessPrice> pageList(int page, int size, Long customerId, Long materialId, Long processId) {
+    public Page<MaterialProcessPrice> pageList(int page, int size, Long customerId, String materialKeyword, Long processId) {
         LambdaQueryWrapper<MaterialProcessPrice> wrapper = new LambdaQueryWrapper<>();
         if (customerId != null) wrapper.eq(MaterialProcessPrice::getCustomerId, customerId);
-        if (materialId != null) wrapper.eq(MaterialProcessPrice::getMaterialId, materialId);
+        if (materialKeyword != null && !materialKeyword.trim().isEmpty()) {
+            wrapper.and(w -> w.like(MaterialProcessPrice::getMaterialName, materialKeyword.trim())
+                              .or().like(MaterialProcessPrice::getMaterialCode, materialKeyword.trim()));
+        }
         if (processId != null) wrapper.eq(MaterialProcessPrice::getProcessId, processId);
         wrapper.orderByDesc(MaterialProcessPrice::getUpdateTime);
         return page(new Page<>(page, size), wrapper);

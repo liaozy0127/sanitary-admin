@@ -8,6 +8,9 @@
             <el-option v-for="c in customerList" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
         </el-form-item>
+        <el-form-item label="物料">
+          <el-input v-model="searchForm.materialKeyword" placeholder="物料名称/代码" clearable style="width: 160px" @keyup.enter="fetchList" />
+        </el-form-item>
         <el-form-item label="工艺">
           <el-select v-model="searchForm.processId" placeholder="全部工艺" clearable filterable style="width: 140px" @change="fetchList">
             <el-option v-for="p in processList" :key="p.id" :label="p.name" :value="p.id" />
@@ -115,7 +118,7 @@ const processList = ref([])
 const matOptions = ref([])
 const matLoading = ref(false)
 
-const searchForm = reactive({ customerId: null, processId: null })
+const searchForm = reactive({ customerId: null, materialKeyword: '', processId: null })
 const pagination = reactive({ page: 1, size: 20, total: 0 })
 
 const formData = reactive({
@@ -138,6 +141,7 @@ const fetchList = async () => {
     const res = await getPriceList({
       page: pagination.page, size: pagination.size,
       customerId: searchForm.customerId || undefined,
+      materialKeyword: searchForm.materialKeyword || undefined,
       processId: searchForm.processId || undefined
     })
     const data = res.data || res
@@ -200,6 +204,7 @@ const onProcessChange = (id) => {
 
 const resetSearch = () => {
   searchForm.customerId = null
+  searchForm.materialKeyword = ''
   searchForm.processId = null
   pagination.page = 1
   fetchList()
