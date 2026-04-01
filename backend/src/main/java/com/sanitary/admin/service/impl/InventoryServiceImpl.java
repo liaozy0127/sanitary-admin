@@ -158,6 +158,30 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
     }
 
     @Override
+    @Transactional
+    public void adjustInventory(Long id, BigDecimal quantity, BigDecimal reworkQty, String remark) {
+        Inventory inv = this.getById(id);
+        if (inv == null) {
+            throw new RuntimeException("库存记录不存在，id=" + id);
+        }
+        BigDecimal beforeQty = inv.getQuantity() != null ? inv.getQuantity() : BigDecimal.ZERO;
+        BigDecimal newQty = quantity != null ? quantity : BigDecimal.ZERO;
+        BigDecimal newReworkQty = reworkQty != null ? reworkQty : BigDecimal.ZERO;
+        BigDecimal changeQty = newQty.subtract(beforeQty);
+
+        inv.setQuantity(newQty);
+        inv.setReworkQty(newReworkQty);
+        this.updateById(inv);
+
+        // 记录手动调整流水（changeType=5）
+        insertLog(inv.getMaterialId(), inv.getCustomerId(), inv.getProcessId(),
+            inv.getMaterialCode(), inv.getMaterialName(), inv.getCustomerName(),
+            inv.getSpec(), inv.getProcessName(),
+            5, changeQty, beforeQty, newQty,
+            "manual", null, "手动调整", LocalDate.now(), remark);
+    }
+
+    @Override
     public IPage<Inventory> pageList(int page, int size, Long customerId, String keyword) {
         // 使用关联查询获取最新的客户、物料、工艺信息
         IPage<Map<String, Object>> mapPage = this.baseMapper.pageListWithJoin(new Page<>(page, size), customerId, keyword);

@@ -12,7 +12,12 @@ import com.sanitary.admin.mapper.CustomerMapper;
 import com.sanitary.admin.mapper.InventoryMapper;
 import com.sanitary.admin.mapper.MaterialMapper;
 import com.sanitary.admin.mapper.ProcessMapper;
+import com.sanitary.admin.mapper.ReceiptItemMapper;
+import com.sanitary.admin.mapper.ProductionItemMapper;
+import com.sanitary.admin.mapper.ShipmentItemMapper;
 import com.sanitary.admin.mapper.ShipmentMapper;
+import com.sanitary.admin.entity.ReceiptItem;
+import com.sanitary.admin.entity.ProductionItem;
 import com.sanitary.admin.service.MaterialProcessPriceService;
 import com.sanitary.admin.service.InventoryService;
 import com.sanitary.admin.service.ShipmentItemService;
@@ -50,6 +55,9 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
     private final MaterialMapper materialMapper;
     private final ProcessMapper processMapper;
     private final MaterialProcessPriceService materialProcessPriceService;
+    private final ReceiptItemMapper receiptItemMapper;
+    private final ProductionItemMapper productionItemMapper;
+    private final ShipmentItemMapper shipmentItemMapper;
 
     @Override
     public Page<Shipment> pageList(int page, int size, String keyword, Long customerId,
@@ -83,7 +91,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
 
         if (shipment.getItems() != null && !shipment.getItems().isEmpty()) {
             shipmentItemService.saveItems(shipment.getId(), shipment.getShipmentNo(), shipment.getItems());
-            syncMaterialPrices(shipment.getItems(), shipment.getCustomerId(), shipment.getCustomerName());
+            syncMaterialPrices(shipment.getItems(), shipment.getCustomerId(), shipment.getCustomerName(), shipment.getShipmentDate());
 
             // 更新库存 - 发货出库（良品+废品均扣减库存）
             for (ShipmentItem item : shipment.getItems()) {
@@ -137,7 +145,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
         // 保存新的明细
         if (shipment.getItems() != null && !shipment.getItems().isEmpty()) {
             shipmentItemService.saveItems(shipment.getId(), shipment.getShipmentNo(), shipment.getItems());
-            syncMaterialPrices(shipment.getItems(), shipment.getCustomerId(), shipment.getCustomerName());
+            syncMaterialPrices(shipment.getItems(), shipment.getCustomerId(), shipment.getCustomerName(), shipment.getShipmentDate());
         }
         
         // 冲销旧库存（归还库存，用 changeType=1 绕过库存不足检查）
@@ -559,9 +567,9 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
     }
 
     /**
-     * 将发货明细中的单价同步回物料默认单价，同时 upsert 工艺价格表。
+     * 将发货明细中的单价同步回物料默认单价、工艺价格表，并更新当月同一客户+物料+工艺的收货/排产明细单价。
      */
-    private void syncMaterialPrices(List<ShipmentItem> items, Long customerId, String customerName) {
+    private void syncMaterialPrices(List<ShipmentItem> items, Long customerId, String customerName, LocalDate shipmentDate) {
         if (items == null) return;
         for (ShipmentItem item : items) {
             if (item.getMaterialId() == null) continue;
@@ -579,6 +587,79 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                     item.getMaterialId(), item.getMaterialName(), item.getMaterialCode(), item.getSpec(),
                     item.getProcessId(), item.getProcessName(), item.getUnitPrice()
                 );
+            }
+            // 同步当月同一客户+物料+工艺的收货/排产/发货明细单价
+            if (shipmentDate != null && item.getMaterialId() != null) {
+                syncSameMonthPrices(customerId, item.getMaterialId(), item.getProcessId(), item.getUnitPrice(), shipmentDate);
+            }
+        }
+    }
+
+    /**
+     * 将当月同一客户+物料+工艺的收货单明细、排产单明细、发货单明细的单价同步为最新价格。
+     */
+    private void syncSameMonthPrices(Long customerId, Long materialId, Long processId, BigDecimal unitPrice, LocalDate refDate) {
+        String monthStart = refDate.withDayOfMonth(1).toString();
+        String monthEnd = refDate.withDayOfMonth(refDate.lengthOfMonth()).toString();
+
+        // 更新当月收货单明细单价（正常收货，非返工，单价与新价不同）
+        LambdaQueryWrapper<com.sanitary.admin.entity.ReceiptItem> rWrapper = new LambdaQueryWrapper<>();
+        rWrapper.inSql(com.sanitary.admin.entity.ReceiptItem::getReceiptId,
+            "SELECT id FROM receipt WHERE customer_id = " + customerId + " AND receipt_date BETWEEN '" + monthStart + "' AND '" + monthEnd + "' AND deleted = 0")
+            .eq(com.sanitary.admin.entity.ReceiptItem::getMaterialId, materialId)
+            .ne(com.sanitary.admin.entity.ReceiptItem::getReceiptSource, "返工")
+            .eq(com.sanitary.admin.entity.ReceiptItem::getDeleted, 0);
+        if (processId != null) {
+            rWrapper.eq(com.sanitary.admin.entity.ReceiptItem::getProcessId, processId);
+        }
+        List<com.sanitary.admin.entity.ReceiptItem> receiptItems = receiptItemMapper.selectList(rWrapper);
+        for (com.sanitary.admin.entity.ReceiptItem ri : receiptItems) {
+            if (unitPrice.compareTo(ri.getUnitPrice() != null ? ri.getUnitPrice() : BigDecimal.ZERO) != 0) {
+                ri.setUnitPrice(unitPrice);
+                if (ri.getQuantity() != null) {
+                    ri.setAmount(ri.getQuantity().multiply(unitPrice).setScale(2, java.math.RoundingMode.HALF_UP));
+                }
+                receiptItemMapper.updateById(ri);
+            }
+        }
+
+        // 更新当月排产单明细电镀单价
+        LambdaQueryWrapper<com.sanitary.admin.entity.ProductionItem> pWrapper = new LambdaQueryWrapper<>();
+        pWrapper.inSql(com.sanitary.admin.entity.ProductionItem::getProductionId,
+            "SELECT id FROM production WHERE customer_id = " + customerId + " AND production_date BETWEEN '" + monthStart + "' AND '" + monthEnd + "' AND deleted = 0")
+            .eq(com.sanitary.admin.entity.ProductionItem::getMaterialId, materialId)
+            .eq(com.sanitary.admin.entity.ProductionItem::getDeleted, 0);
+        if (processId != null) {
+            pWrapper.eq(com.sanitary.admin.entity.ProductionItem::getProcessId, processId);
+        }
+        List<com.sanitary.admin.entity.ProductionItem> prodItems = productionItemMapper.selectList(pWrapper);
+        for (com.sanitary.admin.entity.ProductionItem pi : prodItems) {
+            if (unitPrice.compareTo(pi.getPlatingPrice() != null ? pi.getPlatingPrice() : BigDecimal.ZERO) != 0) {
+                pi.setPlatingPrice(unitPrice);
+                if (pi.getActualQty() != null) {
+                    pi.setPlatingAmount(pi.getActualQty().multiply(unitPrice).setScale(2, java.math.RoundingMode.HALF_UP));
+                }
+                productionItemMapper.updateById(pi);
+            }
+        }
+
+        // 更新当月其他发货单明细单价
+        LambdaQueryWrapper<ShipmentItem> sWrapper = new LambdaQueryWrapper<>();
+        sWrapper.inSql(ShipmentItem::getShipmentId,
+            "SELECT id FROM shipment WHERE customer_id = " + customerId + " AND shipment_date BETWEEN '" + monthStart + "' AND '" + monthEnd + "' AND deleted = 0")
+            .eq(ShipmentItem::getMaterialId, materialId)
+            .eq(ShipmentItem::getDeleted, 0);
+        if (processId != null) {
+            sWrapper.eq(ShipmentItem::getProcessId, processId);
+        }
+        List<ShipmentItem> shipItems = shipmentItemMapper.selectList(sWrapper);
+        for (ShipmentItem si : shipItems) {
+            if (unitPrice.compareTo(si.getUnitPrice() != null ? si.getUnitPrice() : BigDecimal.ZERO) != 0) {
+                si.setUnitPrice(unitPrice);
+                if (si.getQuantity() != null) {
+                    si.setAmount(si.getQuantity().multiply(unitPrice).setScale(2, java.math.RoundingMode.HALF_UP));
+                }
+                shipmentItemMapper.updateById(si);
             }
         }
     }

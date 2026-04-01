@@ -803,6 +803,8 @@ ReceiptServiceImpl.importExcel()
 | 期初库存未补录导致对账单结余为负 | 高 | ✅ 已修复（新增 scripts/init_opening_stock.py，2026-03-15）|
 | inventory 重建 aggregateReceiptQty GROUP BY 含字符串字段导致同 key 多行覆盖 | 高 | ✅ 已修复（GROUP BY 只含3个 key 字段，字符串用 MAX()，2026-03-15）|
 | inventory 重建 aggregateShipmentQty 未计 defective_qty 且缺 status=1 过滤 | 高 | ✅ 已修复（SUM(qty+defective_qty) + status=1，2026-03-15）|
+| **发货单新增/编辑时价格变动，当月同客户+物料+工艺的收货/排产/发货明细单价联动更新** | 高 | ✅ 已完成（2026-04-01）|
+| **库存手动调整功能**（PUT /api/inventory/{id}，月末对账后修正实际库存）| 高 | ✅ 已完成（2026-04-01）|
 | 收货单分批上传（前端按3000行拆分）| 中 | 待开发 |
 | inventory 查询接口带 keyword 参数时返回 400 | 中 | 待修复 |
 | **全模块 Excel 导出功能**（基础档案/生产/财务所有列表页）| 高 | 🚧 开发中 |

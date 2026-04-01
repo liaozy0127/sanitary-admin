@@ -84,4 +84,14 @@ public class InventoryController {
                        @RequestParam(required = false) Long customerId) {
         inventoryService.exportExcel(response, keyword, customerId);
     }
+
+    /** 手动调整库存数量（月末对账后修正实际库存） */
+    @PutMapping("/{id}")
+    public Result<Void> adjust(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        BigDecimal quantity = body.get("quantity") != null ? new BigDecimal(body.get("quantity").toString()) : null;
+        BigDecimal reworkQty = body.get("reworkQty") != null ? new BigDecimal(body.get("reworkQty").toString()) : null;
+        String remark = body.get("remark") != null ? body.get("remark").toString() : null;
+        inventoryService.adjustInventory(id, quantity, reworkQty, remark);
+        return Result.success(null);
+    }
 }

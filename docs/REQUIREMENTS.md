@@ -377,6 +377,7 @@ sanitary-admin 是一个面向卫浴/五金电镀加工厂的**生产管理系�
 **接口**：
 - `GET /api/inventory` — 查询库存列表（支持 keyword、customerId 筛选）
 - `GET /api/inventory/log` — 查询库存流水
+- `PUT /api/inventory/{id}` — **手动调整库存**（修改 quantity 和 rework_qty，记录 changeType=5 调整流水）
 - `POST /api/inventory/rebuild` — 全量重建库存（从所有收货单/发货单重新计算，同时重建返工库存）
 
 **库存重建规则（`POST /api/inventory/rebuild`）**：

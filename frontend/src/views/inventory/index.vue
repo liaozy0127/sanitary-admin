@@ -55,6 +55,11 @@
         </el-table-column>
         <el-table-column prop="lastReceiveTime" label="最后收货" width="160" />
         <el-table-column prop="lastShipTime" label="最后发货" width="160" />
+        <el-table-column label="操作" width="80" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" size="small" :icon="Edit" @click="handleEdit(row)">修改</el-button>
+          </template>
+        </el-table-column>
       </el-table>
 
       <div class="pagination-wrap">
@@ -117,13 +122,32 @@
       </div>
     </el-card>
   </div>
+
+  <!-- 手动调整库存对话框 -->
+  <el-dialog v-model="editVisible" title="手动调整库存" width="400px" :close-on-click-modal="false">
+    <el-form label-width="90px">
+      <el-form-item label="库存总数">
+        <el-input-number v-model="editForm.quantity" :precision="2" :min="0" style="width: 200px" />
+      </el-form-item>
+      <el-form-item label="其中返工">
+        <el-input-number v-model="editForm.reworkQty" :precision="2" :min="0" style="width: 200px" />
+      </el-form-item>
+      <el-form-item label="调整原因">
+        <el-input v-model="editForm.remark" placeholder="请输入调整原因（可选）" style="width: 200px" />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="editVisible = false">取消</el-button>
+      <el-button type="primary" :loading="editSaving" @click="saveEdit">保存</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, Document } from '@element-plus/icons-vue'
-import { getInventoryList, getInventoryLog, exportInventory } from '@/api/inventory'
+import { Search, Refresh, Document, Edit } from '@element-plus/icons-vue'
+import { getInventoryList, getInventoryLog, exportInventory, adjustInventory } from '@/api/inventory'
 import { getCustomerAll } from '@/api/customer'
 
 const loading = ref(false)
@@ -212,6 +236,37 @@ const handleExport = async () => {
     ElMessage.error('导出失败')
   } finally {
     exporting.value = false
+  }
+}
+
+// 库存手动调整
+const editVisible = ref(false)
+const editForm = reactive({ id: null, quantity: 0, reworkQty: 0, remark: '' })
+const editSaving = ref(false)
+
+const handleEdit = (row) => {
+  editForm.id = row.id
+  editForm.quantity = Number(row.quantity || 0)
+  editForm.reworkQty = Number(row.reworkQty || 0)
+  editForm.remark = ''
+  editVisible.value = true
+}
+
+const saveEdit = async () => {
+  editSaving.value = true
+  try {
+    await adjustInventory(editForm.id, {
+      quantity: editForm.quantity,
+      reworkQty: editForm.reworkQty,
+      remark: editForm.remark
+    })
+    ElMessage.success('库存已更新')
+    editVisible.value = false
+    fetchList()
+  } catch (e) {
+    ElMessage.error('保存失败')
+  } finally {
+    editSaving.value = false
   }
 }
 </script>

@@ -46,4 +46,9 @@ public interface InventoryService extends IService<Inventory> {
      * 导出库存明细
      */
     void exportExcel(HttpServletResponse response, String keyword, Long customerId);
+
+    /**
+     * 手动调整库存数量（月末对账后修正），记录 changeType=5 的调整流水
+     */
+    void adjustInventory(Long id, BigDecimal quantity, BigDecimal reworkQty, String remark);
 }
