@@ -346,12 +346,21 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
             item.setPrevBalanceQty(prevBal);
             // currBalanceQty = prevBal + receiptQty - shipmentQty
             item.setCurrBalanceQty(prevBal.add(item.getReceiptQty()).subtract(item.getShipmentQty()));
-            // goodsAmount: billable goods qty = goodsQty_shipped - rework_qty (capped at 0), then × unitPrice
-            // reworkQty is guaranteed non-null; we only deduct from goods shipments (exclude defective)
+            // goodsAmount: 按发货单实际金额比例计算，正确反映单价变动。
+            // 公式：shipmentAmount × (billableQty / goodsShipQty)，goodsShipQty=0 时 goodsAmount=0。
+            // billableQty = max(0, goodsShipQty - reworkQty)
             BigDecimal goodsShipQty = item.getShipmentQty().subtract(item.getDefectiveQty());
             BigDecimal reworkDeduction = item.getReworkQty() != null ? item.getReworkQty() : BigDecimal.ZERO;
             BigDecimal billableQty = goodsShipQty.subtract(reworkDeduction).max(BigDecimal.ZERO);
-            item.setGoodsAmount(billableQty.multiply(item.getUnitPrice()).setScale(2, java.math.RoundingMode.HALF_UP));
+            BigDecimal goodsAmount;
+            if (goodsShipQty.compareTo(BigDecimal.ZERO) > 0) {
+                goodsAmount = item.getShipmentAmount()
+                    .multiply(billableQty)
+                    .divide(goodsShipQty, 2, java.math.RoundingMode.HALF_UP);
+            } else {
+                goodsAmount = BigDecimal.ZERO;
+            }
+            item.setGoodsAmount(goodsAmount);
             itemsToSave.add(item);
         }
 

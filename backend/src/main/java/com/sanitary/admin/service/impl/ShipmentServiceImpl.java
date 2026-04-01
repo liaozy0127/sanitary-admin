@@ -81,7 +81,8 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
 
         if (shipment.getItems() != null && !shipment.getItems().isEmpty()) {
             shipmentItemService.saveItems(shipment.getId(), shipment.getShipmentNo(), shipment.getItems());
-            
+            syncMaterialPrices(shipment.getItems());
+
             // 更新库存 - 发货出库（良品+废品均扣减库存）
             for (ShipmentItem item : shipment.getItems()) {
                 BigDecimal totalQty = item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO;
@@ -134,6 +135,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
         // 保存新的明细
         if (shipment.getItems() != null && !shipment.getItems().isEmpty()) {
             shipmentItemService.saveItems(shipment.getId(), shipment.getShipmentNo(), shipment.getItems());
+            syncMaterialPrices(shipment.getItems());
         }
         
         // 冲销旧库存（归还库存，用 changeType=1 绕过库存不足检查）
@@ -551,6 +553,24 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
             ExcelExportUtil.writeResponse(wb, response, "发货单_" + today + ".xlsx");
         } catch (IOException e) {
             throw new RuntimeException("导出失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 将发货明细中的单价同步回物料默认单价。
+     * 发货单价被手动修改后，下次录入收货/发货时可自动带出最新价格。
+     */
+    private void syncMaterialPrices(List<ShipmentItem> items) {
+        if (items == null) return;
+        for (ShipmentItem item : items) {
+            if (item.getMaterialId() == null) continue;
+            if (item.getUnitPrice() == null || item.getUnitPrice().compareTo(BigDecimal.ZERO) <= 0) continue;
+            Material mat = materialMapper.selectById(item.getMaterialId());
+            if (mat == null) continue;
+            if (mat.getDefaultPrice() == null || mat.getDefaultPrice().compareTo(item.getUnitPrice()) != 0) {
+                mat.setDefaultPrice(item.getUnitPrice());
+                materialMapper.updateById(mat);
+            }
         }
     }
 }
