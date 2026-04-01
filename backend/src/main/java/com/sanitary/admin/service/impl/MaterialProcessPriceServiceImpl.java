@@ -15,13 +15,10 @@ public class MaterialProcessPriceServiceImpl extends ServiceImpl<MaterialProcess
         implements MaterialProcessPriceService {
 
     @Override
-    public Page<MaterialProcessPrice> pageList(int page, int size, Long customerId, String materialKeyword, Long processId) {
+    public Page<MaterialProcessPrice> pageList(int page, int size, Long customerId, Long materialId, Long processId) {
         LambdaQueryWrapper<MaterialProcessPrice> wrapper = new LambdaQueryWrapper<>();
         if (customerId != null) wrapper.eq(MaterialProcessPrice::getCustomerId, customerId);
-        if (materialKeyword != null && !materialKeyword.trim().isEmpty()) {
-            wrapper.and(w -> w.like(MaterialProcessPrice::getMaterialName, materialKeyword.trim())
-                              .or().like(MaterialProcessPrice::getMaterialCode, materialKeyword.trim()));
-        }
+        if (materialId != null) wrapper.eq(MaterialProcessPrice::getMaterialId, materialId);
         if (processId != null) wrapper.eq(MaterialProcessPrice::getProcessId, processId);
         wrapper.orderByDesc(MaterialProcessPrice::getUpdateTime);
         return page(new Page<>(page, size), wrapper);
@@ -36,5 +33,33 @@ public class MaterialProcessPriceServiceImpl extends ServiceImpl<MaterialProcess
                 .eq(MaterialProcessPrice::getProcessId, processId)
                 .last("LIMIT 1"));
         return record != null ? record.getUnitPrice() : null;
+    }
+
+    @Override
+    public void upsertPrice(Long customerId, String customerName, Long materialId, String materialName,
+                            String materialCode, String spec, Long processId, String processName, BigDecimal unitPrice) {
+        if (customerId == null || materialId == null || processId == null) return;
+        if (unitPrice == null || unitPrice.compareTo(java.math.BigDecimal.ZERO) <= 0) return;
+        MaterialProcessPrice record = getOne(new LambdaQueryWrapper<MaterialProcessPrice>()
+                .eq(MaterialProcessPrice::getCustomerId, customerId)
+                .eq(MaterialProcessPrice::getMaterialId, materialId)
+                .eq(MaterialProcessPrice::getProcessId, processId)
+                .last("LIMIT 1"));
+        if (record == null) {
+            record = new MaterialProcessPrice();
+            record.setCustomerId(customerId);
+            record.setCustomerName(customerName);
+            record.setMaterialId(materialId);
+            record.setMaterialName(materialName);
+            record.setMaterialCode(materialCode);
+            record.setSpec(spec);
+            record.setProcessId(processId);
+            record.setProcessName(processName);
+            record.setUnitPrice(unitPrice);
+            save(record);
+        } else {
+            record.setUnitPrice(unitPrice);
+            updateById(record);
+        }
     }
 }

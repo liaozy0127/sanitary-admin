@@ -4,12 +4,16 @@
     <el-card class="search-card">
       <el-form :model="searchForm" inline>
         <el-form-item label="客户">
-          <el-select v-model="searchForm.customerId" placeholder="全部客户" clearable filterable style="width: 160px" @change="fetchList">
+          <el-select v-model="searchForm.customerId" placeholder="全部客户" clearable filterable style="width: 160px" @change="onSearchCustomerChange">
             <el-option v-for="c in customerList" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="物料">
-          <el-input v-model="searchForm.materialKeyword" placeholder="物料名称/代码" clearable style="width: 160px" @keyup.enter="fetchList" />
+          <el-select v-model="searchForm.materialId" placeholder="输入物料名称搜索" clearable filterable remote
+            :remote-method="searchMatFilter" :loading="matFilterLoading" style="width: 200px" @change="fetchList">
+            <el-option v-for="m in matFilterOptions" :key="m.id"
+              :label="m.spec ? m.name + '（' + m.spec + '）' : m.name" :value="m.id" />
+          </el-select>
         </el-form-item>
         <el-form-item label="工艺">
           <el-select v-model="searchForm.processId" placeholder="全部工艺" clearable filterable style="width: 140px" @change="fetchList">
@@ -38,14 +42,14 @@
         <el-table-column prop="materialName" label="物料名称" min-width="150" show-overflow-tooltip />
         <el-table-column prop="materialCode" label="物料代码" width="120" show-overflow-tooltip />
         <el-table-column prop="spec" label="规格型号" width="120" show-overflow-tooltip />
-        <el-table-column prop="processName" label="工艺" width="100" />
-        <el-table-column prop="unitPrice" label="单价" width="100" align="right">
+        <el-table-column prop="processName" label="工艺" width="100" show-overflow-tooltip />
+        <el-table-column prop="unitPrice" label="单价" width="100" align="right" show-overflow-tooltip>
           <template #default="{ row }">
             {{ Number(row.unitPrice).toFixed(2) }}
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
-        <el-table-column label="操作" width="140" align="center" fixed="right">
+        <el-table-column label="操作" width="170" align="center" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" :icon="Edit" @click="openDialog(row)">编辑</el-button>
             <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(row)">删除</el-button>
@@ -118,7 +122,9 @@ const processList = ref([])
 const matOptions = ref([])
 const matLoading = ref(false)
 
-const searchForm = reactive({ customerId: null, materialKeyword: '', processId: null })
+const searchForm = reactive({ customerId: null, materialId: null, processId: null })
+const matFilterOptions = ref([])
+const matFilterLoading = ref(false)
 const pagination = reactive({ page: 1, size: 20, total: 0 })
 
 const formData = reactive({
@@ -141,7 +147,7 @@ const fetchList = async () => {
     const res = await getPriceList({
       page: pagination.page, size: pagination.size,
       customerId: searchForm.customerId || undefined,
-      materialKeyword: searchForm.materialKeyword || undefined,
+      materialId: searchForm.materialId || undefined,
       processId: searchForm.processId || undefined
     })
     const data = res.data || res
@@ -160,6 +166,19 @@ const loadCustomers = async () => {
 const loadProcesses = async () => {
   const res = await getProcessAll()
   processList.value = Array.isArray(res) ? res : (res.data || [])
+}
+
+const searchMatFilter = async (query) => {
+  if (!query || !query.trim()) return
+  matFilterLoading.value = true
+  try {
+    const params = { keyword: query.trim() }
+    if (searchForm.customerId) params.customerId = searchForm.customerId
+    const res = await request.get('/materials/search', { params })
+    matFilterOptions.value = Array.isArray(res) ? res : (res.data || [])
+  } finally {
+    matFilterLoading.value = false
+  }
 }
 
 const searchMaterial = async (query) => {
@@ -202,10 +221,18 @@ const onProcessChange = (id) => {
   formData.processName = p?.name || ''
 }
 
+const onSearchCustomerChange = () => {
+  // 客户变化时清空物料选择（原选物料可能不属于新客户）
+  searchForm.materialId = null
+  matFilterOptions.value = []
+  fetchList()
+}
+
 const resetSearch = () => {
   searchForm.customerId = null
-  searchForm.materialKeyword = ''
+  searchForm.materialId = null
   searchForm.processId = null
+  matFilterOptions.value = []
   pagination.page = 1
   fetchList()
 }
@@ -285,4 +312,6 @@ onMounted(() => {
 .search-card { margin-bottom: 16px; }
 .table-header { display: flex; justify-content: space-between; align-items: center; }
 .pagination-wrap { margin-top: 16px; display: flex; justify-content: flex-end; }
+/* 操作列按钮并排 */
+:deep(.el-table .cell) { white-space: nowrap; }
 </style>

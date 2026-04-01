@@ -30,9 +30,9 @@ public class MaterialProcessPriceController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) Long customerId,
-            @RequestParam(required = false) String materialKeyword,
+            @RequestParam(required = false) Long materialId,
             @RequestParam(required = false) Long processId) {
-        return Result.success(materialProcessPriceService.pageList(page, size, customerId, materialKeyword, processId));
+        return Result.success(materialProcessPriceService.pageList(page, size, customerId, materialId, processId));
     }
 
     @GetMapping("/query")

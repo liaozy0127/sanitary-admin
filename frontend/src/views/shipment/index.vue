@@ -357,8 +357,11 @@ const onItemProcessChange = async (id, index) => {
   if (!row) return
   const process = processList.value.find(p => p.id === id)
   row.processName = process?.name || ''
-  // 工艺变化后查价格表
-  await queryAndSetPrice(row)
+  // 工艺变化时先重置单价
+  row.unitPrice = 0
+  calcItemAmount(row)
+  // 工艺选定后查价格表
+  if (id) await queryAndSetPrice(row)
   // 工艺变化后重新查库存（不同工艺对应不同库存记录）
   loadItemInventory(row)
 }
@@ -372,7 +375,7 @@ const queryAndSetPrice = async (row) => {
     const data = res.data || res
     if (data.unitPrice != null && Number(data.unitPrice) > 0) {
       row.unitPrice = Number(data.unitPrice)
-      if (typeof calcItemAmount === 'function') calcItemAmount(row)
+      calcItemAmount(row)
     }
   } catch (e) { /* 查不到不影响录入 */ }
 }
@@ -520,6 +523,12 @@ const handleSubmit = async () => {
   const hasValidQty = formData.items.some(item => (Number(item.quantity) || 0) > 0 || (Number(item.defectiveQty) || 0) > 0)
   if (!hasValidQty) {
     ElMessage.warning('请至少填写一条良品数量或废品数量大于0的明细')
+    return
+  }
+  // 校验明细中物料和工艺必填
+  const invalidItem = formData.items.find(item => !item.materialId || !item.processId)
+  if (invalidItem) {
+    ElMessage.warning('明细中物料和工艺均为必填')
     return
   }
   submitLoading.value = true

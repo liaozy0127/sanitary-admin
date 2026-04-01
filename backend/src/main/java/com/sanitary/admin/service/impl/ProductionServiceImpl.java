@@ -212,9 +212,9 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
                     item.setReceiptType(getCellString(row, 7));
                     item.setUnit(getCellString(row, 8));
                     item.setPlannedQty(parseQty(getCellString(row, 9)));
-                    item.setPlatingPrice(parsePrice(getCellString(row, 11)));
-                    item.setProductionType(getCellString(row, 12));
-                    item.setDetailRemark(getCellString(row, 13));
+                    item.setPlatingPrice(parsePrice(getCellString(row, 14)));
+                    item.setProductionType(getCellString(row, 17));
+                    item.setDetailRemark(getCellString(row, 15));
 
                     itemsMap.get(productionNo).add(item);
 

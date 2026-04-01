@@ -13,6 +13,7 @@ import com.sanitary.admin.mapper.InventoryMapper;
 import com.sanitary.admin.mapper.MaterialMapper;
 import com.sanitary.admin.mapper.ProcessMapper;
 import com.sanitary.admin.mapper.ShipmentMapper;
+import com.sanitary.admin.service.MaterialProcessPriceService;
 import com.sanitary.admin.service.InventoryService;
 import com.sanitary.admin.service.ShipmentItemService;
 import com.sanitary.admin.service.ShipmentService;
@@ -48,6 +49,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
     private final CustomerMapper customerMapper;
     private final MaterialMapper materialMapper;
     private final ProcessMapper processMapper;
+    private final MaterialProcessPriceService materialProcessPriceService;
 
     @Override
     public Page<Shipment> pageList(int page, int size, String keyword, Long customerId,
@@ -81,7 +83,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
 
         if (shipment.getItems() != null && !shipment.getItems().isEmpty()) {
             shipmentItemService.saveItems(shipment.getId(), shipment.getShipmentNo(), shipment.getItems());
-            syncMaterialPrices(shipment.getItems());
+            syncMaterialPrices(shipment.getItems(), shipment.getCustomerId(), shipment.getCustomerName());
 
             // 更新库存 - 发货出库（良品+废品均扣减库存）
             for (ShipmentItem item : shipment.getItems()) {
@@ -135,7 +137,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
         // 保存新的明细
         if (shipment.getItems() != null && !shipment.getItems().isEmpty()) {
             shipmentItemService.saveItems(shipment.getId(), shipment.getShipmentNo(), shipment.getItems());
-            syncMaterialPrices(shipment.getItems());
+            syncMaterialPrices(shipment.getItems(), shipment.getCustomerId(), shipment.getCustomerName());
         }
         
         // 冲销旧库存（归还库存，用 changeType=1 绕过库存不足检查）
@@ -557,10 +559,9 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
     }
 
     /**
-     * 将发货明细中的单价同步回物料默认单价。
-     * 发货单价被手动修改后，下次录入收货/发货时可自动带出最新价格。
+     * 将发货明细中的单价同步回物料默认单价，同时 upsert 工艺价格表。
      */
-    private void syncMaterialPrices(List<ShipmentItem> items) {
+    private void syncMaterialPrices(List<ShipmentItem> items, Long customerId, String customerName) {
         if (items == null) return;
         for (ShipmentItem item : items) {
             if (item.getMaterialId() == null) continue;
@@ -570,6 +571,14 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
             if (mat.getDefaultPrice() == null || mat.getDefaultPrice().compareTo(item.getUnitPrice()) != 0) {
                 mat.setDefaultPrice(item.getUnitPrice());
                 materialMapper.updateById(mat);
+            }
+            // 同步 upsert 工艺价格表
+            if (item.getProcessId() != null) {
+                materialProcessPriceService.upsertPrice(
+                    customerId, customerName,
+                    item.getMaterialId(), item.getMaterialName(), item.getMaterialCode(), item.getSpec(),
+                    item.getProcessId(), item.getProcessName(), item.getUnitPrice()
+                );
             }
         }
     }

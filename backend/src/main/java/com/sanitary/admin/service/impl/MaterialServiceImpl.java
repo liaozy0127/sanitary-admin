@@ -52,7 +52,8 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
         wrapper.eq(Material::getStatus, 1);
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w.like(Material::getMaterialName, keyword)
-                    .or().like(Material::getMaterialCode, keyword));
+                    .or().like(Material::getMaterialCode, keyword)
+                    .or().like(Material::getSpec, keyword));
             // 有关键词时限制100条
             wrapper.last("LIMIT 100");
         } else {

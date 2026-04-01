@@ -13,6 +13,7 @@ import com.sanitary.admin.mapper.MaterialMapper;
 import com.sanitary.admin.mapper.ReceiptMapper;
 import com.sanitary.admin.mapper.ProcessMapper;
 import com.sanitary.admin.entity.Process;
+import com.sanitary.admin.service.MaterialProcessPriceService;
 import com.sanitary.admin.service.InventoryService;
 import com.sanitary.admin.service.ReceiptItemService;
 import com.sanitary.admin.service.ReceiptService;
@@ -52,6 +53,7 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
     private final InventoryService inventoryService;
     private final InventoryMapper inventoryMapper;
     private final ReceiptItemService receiptItemService;
+    private final MaterialProcessPriceService materialProcessPriceService;
 
     @Override
     public Page<Receipt> pageList(int page, int size, String keyword, Long customerId,
@@ -111,7 +113,7 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
                     inventoryMapper.incrementReworkQty(item.getMaterialId(), receipt.getCustomerId(), effectivePid, item.getQuantity());
                 }
                 // 同步更新物料默认单价（非返工来源且单价>0时覆盖，保持价格最新）
-                syncMaterialPrice(item);
+                syncMaterialPrice(item, receipt.getCustomerId(), receipt.getCustomerName());
             }
         }
 
@@ -196,7 +198,7 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
                     inventoryMapper.incrementReworkQty(item.getMaterialId(), receipt.getCustomerId(), effectivePid, item.getQuantity());
                 }
                 // 同步更新物料默认单价（非返工来源且单价>0时覆盖，保持价格最新）
-                syncMaterialPrice(item);
+                syncMaterialPrice(item, receipt.getCustomerId(), receipt.getCustomerName());
             }
         }
 
@@ -523,11 +525,10 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
     }
 
     /**
-     * 将收货明细的单价同步回物料档案默认单价。
+     * 将收货明细的单价同步回物料档案默认单价，同时 upsert 工艺价格表。
      * 条件：非返工来源 且 单价 > 0 且 materialId 有值。
-     * 无论原单价是多少都覆盖，保证物料档案始终反映最新价格。
      */
-    private void syncMaterialPrice(ReceiptItem item) {
+    private void syncMaterialPrice(ReceiptItem item, Long customerId, String customerName) {
         if (item.getMaterialId() == null) return;
         if (item.getUnitPrice() == null || item.getUnitPrice().compareTo(BigDecimal.ZERO) <= 0) return;
         if ("返工".equals(item.getReceiptSource())) return;
@@ -535,6 +536,14 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
         if (mat != null && item.getUnitPrice().compareTo(mat.getDefaultPrice() != null ? mat.getDefaultPrice() : BigDecimal.ZERO) != 0) {
             mat.setDefaultPrice(item.getUnitPrice());
             materialMapper.updateById(mat);
+        }
+        // 同步 upsert 工艺价格表
+        if (item.getProcessId() != null) {
+            materialProcessPriceService.upsertPrice(
+                customerId, customerName,
+                item.getMaterialId(), item.getMaterialName(), item.getMaterialCode(), item.getSpec(),
+                item.getProcessId(), item.getProcessName(), item.getUnitPrice()
+            );
         }
     }
 

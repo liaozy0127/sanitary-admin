@@ -348,8 +348,10 @@ const onItemProcessChange = async (id, index) => {
   if (!row) return
   const process = processList.value.find(p => p.id === id)
   row.processName = process?.name || ''
+  // 工艺变化时先重置单价
+  row.platingPrice = 0
   // 工艺选定后查价格表
-  await queryAndSetPlatingPrice(row)
+  if (id) await queryAndSetPlatingPrice(row)
 }
 
 const queryAndSetPlatingPrice = async (row) => {
@@ -456,6 +458,12 @@ const handleSubmit = async () => {
   const hasValidQty = formData.items.some(item => (Number(item.plannedQty) || 0) > 0)
   if (!hasValidQty) {
     ElMessage.warning('请至少填写一条排产数量大于0的明细')
+    return
+  }
+  // 校验明细中物料和工艺必填
+  const invalidItem = formData.items.find(item => !item.materialId || !item.processId)
+  if (invalidItem) {
+    ElMessage.warning('明细中物料和工艺均为必填')
     return
   }
   submitLoading.value = true
