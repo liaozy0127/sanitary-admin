@@ -124,7 +124,7 @@
               <el-select v-model="row.materialId" placeholder="输入物料名称搜索" filterable clearable size="small" remote
                 :remote-method="(q) => searchMaterial(q, $index)" :loading="row._matLoading || false"
                 style="width:100%" @change="(id) => onItemMaterialChange(id, $index)" :disabled="!formData.customerId">
-                <el-option v-for="m in (row._matOptions || [])" :key="m.id" :label="m.name" :value="m.id" />
+                <el-option v-for="m in (row._matOptions || [])" :key="m.id" :label="m.spec ? m.name + '（' + m.spec + '）' : m.name" :value="m.id" />
               </el-select>
             </template>
           </el-table-column>
@@ -347,11 +347,6 @@ const onItemMaterialChange = async (id, index) => {
     row.materialName = material.name
     row.materialCode = material.code || ''
     row.spec = material.spec || ''
-    // 带出默认单价
-    if (material.defaultPrice && Number(material.defaultPrice) > 0) {
-      row.unitPrice = Number(material.defaultPrice)
-      if (typeof calcItemAmount === 'function') calcItemAmount(row)
-    }
   }
   // 自动带出工艺：查该客户+物料最近收货单里的工艺
   if (formData.customerId && id) {
@@ -363,14 +358,39 @@ const onItemMaterialChange = async (id, index) => {
       if (data && data.processId) {
         row.processId = data.processId
         row.processName = data.processName || ''
+        // 工艺带出后立即查价格
+        await queryAndSetPrice(row)
       }
     } catch (e) { /* 查不到工艺不影响录入 */ }
   }
+  // 如果仍未拿到价格，回退到物料默认单价
+  if ((!row.unitPrice || Number(row.unitPrice) === 0) && material && material.defaultPrice && Number(material.defaultPrice) > 0) {
+    row.unitPrice = Number(material.defaultPrice)
+    if (typeof calcItemAmount === 'function') calcItemAmount(row)
+  }
 }
 
-const onItemProcessChange = (id, index) => {
+const onItemProcessChange = async (id, index) => {
+  const row = formData.items[index]
+  if (!row) return
   const process = processList.value.find(p => p.id === id)
-  formData.items[index].processName = process?.name || ''
+  row.processName = process?.name || ''
+  // 工艺选定后查价格表
+  await queryAndSetPrice(row)
+}
+
+const queryAndSetPrice = async (row) => {
+  if (!row.materialId || !row.processId || !formData.customerId) return
+  try {
+    const res = await request.get('/material-process-prices/query', {
+      params: { customerId: formData.customerId, materialId: row.materialId, processId: row.processId }
+    })
+    const data = res.data || res
+    if (data.unitPrice != null && Number(data.unitPrice) > 0) {
+      row.unitPrice = Number(data.unitPrice)
+      if (typeof calcItemAmount === 'function') calcItemAmount(row)
+    }
+  } catch (e) { /* 查不到不影响录入 */ }
 }
 
 

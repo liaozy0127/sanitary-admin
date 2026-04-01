@@ -12,4 +12,6 @@ public interface ReceiptItemService extends IService<ReceiptItem> {
     void deleteByReceiptId(Long receiptId);
     /** 查询该客户+物料最新收货单里的工艺信息（processId + processName），没有则返回 null */
     ReceiptItem getLatestProcessByMaterial(Long customerId, Long materialId);
+    /** 查询该客户+物料+工艺最新收货单里的单价，没有则返回 null */
+    ReceiptItem getLatestPrice(Long customerId, Long materialId, Long processId);
 }

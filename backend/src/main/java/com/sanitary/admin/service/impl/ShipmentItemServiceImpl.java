@@ -50,4 +50,19 @@ public class ShipmentItemServiceImpl extends ServiceImpl<ShipmentItemMapper, Shi
     public void deleteByShipmentId(Long shipmentId) {
         remove(new LambdaQueryWrapper<ShipmentItem>().eq(ShipmentItem::getShipmentId, shipmentId));
     }
+
+    @Override
+    public ShipmentItem getLatestPrice(Long customerId, Long materialId, Long processId) {
+        if (customerId == null || materialId == null || processId == null) return null;
+        return getBaseMapper().selectOne(
+            new LambdaQueryWrapper<ShipmentItem>()
+                .eq(ShipmentItem::getMaterialId, materialId)
+                .eq(ShipmentItem::getProcessId, processId)
+                .isNotNull(ShipmentItem::getUnitPrice)
+                .inSql(ShipmentItem::getShipmentId,
+                    "SELECT id FROM shipment WHERE customer_id = " + customerId + " AND deleted = 0")
+                .orderByDesc(ShipmentItem::getId)
+                .last("LIMIT 1")
+        );
+    }
 }

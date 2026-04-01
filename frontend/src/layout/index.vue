@@ -57,6 +57,10 @@
             <el-icon><Box /></el-icon>
             <template #title>物料管理</template>
           </el-menu-item>
+          <el-menu-item index="/price">
+            <el-icon><Ticket /></el-icon>
+            <template #title>工艺价格</template>
+          </el-menu-item>
         </el-sub-menu>
 
         <!-- 生产管理 -->
@@ -141,7 +145,7 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import {
   User, Fold, Expand, ArrowDown, OfficeBuilding, UserFilled, Menu,
   Setting, Files, Operation, Box, SetUp, Download, Upload,
-  Money, Wallet, Document, Calendar, Printer
+  Money, Wallet, Document, Calendar, Printer, Ticket
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 

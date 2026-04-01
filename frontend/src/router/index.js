@@ -50,6 +50,12 @@ const routes = [
         component: () => import('@/views/material/index.vue'),
         meta: { title: '物料管理', requiresAuth: true }
       },
+      {
+        path: 'price',
+        name: 'Price',
+        component: () => import('@/views/price/index.vue'),
+        meta: { title: '工艺价格', requiresAuth: true }
+      },
       // Phase 2: 生产管理
       {
         path: 'receipt',

@@ -64,4 +64,19 @@ public class ReceiptItemServiceImpl extends ServiceImpl<ReceiptItemMapper, Recei
                 .last("LIMIT 1")
         );
     }
+
+    @Override
+    public ReceiptItem getLatestPrice(Long customerId, Long materialId, Long processId) {
+        if (customerId == null || materialId == null || processId == null) return null;
+        return getBaseMapper().selectOne(
+            new LambdaQueryWrapper<ReceiptItem>()
+                .eq(ReceiptItem::getMaterialId, materialId)
+                .eq(ReceiptItem::getProcessId, processId)
+                .isNotNull(ReceiptItem::getUnitPrice)
+                .inSql(ReceiptItem::getReceiptId,
+                    "SELECT id FROM receipt WHERE customer_id = " + customerId + " AND deleted = 0")
+                .orderByDesc(ReceiptItem::getId)
+                .last("LIMIT 1")
+        );
+    }
 }
