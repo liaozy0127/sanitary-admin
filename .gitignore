@@ -26,3 +26,4 @@ dist/
 # 大文件忽略
 dist-package/*.zip
 dist-package/*.tar
+backend/src/main/resources/db/init.sql
