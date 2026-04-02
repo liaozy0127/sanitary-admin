@@ -49,9 +49,30 @@
             <span v-else style="color:#999;font-size:12px">—</span>
           </template>
         </el-table-column>
-        <el-table-column prop="contactPerson" label="联系人" width="90" />
-        <el-table-column prop="contactPhone" label="联系电话" width="120" />
-        <el-table-column prop="salesperson" label="业务员" width="80" />
+        <el-table-column prop="contactPerson" label="联系人" width="90">
+          <template #default="{ row }">
+            <el-tooltip v-if="row.contactPerson" :content="row.contactPerson" placement="top" :show-after="300">
+              <span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ row.contactPerson }}</span>
+            </el-tooltip>
+            <span v-else>—</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="contactPhone" label="联系电话" width="120">
+          <template #default="{ row }">
+            <el-tooltip v-if="row.contactPhone" :content="row.contactPhone" placement="top" :show-after="300">
+              <span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ row.contactPhone }}</span>
+            </el-tooltip>
+            <span v-else>—</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="salesperson" label="业务员" width="80">
+          <template #default="{ row }">
+            <el-tooltip v-if="row.salesperson" :content="row.salesperson" placement="top" :show-after="300">
+              <span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ row.salesperson }}</span>
+            </el-tooltip>
+            <span v-else>—</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small" style="cursor:pointer" @click="toggleStatus(row)">
