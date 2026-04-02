@@ -116,12 +116,12 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="联系人">
-              <el-input v-model="formData.contactPerson" placeholder="请输入联系人" :maxlength="50" />
+              <el-input v-model="formData.contactPerson" placeholder="请输入联系人" :maxlength="50" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="联系电话">
-              <el-input v-model="formData.contactPhone" placeholder="请输入联系电话" :maxlength="20" />
+              <el-input v-model="formData.contactPhone" placeholder="请输入联系电话" :maxlength="20" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -136,12 +136,12 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="税号">
-              <el-input v-model="formData.taxNo" placeholder="请输入税号" :maxlength="50" />
+              <el-input v-model="formData.taxNo" placeholder="请输入税号" :maxlength="50" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="业务员">
-              <el-input v-model="formData.salesperson" placeholder="请输入业务员" :maxlength="50" />
+              <el-input v-model="formData.salesperson" placeholder="请输入业务员" :maxlength="50" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="24">
