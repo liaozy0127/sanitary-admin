@@ -33,7 +33,7 @@
 
       <el-table v-loading="loading" :data="tableData" stripe border style="width: 100%" max-height="calc(100vh - 230px)">
         <el-table-column type="index" label="#" width="50" align="center" />
-        <el-table-column prop="processCode" label="工艺代码" width="100" />
+        <el-table-column prop="processCode" label="工艺代码" width="100" show-overflow-tooltip />
         <el-table-column prop="processName" label="工艺名称" min-width="120" show-overflow-tooltip />
         <el-table-column prop="processCategory" label="工艺类别" width="100" show-overflow-tooltip />
         <el-table-column prop="processNature" label="工艺性质" width="100" show-overflow-tooltip />
