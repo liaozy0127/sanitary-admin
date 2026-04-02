@@ -628,7 +628,7 @@ const handlePrint = async (row) => {
         <td style="text-align:center">${pageIndex * ROWS_PER_PAGE + i + 1}</td>
         <td>${item.materialName || ''}</td>
         <td>${item.spec || ''}</td>
-        <td style="text-align:center">${item.unit || ''}</td>
+        <td style="text-align:center">${item.unit || '个'}</td>
         <td>${item.processName || ''}</td>
         <td style="text-align:center">${item.productionType || ''}</td>
         <td style="text-align:right">${item.quantity != null ? item.quantity : ''}</td>
@@ -675,7 +675,7 @@ const handlePrint = async (row) => {
             </td></tr>
             <tr>
               <th style="width:5%">序号</th>
-              <th style="width:18%">品名</th>
+              <th style="width:26%">品名</th>
               <th style="width:10%">规格</th>
               <th style="width:5%">单位</th>
               <th style="width:11%">工艺要求</th>
@@ -683,8 +683,8 @@ const handlePrint = async (row) => {
               <th style="width:8%">良品数量</th>
               <th style="width:6%">不良品</th>
               <th style="width:7%">单价</th>
-              <th style="width:12%">原件退回</th>
-              <th style="width:12%">备注</th>
+              <th style="width:8%">原件退回</th>
+              <th style="width:8%">备注</th>
             </tr>
           </thead>
           <tbody>${dataRows}${padRows}${totalRow}</tbody>
