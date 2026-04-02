@@ -207,7 +207,7 @@ const pagination = reactive({ page: 1, size: 10, total: 0 })
 
 const today = new Date().toISOString().split('T')[0]
 const formData = reactive({
-  productionDate: today, customerId: null, customerName: '', remark: '',
+  productionNo: '', productionDate: today, customerId: null, customerName: '', remark: '',
   items: []
 })
 
@@ -403,6 +403,7 @@ const openDialog = async (row) => {
     dialogTitle.value = '编辑排产单'
     editId.value = row.id
     Object.assign(formData, {
+      productionNo: row.productionNo,
       productionDate: row.productionDate,
       customerId: row.customerId,
       customerName: row.customerName,
@@ -433,7 +434,7 @@ const openDialog = async (row) => {
 const resetForm = () => {
   formRef.value?.resetFields()
   Object.assign(formData, {
-    productionDate: today, customerId: null, customerName: '', remark: '',
+    productionNo: '', productionDate: today, customerId: null, customerName: '', remark: '',
     items: []
   })
   materialList.value = []
@@ -521,55 +522,200 @@ const handlePrint = async (row) => {
 
     const totalQty = items.reduce((sum, item) => sum + (parseFloat(item.plannedQty) || 0), 0)
 
-    // 根据纸张和CSS自动计算每页行数
-    // 纸张: 241mm × 120mm，页边距 5mm → 可用高度 110mm
-    // 1pt = 0.353mm（印刷分辨率），浏览器默认行高 1.2
-    const R = 0.353
-    const LH = 1.2
-    const titleH  = 13 * R * LH + 4  // 标题行: 13pt × 1.2 + 上下各2mm ≈ 9.5mm
-    const metaH   = 9  * R * LH + 2  // 日期行: 9pt × 1.2 + 上下各1mm ≈ 5.8mm
-    const hdrH    = 8.5* R * LH + 2.5 // 列标题行: 8.5pt × 1.2 + 1mm+1.5mm ≈ 6.1mm
-    const rowH    = hdrH              // 数据行与列标题行同高
-    const remarkH = rowH              // 备注行同高
-    const sigH    = 7                 // 签名栏 div ≈ 7mm
-    const overhead = titleH + metaH + hdrH * 2 + remarkH + sigH + 3 // +3mm 边框余量
-    const ROWS_PER_PAGE = Math.max(1, Math.floor((110 - overhead) / rowH))
-    // 实际计算约 12 行/页
+    // 纸张: 241mm × 120mm，页边距 5mm，96dpi 下 1mm ≈ 3.7795px
+    // 可用宽度: (241-10) * 3.7795 ≈ 873px（减去两侧stamp各10mm后的page-body宽度约为 (241-5*2-2-10*2)mm）
+    // 可用高度: (120-10) * 3.7795 ≈ 416px（减去上下5mm页边距后110mm）
+    const MM_TO_PX = 3.7795
+    const PAGE_HEIGHT_PX = Math.round(110 * MM_TO_PX) // 110mm可用高度
+    // page-body 宽度 = 241mm - 5mm*2(margin) - 2mm(gap) - 10mm*2(stamp) = 209mm
+    const PAGE_BODY_WIDTH_PX = Math.round(209 * MM_TO_PX)
 
-    // 分割数据
+    const CSS = `
+  @page { size: 241mm 120mm; margin: 5mm; }
+  * { box-sizing: border-box; }
+  body { font-family: SimSun, "宋体", serif; font-size: 9pt; margin: 0; }
+  .page { display: flex; align-items: stretch; gap: 2mm; page-break-after: always; }
+  .page.last { page-break-after: auto; }
+  .stamp-side { flex: 0 0 10mm; }
+  .page-body { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .pt { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  .pt th, .pt td { border: 0.5pt solid #0066CC; padding: 1mm 1.5mm; word-break: break-all; }
+  .pt th { text-align: center; font-weight: bold; background: #f0f6ff; }
+  .title-cell { border: none !important; text-align: center; font-size: 13pt; font-weight: bold; padding: 2mm 0 !important; background: white !important; }
+  .meta-cell { border: none !important; padding: 1mm 0 !important; background: white !important; font-weight: normal; }
+  .meta-flex { display: flex; justify-content: space-around; }
+  .meta-flex span { flex: 1; text-align: center; }
+  .foot-remark { background: white; }
+  .sig-line { display: flex; justify-content: flex-start; font-size: 9pt; margin-top: 1.5mm; padding: 0 2mm; }
+  .sig-line span { flex: 1; text-align: left; }
+  .measure-wrap { position: absolute; top: -9999px; left: 0; width: ${PAGE_BODY_WIDTH_PX}px; visibility: hidden; }`
+
+    // 构造数据行 HTML（供测量和最终渲染共用）
+    const makeDataRowHtml = (item) => `<tr>
+      <td>${detail.customerName || ''}</td>
+      <td>${item.materialName || ''}</td>
+      <td>${item.spec || ''}</td>
+      <td>${item.processName || ''}</td>
+      <td style="text-align:right">${item.plannedQty != null ? item.plannedQty : ''}</td>
+      <td style="text-align:center">${item.receiptType || ''}</td>
+      <td></td><td></td><td></td><td></td>
+      <td>${item.detailRemark || ''}</td>
+    </tr>`
+
+    const totalRowHtml = `<tr>
+      <td colspan="4" style="text-align:right;font-weight:bold;">合计</td>
+      <td style="text-align:right;font-weight:bold;">${totalQty || ''}</td>
+      <td colspan="6"></td>
+    </tr>`
+
+    // 固定列宽定义（供测量表使用，与实际渲染保持一致）
+    const colWidths = ['9%','20%','10%','15%','7%','6%','6%','6%','6%','6%','9%']
+
+    // ── 第一步：创建测量用 iframe，渲染所有行后测量实际高度 ──
+    const measureIframe = document.createElement('iframe')
+    measureIframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:241mm;height:120mm;border:none;'
+    document.body.appendChild(measureIframe)
+
+    const colGroupHtml = `<colgroup>${colWidths.map(w => `<col style="width:${w}">`).join('')}</colgroup>`
+
+    // 测量每个数据行的实际渲染高度
+    const measureHtml = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>${CSS}</style></head><body>
+<div class="measure-wrap">
+  <table class="pt" style="width:100%">
+    ${colGroupHtml}
+    <tbody id="mbody">
+      ${items.map((item, i) => `<tr id="mr${i}">${makeDataRowHtml(item).replace(/^<tr>/, '').replace(/<\/tr>$/, '')}</tr>`).join('')}
+      <tr id="mr_total">${totalRowHtml.replace(/^<tr>/, '').replace(/<\/tr>$/, '')}</tr>
+      <tr id="mr_empty"><td>&nbsp;</td>${'<td>&nbsp;</td>'.repeat(10)}</tr>
+    </tbody>
+  </table>
+</div>
+</body></html>`
+
+    await new Promise(resolve => {
+      measureIframe.onload = resolve
+      measureIframe.srcdoc = measureHtml
+    })
+
+    const mDoc = measureIframe.contentDocument
+    const rowHeights = items.map((_, i) => mDoc.getElementById(`mr${i}`)?.offsetHeight || 20)
+    const totalRowHeight = mDoc.getElementById('mr_total')?.offsetHeight || 20
+    const emptyRowHeight = mDoc.getElementById('mr_empty')?.offsetHeight || 20
+
+    // 测量固定 overhead 元素高度（标题、meta、列头、tfoot备注、签名行）
+    // 用一个独立的测量表测量 overhead
+    const overheadHtml = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>${CSS}</style></head><body>
+<div class="measure-wrap" id="owrap">
+  <table class="pt" style="width:100%">
+    <thead>
+      <tr><th colspan="11" class="title-cell" id="oh_title">${docTitle}</th></tr>
+      <tr><td colspan="11" class="meta-cell" id="oh_meta">
+        <div class="meta-flex">
+          <span>排产日期：${detail.productionDate || ''}</span>
+          <span>单号：${detail.productionNo || ''}</span>
+          <span>班别：</span>
+          <span>客户：${detail.customerName || ''}</span>
+        </div>
+      </td></tr>
+      <tr id="oh_hdr1">
+        <th rowspan="2">客户</th><th rowspan="2">品名</th><th rowspan="2">规格</th>
+        <th rowspan="2">工艺</th><th rowspan="2">数量</th><th rowspan="2">类型</th>
+        <th colspan="4">完成情况</th><th rowspan="2">备注</th>
+      </tr>
+      <tr id="oh_hdr2"><th>1良品</th><th>2良品</th><th>3良品</th><th>不良</th></tr>
+    </thead>
+    <tbody><tr id="oh_empty"><td>&nbsp;</td>${'<td>&nbsp;</td>'.repeat(10)}</tr></tbody>
+    <tfoot>
+      <tr><td colspan="11" class="foot-remark" id="oh_remark">备注：${remark}</td></tr>
+    </tfoot>
+  </table>
+  <div class="sig-line" id="oh_sig">
+    <span>${sig3}</span><span>${sig1}</span><span>${sig2}</span>
+  </div>
+</div>
+</body></html>`
+
+    const overheadIframe = document.createElement('iframe')
+    overheadIframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:241mm;height:120mm;border:none;'
+    document.body.appendChild(overheadIframe)
+
+    await new Promise(resolve => {
+      overheadIframe.onload = resolve
+      overheadIframe.srcdoc = overheadHtml
+    })
+
+    const oDoc = overheadIframe.contentDocument
+    // 直接量整个容器高度，避免逐元素累加带来的 border 折叠/rowspan 重复计算误差
+    const overheadPx = (oDoc.getElementById('owrap')?.offsetHeight || 0) + 2 // +2px 安全余量
+
+    document.body.removeChild(measureIframe)
+    document.body.removeChild(overheadIframe)
+
+    const availableBodyPx = PAGE_HEIGHT_PX - overheadPx
+
+    // ── 第二步：按实际高度贪心分页 ──
+    // 非末页用满 availableBodyPx，末页额外需要留出 totalRowHeight（合计行）
+    // 分页时先按满页预算分，分完后检查末页是否还装得下合计行，装不下则把最后一条移入新页
     const chunks = []
-    if (items.length === 0) chunks.push([])
-    else for (let i = 0; i < items.length; i += ROWS_PER_PAGE) chunks.push(items.slice(i, i + ROWS_PER_PAGE))
+    let currentChunk = []
+    let usedPx = 0
 
-    // 空白填充行（11列）—— 用 &nbsp; 保证行高与数据行一致
+    for (let i = 0; i < items.length; i++) {
+      const h = rowHeights[i]
+      if (currentChunk.length > 0 && usedPx + h > availableBodyPx) {
+        chunks.push(currentChunk)
+        currentChunk = []
+        usedPx = 0
+      }
+      currentChunk.push(items[i])
+      usedPx += h
+    }
+    chunks.push(currentChunk)
+
+    if (chunks.length === 0) chunks.push([])
+
+    // 检查末页：数据行 + 合计行是否超出，超出则把最后一条移入新页
+    const lastChunk = chunks[chunks.length - 1]
+    const lastUsedPx = lastChunk.reduce((s, item) => s + rowHeights[items.indexOf(item)], 0)
+    if (lastChunk.length > 0 && lastUsedPx + totalRowHeight > availableBodyPx) {
+      const overflow = lastChunk.splice(lastChunk.length - 1)
+      chunks.push(overflow)
+    }
+
+    // ── 第三步：生成最终 HTML，空行补齐末页 ──
     const emptyRow = `<tr>${'<td>&nbsp;</td>'.repeat(11)}</tr>`
 
     const makePage = (chunk, isLast) => {
-      const dataRows = chunk.map(item => `<tr>
-        <td>${detail.customerName || ''}</td>
-        <td>${item.materialName || ''}</td>
-        <td>${item.spec || ''}</td>
-        <td>${item.processName || ''}</td>
-        <td style="text-align:right">${item.plannedQty != null ? item.plannedQty : ''}</td>
-        <td style="text-align:center">${item.receiptType || ''}</td>
-        <td></td><td></td><td></td><td></td>
-        <td>${item.detailRemark || ''}</td>
-      </tr>`).join('')
+      const dataRows = chunk.map(item => makeDataRowHtml(item)).join('')
 
-      // 末页留1行给合计，其余页填满
-      const fillTarget = isLast ? ROWS_PER_PAGE - 1 : ROWS_PER_PAGE
-      const padRows = emptyRow.repeat(Math.max(0, fillTarget - chunk.length))
+      // 计算已用高度，空行补齐至 availableBodyPx - totalRowHeight（末页）或 availableBodyPx（非末页）
+      const chunkUsedPx = chunk.reduce((s, item, i) => {
+        const globalIdx = items.indexOf(item)
+        return s + (globalIdx >= 0 ? rowHeights[globalIdx] : emptyRowHeight)
+      }, 0)
 
-      const totalRow = isLast ? `<tr>
-        <td colspan="4" style="text-align:right;font-weight:bold;">合计</td>
-        <td style="text-align:right;font-weight:bold;">${totalQty || ''}</td>
-        <td colspan="6"></td>
-      </tr>` : ''
+      let padRows = ''
+      if (isLast) {
+        // 末页：用空行填充剩余空间（减去合计行高度）
+        const remaining = availableBodyPx - totalRowHeight - chunkUsedPx
+        const padCount = Math.max(0, Math.floor(remaining / emptyRowHeight))
+        padRows = emptyRow.repeat(padCount)
+      } else {
+        // 非末页：填充至撑满页面
+        const remaining = availableBodyPx - chunkUsedPx
+        const padCount = Math.max(0, Math.floor(remaining / emptyRowHeight))
+        padRows = emptyRow.repeat(padCount)
+      }
+
+      const totalRow = isLast ? totalRowHtml : ''
 
       return `<div class="page${isLast ? ' last' : ''}">
         <div class="stamp-side"></div>
         <div class="page-body">
         <table class="pt">
+          ${colGroupHtml}
           <thead>
             <tr><th colspan="11" class="title-cell">${docTitle}</th></tr>
             <tr><td colspan="11" class="meta-cell">
@@ -606,25 +752,7 @@ const handlePrint = async (row) => {
 
     const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>排产单 ${detail.productionNo || ''}</title>
-<style>
-  @page { size: 241mm 120mm; margin: 5mm; }
-  * { box-sizing: border-box; }
-  body { font-family: SimSun, "宋体", serif; font-size: 9pt; margin: 0; }
-  .page { display: flex; align-items: stretch; gap: 2mm; min-height: 108mm; page-break-after: always; }
-  .page.last { page-break-after: auto; min-height: 0; }
-  .stamp-side { flex: 0 0 10mm; }
-  .page-body { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  .pt { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
-  .pt th, .pt td { border: 0.5pt solid #0066CC; padding: 1mm 1.5mm; }
-  .pt th { text-align: center; font-weight: bold; background: #f0f6ff; }
-  .title-cell { border: none !important; text-align: center; font-size: 13pt; font-weight: bold; padding: 2mm 0 !important; background: white !important; }
-  .meta-cell { border: none !important; padding: 1mm 0 !important; background: white !important; font-weight: normal; }
-  .meta-flex { display: flex; justify-content: space-around; }
-  .meta-flex span { flex: 1; text-align: center; }
-  .foot-remark { background: white; }
-  .sig-line { display: flex; justify-content: flex-start; font-size: 9pt; margin-top: 1.5mm; padding: 0 2mm; }
-  .sig-line span { flex: 1; text-align: left; }
-</style></head><body>
+<style>${CSS}</style></head><body>
 ${pages}
 </body></html>`
 
