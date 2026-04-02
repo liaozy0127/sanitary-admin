@@ -1,18 +1,26 @@
 package com.sanitary.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sanitary.admin.entity.Material;
 import com.sanitary.admin.entity.Customer;
+import com.sanitary.admin.entity.ReceiptItem;
+import com.sanitary.admin.entity.ProductionItem;
+import com.sanitary.admin.entity.ShipmentItem;
 import com.sanitary.admin.mapper.MaterialMapper;
 import com.sanitary.admin.mapper.CustomerMapper;
+import com.sanitary.admin.mapper.ReceiptItemMapper;
+import com.sanitary.admin.mapper.ProductionItemMapper;
+import com.sanitary.admin.mapper.ShipmentItemMapper;
 import com.sanitary.admin.service.MaterialService;
 import com.sanitary.admin.util.ExcelExportUtil;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -31,6 +39,9 @@ import java.util.stream.Collectors;
 public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> implements MaterialService {
 
     private final CustomerMapper customerMapper;
+    private final ReceiptItemMapper receiptItemMapper;
+    private final ProductionItemMapper productionItemMapper;
+    private final ShipmentItemMapper shipmentItemMapper;
 
     @Override
     public Page<Material> pageList(int page, int size, String keyword, Long customerId) {
@@ -278,5 +289,51 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
         } catch (IOException e) {
             throw new RuntimeException("导出失败: " + e.getMessage());
         }
+    }
+
+    @Override
+    @Transactional
+    public void updateMaterial(Material material) {
+        updateById(material);
+
+        Long id = material.getId();
+        String newName = material.getMaterialName();
+        String newCode = material.getMaterialCode();
+        String newSpec = material.getSpec();
+
+        // 只同步非空字段，避免局部更新（如仅改状态）时清空冗余字段
+        if (newName == null && newCode == null && newSpec == null) {
+            return;
+        }
+
+        // 同步收货单明细
+        LambdaUpdateWrapper<ReceiptItem> rWrapper = new LambdaUpdateWrapper<ReceiptItem>()
+                .eq(ReceiptItem::getMaterialId, id)
+                .eq(ReceiptItem::getDeleted, 0);
+        ReceiptItem rUpdate = new ReceiptItem();
+        if (newName != null) rUpdate.setMaterialName(newName);
+        if (newCode != null) rUpdate.setMaterialCode(newCode);
+        if (newSpec != null) rUpdate.setSpec(newSpec);
+        receiptItemMapper.update(rUpdate, rWrapper);
+
+        // 同步排产单明细
+        LambdaUpdateWrapper<ProductionItem> pWrapper = new LambdaUpdateWrapper<ProductionItem>()
+                .eq(ProductionItem::getMaterialId, id)
+                .eq(ProductionItem::getDeleted, 0);
+        ProductionItem pUpdate = new ProductionItem();
+        if (newName != null) pUpdate.setMaterialName(newName);
+        if (newCode != null) pUpdate.setMaterialCode(newCode);
+        if (newSpec != null) pUpdate.setSpec(newSpec);
+        productionItemMapper.update(pUpdate, pWrapper);
+
+        // 同步发货单明细
+        LambdaUpdateWrapper<ShipmentItem> sWrapper = new LambdaUpdateWrapper<ShipmentItem>()
+                .eq(ShipmentItem::getMaterialId, id)
+                .eq(ShipmentItem::getDeleted, 0);
+        ShipmentItem sUpdate = new ShipmentItem();
+        if (newName != null) sUpdate.setMaterialName(newName);
+        if (newCode != null) sUpdate.setMaterialCode(newCode);
+        if (newSpec != null) sUpdate.setSpec(newSpec);
+        shipmentItemMapper.update(sUpdate, sWrapper);
     }
 }

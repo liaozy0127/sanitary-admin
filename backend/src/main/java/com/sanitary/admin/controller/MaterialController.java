@@ -48,7 +48,7 @@ public class MaterialController {
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody Material material) {
         material.setId(id);
-        materialService.updateById(material);
+        materialService.updateMaterial(material);
         return Result.success();
     }
 

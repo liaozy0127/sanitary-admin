@@ -16,4 +16,6 @@ public interface MaterialService extends IService<Material> {
     String checkAndCreate(Material material);
     Map<String, Object> importFromExcel(MultipartFile file);
     void exportExcel(HttpServletResponse response, String keyword, Long customerId);
+    /** 更新物料档案，并同步更新收货/排产/发货单明细中的冗余字段 */
+    void updateMaterial(Material material);
 }
