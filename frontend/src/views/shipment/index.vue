@@ -683,8 +683,8 @@ const handlePrint = async (row) => {
               <th style="width:8%">良品数量</th>
               <th style="width:6%">不良品</th>
               <th style="width:7%">单价</th>
-              <th style="width:7%">原件退回</th>
-              <th style="width:17%">备注</th>
+              <th style="width:12%">原件退回</th>
+              <th style="width:12%">备注</th>
             </tr>
           </thead>
           <tbody>${dataRows}${padRows}${totalRow}</tbody>
