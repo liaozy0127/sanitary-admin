@@ -331,6 +331,60 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
             }
         }
 
+        // ---- 反推法：基于当前库存快照计算结余 ----
+        // 1. 读取当前库存快照
+        LambdaQueryWrapper<Inventory> invWrapper = new LambdaQueryWrapper<Inventory>()
+            .eq(Inventory::getCustomerId, customerId);
+        List<Inventory> inventories = inventoryMapper.selectList(invWrapper);
+        Map<String, BigDecimal> inventoryMap = new HashMap<>();
+        for (Inventory inv : inventories) {
+            Long mid = inv.getMaterialId() != null ? inv.getMaterialId() : 0L;
+            Long pid = inv.getProcessId() != null ? inv.getProcessId() : 0L;
+            inventoryMap.put(mid + "_" + pid, inv.getQuantity() != null ? inv.getQuantity() : BigDecimal.ZERO);
+        }
+
+        // 2. 对账月结束后的收货
+        LocalDate monthEnd = ym.atEndOfMonth();
+        LambdaQueryWrapper<Receipt> afterReceiptWrapper = new LambdaQueryWrapper<Receipt>()
+            .eq(Receipt::getCustomerId, customerId)
+            .eq(Receipt::getStatus, 1)
+            .gt(Receipt::getReceiptDate, monthEnd);
+        List<Receipt> afterReceipts = receiptMapper.selectList(afterReceiptWrapper);
+        List<Long> afterReceiptIds = afterReceipts.stream().map(Receipt::getId).collect(Collectors.toList());
+        Map<String, BigDecimal> afterReceiptMap = new HashMap<>();
+        if (!afterReceiptIds.isEmpty()) {
+            List<ReceiptItem> afterRItems = receiptItemMapper.selectList(
+                new LambdaQueryWrapper<ReceiptItem>().in(ReceiptItem::getReceiptId, afterReceiptIds));
+            for (ReceiptItem ri : afterRItems) {
+                Long mid = ri.getMaterialId() != null ? ri.getMaterialId() : 0L;
+                Long pid = ri.getProcessId() != null ? ri.getProcessId() : 0L;
+                String k = mid + "_" + pid;
+                BigDecimal qty = ri.getQuantity() != null ? ri.getQuantity() : BigDecimal.ZERO;
+                afterReceiptMap.merge(k, qty, BigDecimal::add);
+            }
+        }
+
+        // 3. 对账月结束后的发货
+        LambdaQueryWrapper<Shipment> afterShipmentWrapper = new LambdaQueryWrapper<Shipment>()
+            .eq(Shipment::getCustomerId, customerId)
+            .eq(Shipment::getStatus, 1)
+            .gt(Shipment::getShipmentDate, monthEnd);
+        List<Shipment> afterShipments = shipmentMapper.selectList(afterShipmentWrapper);
+        List<Long> afterShipmentIds = afterShipments.stream().map(Shipment::getId).collect(Collectors.toList());
+        Map<String, BigDecimal> afterShipmentMap = new HashMap<>();
+        if (!afterShipmentIds.isEmpty()) {
+            List<ShipmentItem> afterSItems = shipmentItemMapper.selectList(
+                new LambdaQueryWrapper<ShipmentItem>().in(ShipmentItem::getShipmentId, afterShipmentIds));
+            for (ShipmentItem si : afterSItems) {
+                Long mid = si.getMaterialId() != null ? si.getMaterialId() : 0L;
+                Long pid = si.getProcessId() != null ? si.getProcessId() : 0L;
+                String k = mid + "_" + pid;
+                BigDecimal goodsQty = si.getQuantity() != null ? si.getQuantity() : BigDecimal.ZERO;
+                BigDecimal defQty = si.getDefectiveQty() != null ? si.getDefectiveQty() : BigDecimal.ZERO;
+                afterShipmentMap.merge(k, goodsQty.add(defQty), BigDecimal::add);
+            }
+        }
+
         List<StatementItem> itemsToSave = new ArrayList<>();
         for (Map.Entry<String, StatementItem> entry : itemMap.entrySet()) {
             StatementItem item = entry.getValue();
@@ -341,11 +395,22 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                     item.setUnitPrice(mat.getDefaultPrice());
                 }
             }
-            // prevBalanceQty
-            BigDecimal prevBal = prevBalanceMap.getOrDefault(entry.getKey(), BigDecimal.ZERO);
+            // 计算结余：优先使用反推法（当前库存 - 月后净变动），无库存记录时退化为单据累加
+            String key = entry.getKey();
+            BigDecimal prevBal;
+            BigDecimal currBal;
+            if (inventoryMap.containsKey(key)) {
+                BigDecimal invQty = inventoryMap.get(key);
+                BigDecimal afterReceipt = afterReceiptMap.getOrDefault(key, BigDecimal.ZERO);
+                BigDecimal afterShipment = afterShipmentMap.getOrDefault(key, BigDecimal.ZERO);
+                currBal = invQty.subtract(afterReceipt).add(afterShipment);
+                prevBal = currBal.subtract(item.getReceiptQty()).add(item.getShipmentQty());
+            } else {
+                prevBal = prevBalanceMap.getOrDefault(key, BigDecimal.ZERO);
+                currBal = prevBal.add(item.getReceiptQty()).subtract(item.getShipmentQty());
+            }
             item.setPrevBalanceQty(prevBal);
-            // currBalanceQty = prevBal + receiptQty - shipmentQty
-            item.setCurrBalanceQty(prevBal.add(item.getReceiptQty()).subtract(item.getShipmentQty()));
+            item.setCurrBalanceQty(currBal);
             // goodsAmount: 按发货单实际金额比例计算，正确反映单价变动。
             // 公式：shipmentAmount × (billableQty / goodsShipQty)，goodsShipQty=0 时 goodsAmount=0。
             // billableQty = max(0, goodsShipQty - reworkQty)
