@@ -54,7 +54,6 @@
             <el-tooltip v-if="row.contactPerson" :content="row.contactPerson" placement="top" :show-after="300">
               <span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ row.contactPerson }}</span>
             </el-tooltip>
-            <span v-else>—</span>
           </template>
         </el-table-column>
         <el-table-column prop="contactPhone" label="联系电话" width="120">
@@ -62,7 +61,6 @@
             <el-tooltip v-if="row.contactPhone" :content="row.contactPhone" placement="top" :show-after="300">
               <span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ row.contactPhone }}</span>
             </el-tooltip>
-            <span v-else>—</span>
           </template>
         </el-table-column>
         <el-table-column prop="salesperson" label="业务员" width="80">
@@ -70,7 +68,6 @@
             <el-tooltip v-if="row.salesperson" :content="row.salesperson" placement="top" :show-after="300">
               <span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ row.salesperson }}</span>
             </el-tooltip>
-            <span v-else>—</span>
           </template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="90" align="center">
