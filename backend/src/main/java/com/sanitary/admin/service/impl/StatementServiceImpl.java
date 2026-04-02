@@ -636,7 +636,7 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
 
         XSSFWorkbook wb = new XSSFWorkbook();
         Sheet sheet = wb.createSheet("对账单");
-        String[] headers = {"对账单号","对账月份","客户名称","产品编码","产品名称","工艺要求",
+        String[] headers = {"对账单号","对账月份","客户名称","产品编码","产品名称","规格型号","工艺要求",
             "上月结余","本月收货","发货合计","良品数量","返工数量","本月结余","单价","良品金额","备注"};
         ExcelExportUtil.writeTitleRow(sheet, wb, "对账单", headers.length);
         ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
@@ -672,22 +672,23 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                 ExcelExportUtil.setCell(row, 2, "", cs);
                 ExcelExportUtil.setCell(row, 3, item.getMaterialCode(), cs);
                 ExcelExportUtil.setCell(row, 4, item.getMaterialName(), cs);
-                ExcelExportUtil.setCell(row, 5, item.getProcessName(), cs);
-                ExcelExportUtil.setCell(row, 6, item.getPrevBalanceQty(), ns);
-                ExcelExportUtil.setCell(row, 7, item.getReceiptQty(), ns);
-                ExcelExportUtil.setCell(row, 8, item.getShipmentQty(), ns);
+                ExcelExportUtil.setCell(row, 5, item.getSpec(), cs);
+                ExcelExportUtil.setCell(row, 6, item.getProcessName(), cs);
+                ExcelExportUtil.setCell(row, 7, item.getPrevBalanceQty(), ns);
+                ExcelExportUtil.setCell(row, 8, item.getReceiptQty(), ns);
+                ExcelExportUtil.setCell(row, 9, item.getShipmentQty(), ns);
                 // 良品数量 = 发货合计 - 退回 - 返工
                 BigDecimal goodsShip = (item.getShipmentQty() != null ? item.getShipmentQty() : BigDecimal.ZERO)
                     .subtract(item.getDefectiveQty() != null ? item.getDefectiveQty() : BigDecimal.ZERO)
                     .subtract(item.getReworkQty() != null ? item.getReworkQty() : BigDecimal.ZERO)
                     .max(BigDecimal.ZERO);
                 BigDecimal reworkQtyVal = item.getReworkQty() != null ? item.getReworkQty() : BigDecimal.ZERO;
-                ExcelExportUtil.setCell(row, 9, goodsShip, ns);
-                ExcelExportUtil.setCell(row, 10, reworkQtyVal, ns);
-                ExcelExportUtil.setCell(row, 11, item.getCurrBalanceQty(), ns);
-                ExcelExportUtil.setCell(row, 12, item.getUnitPrice(), ns);
-                ExcelExportUtil.setCell(row, 13, item.getGoodsAmount(), ns);
-                ExcelExportUtil.setCell(row, 14, item.getRemark(), cs);
+                ExcelExportUtil.setCell(row, 10, goodsShip, ns);
+                ExcelExportUtil.setCell(row, 11, reworkQtyVal, ns);
+                ExcelExportUtil.setCell(row, 12, item.getCurrBalanceQty(), ns);
+                ExcelExportUtil.setCell(row, 13, item.getUnitPrice(), ns);
+                ExcelExportUtil.setCell(row, 14, item.getGoodsAmount(), ns);
+                ExcelExportUtil.setCell(row, 15, item.getRemark(), cs);
                 if (item.getReceiptQty() != null) totalReceiptQty = totalReceiptQty.add(item.getReceiptQty());
                 if (item.getShipmentQty() != null) totalShipmentQty = totalShipmentQty.add(item.getShipmentQty());
                 totalGoodsQty = totalGoodsQty.add(goodsShip);
@@ -701,15 +702,15 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         CellStyle sumN = ExcelExportUtil.summaryNumStyle(wb);
         Row sumRow = sheet.createRow(rowIdx);
         ExcelExportUtil.setCell(sumRow, 0, "合计", sumS);
-        for (int i = 1; i <= 6; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
-        ExcelExportUtil.setCell(sumRow, 7, totalReceiptQty, sumN);
-        ExcelExportUtil.setCell(sumRow, 8, totalShipmentQty, sumN);
-        ExcelExportUtil.setCell(sumRow, 9, totalGoodsQty, sumN);
-        ExcelExportUtil.setCell(sumRow, 10, totalReworkQty, sumN);
-        ExcelExportUtil.setCell(sumRow, 11, "", sumS);
+        for (int i = 1; i <= 7; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 8, totalReceiptQty, sumN);
+        ExcelExportUtil.setCell(sumRow, 9, totalShipmentQty, sumN);
+        ExcelExportUtil.setCell(sumRow, 10, totalGoodsQty, sumN);
+        ExcelExportUtil.setCell(sumRow, 11, totalReworkQty, sumN);
         ExcelExportUtil.setCell(sumRow, 12, "", sumS);
-        ExcelExportUtil.setCell(sumRow, 13, totalGoodsAmount, sumN);
-        ExcelExportUtil.setCell(sumRow, 14, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 13, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 14, totalGoodsAmount, sumN);
+        ExcelExportUtil.setCell(sumRow, 15, "", sumS);
 
         sheet.createFreezePane(0, 2);
         ExcelExportUtil.autoSize(sheet, headers.length);

@@ -26,6 +26,7 @@ public class StatementItemServiceImpl extends ServiceImpl<StatementItemMapper, S
             item.setMaterialId(toLong(map.get("material_id")));
             item.setMaterialCode(str(map.get("material_code")));
             item.setMaterialName(str(map.get("material_name")));
+            item.setSpec(str(map.get("spec")));
             item.setProcessId(toLong(map.get("process_id")));
             item.setProcessName(str(map.get("process_name")));
             item.setPrevBalanceQty(toBigDecimal(map.get("prev_balance_qty")));

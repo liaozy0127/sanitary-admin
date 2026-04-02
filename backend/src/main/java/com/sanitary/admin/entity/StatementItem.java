@@ -14,6 +14,8 @@ public class StatementItem {
     private Long materialId;
     private String materialCode;
     private String materialName;
+    @TableField(exist = false)
+    private String spec;
     private Long processId;
     private String processName;
     private BigDecimal prevBalanceQty;

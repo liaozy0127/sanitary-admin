@@ -42,6 +42,7 @@
                 v-loading="row._itemsLoading" element-loading-text="加载明细中...">
                 <el-table-column prop="materialCode" label="产品代码" width="110" />
                 <el-table-column prop="materialName" label="产品名称" min-width="160" show-overflow-tooltip />
+                <el-table-column prop="spec" label="规格型号" min-width="120" show-overflow-tooltip />
                 <el-table-column prop="processName" label="工艺要求" width="100" />
                 <el-table-column prop="prevBalanceQty" label="上月结余" width="90" align="right">
                   <template #default="{ row: item }">{{ fmtQty(item.prevBalanceQty) }}</template>

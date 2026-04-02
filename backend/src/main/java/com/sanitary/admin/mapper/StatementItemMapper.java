@@ -18,6 +18,7 @@ public interface StatementItemMapper extends BaseMapper<StatementItem> {
             "  si.curr_balance_qty, si.unit_price, si.goods_amount, si.shipment_amount, si.remark, " +
             "  COALESCE(m.material_code, si.material_code) AS material_code, " +
             "  COALESCE(m.material_name, si.material_name) AS material_name, " +
+            "  m.spec AS spec, " +
             "  COALESCE(p.process_name, si.process_name) AS process_name " +
             "FROM statement_item si " +
             "LEFT JOIN material m ON m.id = si.material_id " +
