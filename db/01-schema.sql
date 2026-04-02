@@ -266,7 +266,8 @@ CREATE TABLE `production_item` (
   `deleted` tinyint NOT NULL DEFAULT '0',
   `create_time` datetime DEFAULT NULL,
   `update_time` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `idx_production_id` (`production_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=73545 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='排产单明细';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -324,7 +325,8 @@ CREATE TABLE `receipt_item` (
   `deleted` tinyint NOT NULL DEFAULT '0',
   `create_time` datetime DEFAULT NULL,
   `update_time` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `idx_receipt_id` (`receipt_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=110455 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='收货单明细';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -429,7 +431,8 @@ CREATE TABLE `shipment_item` (
   `deleted` tinyint NOT NULL DEFAULT '0',
   `create_time` datetime DEFAULT NULL,
   `update_time` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `idx_shipment_id` (`shipment_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=127788 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='发货单明细';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
