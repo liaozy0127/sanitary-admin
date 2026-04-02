@@ -11,4 +11,4 @@ export const importProductions = (data, params) => request.post('/productions/im
 })
 export const updateProductionStatus = (id, prodStatus) => request.put(`/productions/${id}/status`, null, { params: { prodStatus } })
 export const exportProductions = (params) =>
-  request.get('/productions/export', { params, responseType: 'blob' })
+  request.get('/productions/export', { params, responseType: 'blob', timeout: 120000 })
