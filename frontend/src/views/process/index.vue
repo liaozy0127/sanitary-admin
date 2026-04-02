@@ -84,17 +84,17 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="工艺类别">
-              <el-input v-model="formData.processCategory" placeholder="请输入工艺类别" :maxlength="50" />
+              <el-input v-model="formData.processCategory" placeholder="请输入工艺类别" :maxlength="50" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="工艺性质">
-              <el-input v-model="formData.processNature" placeholder="请输入工艺性质" :maxlength="50" />
+              <el-input v-model="formData.processNature" placeholder="请输入工艺性质" :maxlength="50" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="厚度要求">
-              <el-input v-model="formData.thicknessReq" placeholder="请输入厚度要求" :maxlength="100" />
+              <el-input v-model="formData.thicknessReq" placeholder="请输入厚度要求" :maxlength="100" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="24">
