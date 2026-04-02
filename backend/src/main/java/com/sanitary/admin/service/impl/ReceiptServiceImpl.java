@@ -114,6 +114,8 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
                 }
                 // 同步更新物料默认单价（非返工来源且单价>0时覆盖，保持价格最新）
                 syncMaterialPrice(item, receipt.getCustomerId(), receipt.getCustomerName(), receipt.getReceiptDate());
+                // 同步物料规格到物料档案
+                syncMaterialSpec(item);
             }
         }
 
@@ -199,6 +201,8 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
                 }
                 // 同步更新物料默认单价（非返工来源且单价>0时覆盖，保持价格最新）
                 syncMaterialPrice(item, receipt.getCustomerId(), receipt.getCustomerName(), receipt.getReceiptDate());
+                // 同步物料规格到物料档案
+                syncMaterialSpec(item);
             }
         }
 
@@ -528,8 +532,7 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
      * 将收货明细的单价同步回物料档案默认单价，同时 upsert 工艺价格表。
      * 条件：非返工来源 且 单价 > 0 且 materialId 有值。
      */
-    private void syncMaterialPrice(ReceiptItem item, Long customerId, String customerName, LocalDate receiptDate) {
-        if (item.getMaterialId() == null) return;
+    private void syncMaterialPrice(ReceiptItem item, Long customerId, String customerName, LocalDate receiptDate) {        if (item.getMaterialId() == null) return;
         if (item.getUnitPrice() == null || item.getUnitPrice().compareTo(BigDecimal.ZERO) <= 0) return;
         if ("返工".equals(item.getReceiptSource())) return;
         Material mat = materialMapper.selectById(item.getMaterialId());
@@ -544,6 +547,19 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
                 item.getMaterialId(), item.getMaterialName(), item.getMaterialCode(), item.getSpec(),
                 item.getProcessId(), item.getProcessName(), item.getUnitPrice()
             );
+        }
+    }
+
+    /** 若收货明细中的规格与物料档案不一致，则同步更新物料档案的规格。 */
+    private void syncMaterialSpec(ReceiptItem item) {
+        if (item.getMaterialId() == null) return;
+        String newSpec = item.getSpec();
+        if (newSpec == null) return;
+        Material mat = materialMapper.selectById(item.getMaterialId());
+        if (mat == null) return;
+        if (!newSpec.equals(mat.getSpec())) {
+            mat.setSpec(newSpec);
+            materialMapper.updateById(mat);
         }
     }
 
