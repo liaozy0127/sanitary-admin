@@ -596,16 +596,15 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
     }
 
     /**
-     * 将当月同一客户+物料+工艺的收货单明细、排产单明细、发货单明细的单价同步为最新价格。
+     * 将当月及之后同一客户+物料+工艺的收货单明细、排产单明细、发货单明细的单价同步为最新价格。
      */
     private void syncSameMonthPrices(Long customerId, Long materialId, Long processId, BigDecimal unitPrice, LocalDate refDate) {
         String monthStart = refDate.withDayOfMonth(1).toString();
-        String monthEnd = refDate.withDayOfMonth(refDate.lengthOfMonth()).toString();
 
-        // 更新当月收货单明细单价（正常收货，非返工，单价与新价不同）
+        // 更新当月及之后收货单明细单价（正常收货，非返工，单价与新价不同）
         LambdaQueryWrapper<com.sanitary.admin.entity.ReceiptItem> rWrapper = new LambdaQueryWrapper<>();
         rWrapper.inSql(com.sanitary.admin.entity.ReceiptItem::getReceiptId,
-            "SELECT id FROM receipt WHERE customer_id = " + customerId + " AND receipt_date BETWEEN '" + monthStart + "' AND '" + monthEnd + "' AND deleted = 0")
+            "SELECT id FROM receipt WHERE customer_id = " + customerId + " AND receipt_date >= '" + monthStart + "' AND deleted = 0")
             .eq(com.sanitary.admin.entity.ReceiptItem::getMaterialId, materialId)
             .ne(com.sanitary.admin.entity.ReceiptItem::getReceiptSource, "返工")
             .eq(com.sanitary.admin.entity.ReceiptItem::getDeleted, 0);
@@ -623,10 +622,10 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
             }
         }
 
-        // 更新当月排产单明细电镀单价
+        // 更新当月及之后排产单明细电镀单价
         LambdaQueryWrapper<com.sanitary.admin.entity.ProductionItem> pWrapper = new LambdaQueryWrapper<>();
         pWrapper.inSql(com.sanitary.admin.entity.ProductionItem::getProductionId,
-            "SELECT id FROM production WHERE customer_id = " + customerId + " AND production_date BETWEEN '" + monthStart + "' AND '" + monthEnd + "' AND deleted = 0")
+            "SELECT id FROM production WHERE customer_id = " + customerId + " AND production_date >= '" + monthStart + "' AND deleted = 0")
             .eq(com.sanitary.admin.entity.ProductionItem::getMaterialId, materialId)
             .eq(com.sanitary.admin.entity.ProductionItem::getDeleted, 0);
         if (processId != null) {
@@ -643,10 +642,10 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
             }
         }
 
-        // 更新当月其他发货单明细单价
+        // 更新当月及之后其他发货单明细单价
         LambdaQueryWrapper<ShipmentItem> sWrapper = new LambdaQueryWrapper<>();
         sWrapper.inSql(ShipmentItem::getShipmentId,
-            "SELECT id FROM shipment WHERE customer_id = " + customerId + " AND shipment_date BETWEEN '" + monthStart + "' AND '" + monthEnd + "' AND deleted = 0")
+            "SELECT id FROM shipment WHERE customer_id = " + customerId + " AND shipment_date >= '" + monthStart + "' AND deleted = 0")
             .eq(ShipmentItem::getMaterialId, materialId)
             .eq(ShipmentItem::getDeleted, 0);
         if (processId != null) {
