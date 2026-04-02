@@ -2,31 +2,61 @@ package com.sanitary.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.sanitary.admin.entity.Material;
 import com.sanitary.admin.entity.ReceiptItem;
+import com.sanitary.admin.mapper.MaterialMapper;
 import com.sanitary.admin.mapper.ReceiptItemMapper;
 import com.sanitary.admin.service.ReceiptItemService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class ReceiptItemServiceImpl extends ServiceImpl<ReceiptItemMapper, ReceiptItem> implements ReceiptItemService {
+
+    private final MaterialMapper materialMapper;
 
     @Override
     public List<ReceiptItem> listByReceiptId(Long receiptId) {
-        return list(new LambdaQueryWrapper<ReceiptItem>()
+        List<ReceiptItem> items = list(new LambdaQueryWrapper<ReceiptItem>()
                 .eq(ReceiptItem::getReceiptId, receiptId)
                 .orderByAsc(ReceiptItem::getId));
+        fillLatestSpec(items);
+        return items;
     }
 
     @Override
     public List<ReceiptItem> listByReceiptIds(List<Long> receiptIds) {
         if (receiptIds == null || receiptIds.isEmpty()) return new java.util.ArrayList<>();
-        return this.list(new LambdaQueryWrapper<ReceiptItem>()
+        List<ReceiptItem> items = this.list(new LambdaQueryWrapper<ReceiptItem>()
             .in(ReceiptItem::getReceiptId, receiptIds)
             .orderByAsc(ReceiptItem::getId));
+        fillLatestSpec(items);
+        return items;
+    }
+
+    /** 批量回填物料最新规格，避免冗余字段与物料档案不同步。 */
+    private void fillLatestSpec(List<ReceiptItem> items) {
+        if (items == null || items.isEmpty()) return;
+        List<Long> materialIds = items.stream()
+            .map(ReceiptItem::getMaterialId)
+            .filter(id -> id != null)
+            .distinct()
+            .collect(Collectors.toList());
+        if (materialIds.isEmpty()) return;
+        Map<Long, String> specMap = materialMapper.selectBatchIds(materialIds).stream()
+            .collect(Collectors.toMap(Material::getId, m -> m.getSpec() != null ? m.getSpec() : ""));
+        for (ReceiptItem item : items) {
+            if (item.getMaterialId() != null && specMap.containsKey(item.getMaterialId())) {
+                item.setSpec(specMap.get(item.getMaterialId()));
+            }
+        }
     }
 
     @Override
