@@ -111,7 +111,7 @@
           <template #default="{ row }">{{ fmtQty(row.shipmentQty) }}</template>
         </el-table-column>
         <el-table-column label="应收金额" width="110" align="right">
-          <template #default="{ row }">¥{{ fmtAmt(row.goodsAmount) }}</template>
+          <template #default="{ row }">¥{{ fmtAmt(row.shipmentAmount) }}</template>
         </el-table-column>
         <el-table-column label="操作" width="90" align="center" fixed="right">
           <template #default="{ row }">
