@@ -31,12 +31,17 @@ public class StatementItemServiceImpl extends ServiceImpl<StatementItemMapper, S
             item.setProcessName(str(map.get("process_name")));
             item.setPrevBalanceQty(toBigDecimal(map.get("prev_balance_qty")));
             item.setReceiptQty(toBigDecimal(map.get("receipt_qty")));
+            item.setNormalReceiptQty(toBigDecimal(map.get("normal_receipt_qty")));
             item.setReworkQty(toBigDecimal(map.get("rework_qty")));
             item.setShipmentQty(toBigDecimal(map.get("shipment_qty")));
+            item.setGoodsShipQty(toBigDecimal(map.get("goods_ship_qty")));
             item.setDefectiveQty(toBigDecimal(map.get("defective_qty")));
             item.setCurrBalanceQty(toBigDecimal(map.get("curr_balance_qty")));
             item.setUnitPrice(toBigDecimal(map.get("unit_price")));
             item.setGoodsAmount(toBigDecimal(map.get("goods_amount")));
+            item.setReworkAmount(toBigDecimal(map.get("rework_amount")));
+            item.setPrevFinancialBalance(toBigDecimal(map.get("prev_financial_balance")));
+            item.setPrevFinancialOrigin(str(map.get("prev_financial_origin")));
             item.setShipmentAmount(toBigDecimal(map.get("shipment_amount")));
             item.setRemark(str(map.get("remark")));
             items.add(item);

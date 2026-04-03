@@ -179,8 +179,10 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
             updateById(existing);
             // Re-generate items
             statementItemService.deleteByStatementId(existing.getId());
-            BigDecimal existingGoodsAmount = buildAndSaveItems(existing, customerId, ym, allReceiptItems, allShipmentItems);
+            BigDecimal existingGoodsAmount = buildAndSaveItems(existing, customerId, ym, receipts, allReceiptItems, shipments, allShipmentItems);
             existing.setGoodsAmount(existingGoodsAmount);
+            // 更新 shipmentAmount 为明细汇总（含结转行）
+            existing.setShipmentAmount(existingGoodsAmount);
             updateById(existing);
             return existing;
         }
@@ -196,8 +198,10 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         statement.setReceiptAmount(receiptAmount);
         statement.setShipmentAmount(shipmentAmount);
         save(statement);
-        BigDecimal newGoodsAmount = buildAndSaveItems(statement, customerId, ym, allReceiptItems, allShipmentItems);
+        BigDecimal newGoodsAmount = buildAndSaveItems(statement, customerId, ym, receipts, allReceiptItems, shipments, allShipmentItems);
         statement.setGoodsAmount(newGoodsAmount);
+        // 更新 shipmentAmount 为明细汇总（含结转行）
+        statement.setShipmentAmount(newGoodsAmount);
         updateById(statement);
         return statement;
     }
@@ -207,7 +211,8 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
     }
 
     private BigDecimal buildAndSaveItems(Statement stmt, Long customerId, YearMonth ym,
-                                   List<ReceiptItem> receiptItems, List<ShipmentItem> shipmentItems) {
+                                   List<Receipt> receipts, List<ReceiptItem> receiptItems,
+                                   List<Shipment> shipments, List<ShipmentItem> shipmentItems) {
         // Group by materialId + "_" + processId
         Map<String, StatementItem> itemMap = new LinkedHashMap<>();
 
@@ -223,10 +228,14 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                 si.setProcessId(pid != 0L ? pid : null);
                 si.setProcessName(ri.getProcessName());
                 si.setReceiptQty(BigDecimal.ZERO);
+                si.setNormalReceiptQty(BigDecimal.ZERO);
                 si.setReworkQty(BigDecimal.ZERO);
                 si.setShipmentQty(BigDecimal.ZERO);
+                si.setGoodsShipQty(BigDecimal.ZERO);
                 si.setDefectiveQty(BigDecimal.ZERO);
                 si.setGoodsAmount(BigDecimal.ZERO);
+                si.setReworkAmount(BigDecimal.ZERO);
+                si.setPrevFinancialBalance(BigDecimal.ZERO);
                 si.setShipmentAmount(BigDecimal.ZERO);
                 si.setPrevBalanceQty(BigDecimal.ZERO);
                 si.setCurrBalanceQty(BigDecimal.ZERO);
@@ -238,11 +247,8 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
             // Accumulate rework qty separately (these are free)
             if ("返工".equals(ri.getReceiptSource())) {
                 item.setReworkQty(item.getReworkQty().add(riQty));
-            }
-            // Use unit_price from receipt item if not set yet; skip rework rows (their price should be 0)
-            if (!"返工".equals(ri.getReceiptSource()) && item.getUnitPrice().compareTo(BigDecimal.ZERO) == 0
-                    && ri.getUnitPrice() != null && ri.getUnitPrice().compareTo(BigDecimal.ZERO) > 0) {
-                item.setUnitPrice(ri.getUnitPrice());
+            } else {
+                item.setNormalReceiptQty(item.getNormalReceiptQty().add(riQty));
             }
         }
 
@@ -258,10 +264,14 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                 newItem.setProcessId(pid != 0L ? pid : null);
                 newItem.setProcessName(si.getProcessName());
                 newItem.setReceiptQty(BigDecimal.ZERO);
+                newItem.setNormalReceiptQty(BigDecimal.ZERO);
                 newItem.setReworkQty(BigDecimal.ZERO);
                 newItem.setShipmentQty(BigDecimal.ZERO);
+                newItem.setGoodsShipQty(BigDecimal.ZERO);
                 newItem.setDefectiveQty(BigDecimal.ZERO);
                 newItem.setGoodsAmount(BigDecimal.ZERO);
+                newItem.setReworkAmount(BigDecimal.ZERO);
+                newItem.setPrevFinancialBalance(BigDecimal.ZERO);
                 newItem.setShipmentAmount(BigDecimal.ZERO);
                 newItem.setPrevBalanceQty(BigDecimal.ZERO);
                 newItem.setCurrBalanceQty(BigDecimal.ZERO);
@@ -273,11 +283,51 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
             BigDecimal amt = si.getAmount() != null ? si.getAmount() : BigDecimal.ZERO;
             item.setShipmentQty(item.getShipmentQty().add(goodsQty).add(defQty));
             item.setDefectiveQty(item.getDefectiveQty().add(defQty));
-            // goodsAmount and shipmentAmount will be recalculated after rework deduction; accumulate raw amount here
             item.setShipmentAmount(item.getShipmentAmount().add(amt));
-            if (item.getUnitPrice().compareTo(BigDecimal.ZERO) == 0 && si.getUnitPrice() != null
-                    && si.getUnitPrice().compareTo(BigDecimal.ZERO) > 0) {
-                item.setUnitPrice(si.getUnitPrice());
+        }
+
+        // ---- 取价：发货单最新一条优先，其次收货单最新一条（非返工）----
+        // 构建 shipmentId -> shipmentDate 映射
+        Map<Long, java.time.LocalDate> shipmentDateMap = new HashMap<>();
+        for (Shipment s : shipments) {
+            if (s.getShipmentDate() != null) shipmentDateMap.put(s.getId(), s.getShipmentDate());
+        }
+        // 构建 receiptId -> receiptDate 映射
+        Map<Long, java.time.LocalDate> receiptDateMap = new HashMap<>();
+        for (Receipt rc : receipts) {
+            if (rc.getReceiptDate() != null) receiptDateMap.put(rc.getId(), rc.getReceiptDate());
+        }
+
+        // 每个 key 的最新发货单价
+        Map<String, BigDecimal> latestShipPriceMap = new HashMap<>();
+        Map<String, java.time.LocalDate> latestShipDateMap = new HashMap<>();
+        for (ShipmentItem si : shipmentItems) {
+            if (si.getUnitPrice() == null || si.getUnitPrice().compareTo(BigDecimal.ZERO) <= 0) continue;
+            Long mid = si.getMaterialId() != null ? si.getMaterialId() : 0L;
+            Long pid = si.getProcessId() != null ? si.getProcessId() : 0L;
+            String key = mid + "_" + pid;
+            java.time.LocalDate date = shipmentDateMap.get(si.getShipmentId());
+            java.time.LocalDate existing = latestShipDateMap.get(key);
+            if (existing == null || (date != null && date.isAfter(existing))) {
+                latestShipPriceMap.put(key, si.getUnitPrice());
+                latestShipDateMap.put(key, date != null ? date : java.time.LocalDate.MIN);
+            }
+        }
+
+        // 每个 key 的最新收货单价（非返工）
+        Map<String, BigDecimal> latestRcptPriceMap = new HashMap<>();
+        Map<String, java.time.LocalDate> latestRcptDateMap = new HashMap<>();
+        for (ReceiptItem ri : receiptItems) {
+            if ("返工".equals(ri.getReceiptSource())) continue;
+            if (ri.getUnitPrice() == null || ri.getUnitPrice().compareTo(BigDecimal.ZERO) <= 0) continue;
+            Long mid = ri.getMaterialId() != null ? ri.getMaterialId() : 0L;
+            Long pid = ri.getProcessId() != null ? ri.getProcessId() : 0L;
+            String key = mid + "_" + pid;
+            java.time.LocalDate date = receiptDateMap.get(ri.getReceiptId());
+            java.time.LocalDate existing = latestRcptDateMap.get(key);
+            if (existing == null || (date != null && date.isAfter(existing))) {
+                latestRcptPriceMap.put(key, ri.getUnitPrice());
+                latestRcptDateMap.put(key, date != null ? date : java.time.LocalDate.MIN);
             }
         }
 
@@ -285,6 +335,36 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         // for this customer, grouped by materialId+processId. This is independent of whether prior
         // statement records exist, making each month's generation idempotent.
         LocalDate monthStart = ym.atDay(1);
+
+        // ---- 查上月对账明细，用于处理上期结转 ----
+        // 业务规则：仅当上月对账单【总金额】为负时才结转
+        // 对每条上月负金额明细：若本月有相同 materialId+processId → 合并行（加返工数量和金额）
+        //                       若本月没有 → 新增幽灵行（收发货为0，只有返工数量/金额）
+        YearMonth prevYm = ym.minusMonths(1);
+        String prevMonth = prevYm.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
+        LambdaQueryWrapper<Statement> prevStmtWrapper = new LambdaQueryWrapper<Statement>()
+            .eq(Statement::getCustomerId, customerId)
+            .eq(Statement::getStatementMonth, prevMonth)
+            .last("LIMIT 1");
+        Statement prevStatement = getOne(prevStmtWrapper);
+        // 上月需结转的明细列表（只在上月总金额为负时使用）
+        List<StatementItem> prevCarryItems = new ArrayList<>();
+        if (prevStatement != null) {
+            List<StatementItem> prevItems = statementItemService.getByStatementId(prevStatement.getId());
+            // 计算上月总金额
+            BigDecimal prevTotal = prevItems.stream()
+                .map(pi -> pi.getShipmentAmount() != null ? pi.getShipmentAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+            // 仅当上月总金额为负时才结转
+            if (prevTotal.compareTo(BigDecimal.ZERO) < 0) {
+                for (StatementItem pi : prevItems) {
+                    BigDecimal itemAmt = pi.getShipmentAmount() != null ? pi.getShipmentAmount() : BigDecimal.ZERO;
+                    if (itemAmt.compareTo(BigDecimal.ZERO) < 0) {
+                        prevCarryItems.add(pi);
+                    }
+                }
+            }
+        }
 
         // All receipts for this customer BEFORE the month start
         LambdaQueryWrapper<Receipt> prevReceiptWrapper = new LambdaQueryWrapper<Receipt>()
@@ -388,6 +468,15 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         List<StatementItem> itemsToSave = new ArrayList<>();
         for (Map.Entry<String, StatementItem> entry : itemMap.entrySet()) {
             StatementItem item = entry.getValue();
+            String key = entry.getKey();
+            // 取价：发货单最新 > 收货单最新 > 物料默认价
+            BigDecimal unitPrice = latestShipPriceMap.get(key);
+            if (unitPrice == null || unitPrice.compareTo(BigDecimal.ZERO) == 0) {
+                unitPrice = latestRcptPriceMap.get(key);
+            }
+            if (unitPrice != null && unitPrice.compareTo(BigDecimal.ZERO) > 0) {
+                item.setUnitPrice(unitPrice);
+            }
             // Fallback unit price from material
             if (item.getUnitPrice().compareTo(BigDecimal.ZERO) == 0 && item.getMaterialId() != null) {
                 Material mat = materialMapper.selectById(item.getMaterialId());
@@ -396,7 +485,6 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                 }
             }
             // 计算结余：优先使用反推法（当前库存 - 月后净变动），无库存记录时退化为单据累加
-            String key = entry.getKey();
             BigDecimal prevBal;
             BigDecimal currBal;
             if (inventoryMap.containsKey(key)) {
@@ -411,30 +499,77 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
             }
             item.setPrevBalanceQty(prevBal);
             item.setCurrBalanceQty(currBal);
-            // goodsAmount: 按发货单实际金额比例计算，正确反映单价变动。
-            // 公式：shipmentAmount × (billableQty / goodsShipQty)，goodsShipQty=0 时 goodsAmount=0。
-            // billableQty = max(0, goodsShipQty - reworkQty)
-            BigDecimal goodsShipQty = item.getShipmentQty().subtract(item.getDefectiveQty());
-            BigDecimal reworkDeduction = item.getReworkQty() != null ? item.getReworkQty() : BigDecimal.ZERO;
-            BigDecimal billableQty = goodsShipQty.subtract(reworkDeduction).max(BigDecimal.ZERO);
-            BigDecimal goodsAmount;
-            if (goodsShipQty.compareTo(BigDecimal.ZERO) > 0) {
-                goodsAmount = item.getShipmentAmount()
-                    .multiply(billableQty)
-                    .divide(goodsShipQty, 2, java.math.RoundingMode.HALF_UP);
-            } else {
-                goodsAmount = BigDecimal.ZERO;
-            }
+            // 发货金额（良品）= 发货总数量 × 单价
+            BigDecimal shipQty = item.getShipmentQty() != null ? item.getShipmentQty() : BigDecimal.ZERO;
+            BigDecimal goodsAmount = shipQty.multiply(item.getUnitPrice()).setScale(2, java.math.RoundingMode.HALF_UP);
+            // 发货金额（返工）= -本月收货（返工）× 单价（负数，表示抵扣）
+            BigDecimal reworkQty = item.getReworkQty() != null ? item.getReworkQty() : BigDecimal.ZERO;
+            BigDecimal reworkAmount = reworkQty.multiply(item.getUnitPrice()).negate().setScale(2, java.math.RoundingMode.HALF_UP);
+            // 发货金额（合计）= 良品金额 + 返工金额
+            BigDecimal totalAmount = goodsAmount.add(reworkAmount);
+            item.setGoodsShipQty(shipQty);
             item.setGoodsAmount(goodsAmount);
+            item.setReworkAmount(reworkAmount);
+            item.setPrevFinancialBalance(BigDecimal.ZERO);
+            item.setPrevFinancialOrigin(null);
+            item.setShipmentAmount(totalAmount);
             itemsToSave.add(item);
+        }
+
+        // ---- 处理上期结转：上月总金额为负时，将上月负金额明细合并或新增到本月 ----
+        for (StatementItem pi : prevCarryItems) {
+            Long mid = pi.getMaterialId() != null ? pi.getMaterialId() : 0L;
+            Long pid = pi.getProcessId() != null ? pi.getProcessId() : 0L;
+            String k = mid + "_" + pid;
+            // 上月该明细的返工数量和返工金额（已经是负数）
+            BigDecimal carryReworkQty = pi.getReworkQty() != null ? pi.getReworkQty() : BigDecimal.ZERO;
+            BigDecimal carryReworkAmt = pi.getReworkAmount() != null ? pi.getReworkAmount() : BigDecimal.ZERO;
+
+            // 查本月 itemMap 是否已有该 key
+            StatementItem existing = itemMap.get(k);
+            if (existing != null) {
+                // 合并：把上月的返工数量和返工金额加入本月已有行
+                BigDecimal existReworkQty = existing.getReworkQty() != null ? existing.getReworkQty() : BigDecimal.ZERO;
+                BigDecimal existReworkAmt = existing.getReworkAmount() != null ? existing.getReworkAmount() : BigDecimal.ZERO;
+                existing.setReworkQty(existReworkQty.add(carryReworkQty));
+                existing.setReworkAmount(existReworkAmt.add(carryReworkAmt));
+                // 重算该行 shipmentAmount
+                BigDecimal mergedTotal = (existing.getGoodsAmount() != null ? existing.getGoodsAmount() : BigDecimal.ZERO)
+                    .add(existing.getReworkAmount());
+                existing.setShipmentAmount(mergedTotal);
+            } else {
+                // 幽灵行：收发货为0，只有返工数量/金额（来自上月结转）
+                StatementItem ghost = new StatementItem();
+                ghost.setMaterialId(mid != 0L ? mid : null);
+                ghost.setMaterialCode(pi.getMaterialCode());
+                ghost.setMaterialName(pi.getMaterialName());
+                ghost.setProcessId(pid != 0L ? pid : null);
+                ghost.setProcessName(pi.getProcessName());
+                ghost.setPrevBalanceQty(BigDecimal.ZERO);
+                ghost.setReceiptQty(BigDecimal.ZERO);
+                ghost.setNormalReceiptQty(BigDecimal.ZERO);
+                ghost.setReworkQty(carryReworkQty);
+                ghost.setShipmentQty(BigDecimal.ZERO);
+                ghost.setGoodsShipQty(BigDecimal.ZERO);
+                ghost.setDefectiveQty(BigDecimal.ZERO);
+                ghost.setCurrBalanceQty(BigDecimal.ZERO);
+                ghost.setUnitPrice(pi.getUnitPrice() != null ? pi.getUnitPrice() : BigDecimal.ZERO);
+                ghost.setGoodsAmount(BigDecimal.ZERO);
+                ghost.setReworkAmount(carryReworkAmt);
+                ghost.setPrevFinancialBalance(BigDecimal.ZERO);
+                ghost.setPrevFinancialOrigin(null);
+                ghost.setShipmentAmount(carryReworkAmt);
+                itemsToSave.add(ghost);
+                itemMap.put(k, ghost);
+            }
         }
 
         if (!itemsToSave.isEmpty()) {
             statementItemService.saveItems(stmt.getId(), stmt.getStatementNo(), itemsToSave);
         }
-        // Return total goodsAmount for this statement
+        // Return total shipmentAmount (良品金额+返工抵扣后的实收合计) for this statement
         return itemsToSave.stream()
-            .map(i -> i.getGoodsAmount() != null ? i.getGoodsAmount() : BigDecimal.ZERO)
+            .map(i -> i.getShipmentAmount() != null ? i.getShipmentAmount() : BigDecimal.ZERO)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -637,7 +772,13 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         XSSFWorkbook wb = new XSSFWorkbook();
         Sheet sheet = wb.createSheet("对账单");
         String[] headers = {"对账单号","对账月份","客户名称","产品编码","产品名称","规格型号","工艺要求",
-            "上月结余","本月收货","发货合计","良品数量","返工数量","本月结余","单价","良品金额","备注"};
+            "上月结余",
+            "本月收货(正常)","本月收货(返工)","本月收货(合计)",
+            "本月发货(良品)","本月发货(合计)",
+            "本月结余",
+            "单价",
+            "发货金额(良品)","发货金额(返工)","上期结转","发货金额(合计)",
+            "备注"};
         ExcelExportUtil.writeTitleRow(sheet, wb, "对账单", headers.length);
         ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
 
@@ -647,9 +788,11 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         CellStyle n0 = ExcelExportUtil.numStyle(wb, false);
         CellStyle n1 = ExcelExportUtil.numStyle(wb, true);
 
-        BigDecimal totalReceiptQty = BigDecimal.ZERO, totalShipmentQty = BigDecimal.ZERO,
-            totalGoodsQty = BigDecimal.ZERO, totalReworkQty = BigDecimal.ZERO,
-            totalGoodsAmount = BigDecimal.ZERO;
+        BigDecimal totalReceiptQty = BigDecimal.ZERO, totalNormalReceiptQty = BigDecimal.ZERO,
+            totalReworkReceiptQty = BigDecimal.ZERO, totalGoodsShipQty = BigDecimal.ZERO,
+            totalShipmentQty = BigDecimal.ZERO, totalGoodsAmount = BigDecimal.ZERO,
+            totalReworkAmount = BigDecimal.ZERO, totalPrevFinancial = BigDecimal.ZERO,
+            totalTotalAmount = BigDecimal.ZERO;
 
         int rowIdx = 2;
         int detailCount = 0;
@@ -675,25 +818,35 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                 ExcelExportUtil.setCell(row, 5, item.getSpec(), cs);
                 ExcelExportUtil.setCell(row, 6, item.getProcessName(), cs);
                 ExcelExportUtil.setCell(row, 7, item.getPrevBalanceQty(), ns);
-                ExcelExportUtil.setCell(row, 8, item.getReceiptQty(), ns);
-                ExcelExportUtil.setCell(row, 9, item.getShipmentQty(), ns);
-                // 良品数量 = 发货合计 - 退回 - 返工
-                BigDecimal goodsShip = (item.getShipmentQty() != null ? item.getShipmentQty() : BigDecimal.ZERO)
-                    .subtract(item.getDefectiveQty() != null ? item.getDefectiveQty() : BigDecimal.ZERO)
-                    .subtract(item.getReworkQty() != null ? item.getReworkQty() : BigDecimal.ZERO)
-                    .max(BigDecimal.ZERO);
-                BigDecimal reworkQtyVal = item.getReworkQty() != null ? item.getReworkQty() : BigDecimal.ZERO;
-                ExcelExportUtil.setCell(row, 10, goodsShip, ns);
-                ExcelExportUtil.setCell(row, 11, reworkQtyVal, ns);
-                ExcelExportUtil.setCell(row, 12, item.getCurrBalanceQty(), ns);
-                ExcelExportUtil.setCell(row, 13, item.getUnitPrice(), ns);
-                ExcelExportUtil.setCell(row, 14, item.getGoodsAmount(), ns);
-                ExcelExportUtil.setCell(row, 15, item.getRemark(), cs);
-                if (item.getReceiptQty() != null) totalReceiptQty = totalReceiptQty.add(item.getReceiptQty());
-                if (item.getShipmentQty() != null) totalShipmentQty = totalShipmentQty.add(item.getShipmentQty());
-                totalGoodsQty = totalGoodsQty.add(goodsShip);
-                totalReworkQty = totalReworkQty.add(reworkQtyVal);
-                if (item.getGoodsAmount() != null) totalGoodsAmount = totalGoodsAmount.add(item.getGoodsAmount());
+                BigDecimal normalReceiptQty = item.getNormalReceiptQty() != null ? item.getNormalReceiptQty() : BigDecimal.ZERO;
+                BigDecimal reworkReceiptQty = item.getReworkQty() != null ? item.getReworkQty() : BigDecimal.ZERO;
+                BigDecimal receiptTotal = item.getReceiptQty() != null ? item.getReceiptQty() : BigDecimal.ZERO;
+                BigDecimal shipTotalQty = item.getShipmentQty() != null ? item.getShipmentQty() : BigDecimal.ZERO;
+                BigDecimal goodsAmtVal = item.getGoodsAmount() != null ? item.getGoodsAmount() : BigDecimal.ZERO;
+                BigDecimal reworkAmtVal = item.getReworkAmount() != null ? item.getReworkAmount() : BigDecimal.ZERO;
+                BigDecimal prevFinancialVal = item.getPrevFinancialBalance() != null ? item.getPrevFinancialBalance() : BigDecimal.ZERO;
+                BigDecimal totalAmtVal = item.getShipmentAmount() != null ? item.getShipmentAmount() : BigDecimal.ZERO;
+                ExcelExportUtil.setCell(row, 8, normalReceiptQty, ns);
+                ExcelExportUtil.setCell(row, 9, reworkReceiptQty, ns);
+                ExcelExportUtil.setCell(row, 10, receiptTotal, ns);
+                ExcelExportUtil.setCell(row, 11, shipTotalQty, ns);  // 本月发货(良品) = 发货总数
+                ExcelExportUtil.setCell(row, 12, shipTotalQty, ns);  // 本月发货(合计) = 同上
+                ExcelExportUtil.setCell(row, 13, item.getCurrBalanceQty(), ns);
+                ExcelExportUtil.setCell(row, 14, item.getUnitPrice(), ns);
+                ExcelExportUtil.setCell(row, 15, goodsAmtVal, ns);
+                ExcelExportUtil.setCell(row, 16, reworkAmtVal, ns);
+                ExcelExportUtil.setCell(row, 17, prevFinancialVal, ns);  // 上期结转
+                ExcelExportUtil.setCell(row, 18, totalAmtVal, ns);       // 发货金额(合计)
+                ExcelExportUtil.setCell(row, 19, item.getRemark(), cs);
+                totalReceiptQty = totalReceiptQty.add(receiptTotal);
+                totalNormalReceiptQty = totalNormalReceiptQty.add(normalReceiptQty);
+                totalReworkReceiptQty = totalReworkReceiptQty.add(reworkReceiptQty);
+                totalGoodsShipQty = totalGoodsShipQty.add(shipTotalQty);
+                totalShipmentQty = totalShipmentQty.add(shipTotalQty);
+                totalGoodsAmount = totalGoodsAmount.add(goodsAmtVal);
+                totalReworkAmount = totalReworkAmount.add(reworkAmtVal);
+                totalPrevFinancial = totalPrevFinancial.add(prevFinancialVal);
+                totalTotalAmount = totalTotalAmount.add(totalAmtVal);
                 detailCount++;
             }
         }
@@ -703,14 +856,18 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         Row sumRow = sheet.createRow(rowIdx);
         ExcelExportUtil.setCell(sumRow, 0, "合计", sumS);
         for (int i = 1; i <= 7; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
-        ExcelExportUtil.setCell(sumRow, 8, totalReceiptQty, sumN);
-        ExcelExportUtil.setCell(sumRow, 9, totalShipmentQty, sumN);
-        ExcelExportUtil.setCell(sumRow, 10, totalGoodsQty, sumN);
-        ExcelExportUtil.setCell(sumRow, 11, totalReworkQty, sumN);
-        ExcelExportUtil.setCell(sumRow, 12, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 8, totalNormalReceiptQty, sumN);
+        ExcelExportUtil.setCell(sumRow, 9, totalReworkReceiptQty, sumN);
+        ExcelExportUtil.setCell(sumRow, 10, totalReceiptQty, sumN);
+        ExcelExportUtil.setCell(sumRow, 11, totalGoodsShipQty, sumN);
+        ExcelExportUtil.setCell(sumRow, 12, totalShipmentQty, sumN);
         ExcelExportUtil.setCell(sumRow, 13, "", sumS);
-        ExcelExportUtil.setCell(sumRow, 14, totalGoodsAmount, sumN);
-        ExcelExportUtil.setCell(sumRow, 15, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 14, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 15, totalGoodsAmount, sumN);
+        ExcelExportUtil.setCell(sumRow, 16, totalReworkAmount, sumN);
+        ExcelExportUtil.setCell(sumRow, 17, totalPrevFinancial, sumN);
+        ExcelExportUtil.setCell(sumRow, 18, totalTotalAmount, sumN);
+        ExcelExportUtil.setCell(sumRow, 19, "", sumS);
 
         sheet.createFreezePane(0, 2);
         ExcelExportUtil.autoSize(sheet, headers.length);
@@ -746,7 +903,16 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
             }
         }
 
-        for (String key : keys) {
+        // ⚠️ 必须按月份从早到晚排序，确保 prevFinancialBalance 结转正确
+        // key 格式: customerId_yyyy-MM，按月份字段（下划线后的部分）升序排序
+        List<String> sortedKeys = new java.util.ArrayList<>(keys);
+        sortedKeys.sort((a, b) -> {
+            String monthA = a.substring(a.indexOf('_') + 1);
+            String monthB = b.substring(b.indexOf('_') + 1);
+            return monthA.compareTo(monthB);
+        });
+
+        for (String key : sortedKeys) {
             String[] parts = key.split("_");
             Long customerId = Long.valueOf(parts[0]);
             String month = parts[1];

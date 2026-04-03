@@ -47,21 +47,20 @@
                 <el-table-column prop="prevBalanceQty" label="上月结余" width="90" align="right">
                   <template #default="{ row: item }">{{ fmtQty(item.prevBalanceQty) }}</template>
                 </el-table-column>
-                <el-table-column prop="receiptQty" label="本月收货" width="90" align="right">
+                <el-table-column label="本月收货(正常)" width="110" align="right">
+                  <template #default="{ row: item }">{{ fmtQty(item.normalReceiptQty) }}</template>
+                </el-table-column>
+                <el-table-column label="本月收货(返工)" width="110" align="right">
+                  <template #default="{ row: item }">{{ fmtQty(item.reworkQty) }}</template>
+                </el-table-column>
+                <el-table-column prop="receiptQty" label="本月收货(合计)" width="110" align="right">
                   <template #default="{ row: item }">{{ fmtQty(item.receiptQty) }}</template>
                 </el-table-column>
-                <el-table-column prop="shipmentQty" label="发货合计" width="90" align="right">
+                <el-table-column label="本月发货(良品)" width="110" align="right">
                   <template #default="{ row: item }">{{ fmtQty(item.shipmentQty) }}</template>
                 </el-table-column>
-                <el-table-column label="良品数量" width="90" align="right">
-                  <template #default="{ row: item }">
-                    {{ fmtQty(Math.max(0, (Number(item.shipmentQty)||0) - (Number(item.defectiveQty)||0) - (Number(item.reworkQty)||0))) }}
-                  </template>
-                </el-table-column>
-                <el-table-column label="返工数量" width="90" align="right">
-                  <template #default="{ row: item }">
-                    {{ fmtQty(item.reworkQty || 0) }}
-                  </template>
+                <el-table-column prop="shipmentQty" label="本月发货(合计)" width="110" align="right">
+                  <template #default="{ row: item }">{{ fmtQty(item.shipmentQty) }}</template>
                 </el-table-column>
                 <el-table-column prop="currBalanceQty" label="本月结余" width="90" align="right">
                   <template #default="{ row: item }">{{ fmtQty(item.currBalanceQty) }}</template>
@@ -69,17 +68,33 @@
                 <el-table-column prop="unitPrice" label="单价" width="80" align="right">
                   <template #default="{ row: item }">{{ fmtPrice(item.unitPrice) }}</template>
                 </el-table-column>
-                <el-table-column prop="goodsAmount" label="良品金额" width="100" align="right">
+                <el-table-column label="发货金额(良品)" width="110" align="right">
                   <template #default="{ row: item }">{{ fmtAmt(item.goodsAmount) }}</template>
+                </el-table-column>
+                <el-table-column label="发货金额(返工)" width="110" align="right">
+                  <template #default="{ row: item }">
+                    <span :style="{ color: (item.reworkAmount || 0) < 0 ? '#f56c6c' : '' }">
+                      {{ fmtAmt(item.reworkAmount) }}
+                    </span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="发货金额(合计)" width="110" align="right">
+                  <template #default="{ row: item }">
+                    <span :style="{ color: (item.shipmentAmount || 0) < 0 ? '#f56c6c' : '' }">
+                      {{ fmtAmt(item.shipmentAmount) }}
+                    </span>
+                  </template>
                 </el-table-column>
                 <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
               </el-table>
               <div v-if="row.items && row.items.length" class="items-summary">
-                合计：收货 <b>{{ sumField(row.items, 'receiptQty') }}</b> &nbsp;|&nbsp;
-                发货合计 <b>{{ sumField(row.items, 'shipmentQty') }}</b> &nbsp;|&nbsp;
-                良品数量 <b>{{ row.items.reduce((a,i) => a + Math.max(0,(Number(i.shipmentQty)||0)-(Number(i.defectiveQty)||0)-(Number(i.reworkQty)||0)), 0).toLocaleString() }}</b> &nbsp;|&nbsp;
-                返工数量 <b>{{ sumField(row.items, 'reworkQty') }}</b> &nbsp;|&nbsp;
-                良品金额 <b>¥{{ sumField(row.items, 'goodsAmount') }}</b>
+                合计：收货(正常) <b>{{ sumField(row.items, 'normalReceiptQty') }}</b> &nbsp;|&nbsp;
+                收货(返工) <b>{{ sumField(row.items, 'reworkQty') }}</b> &nbsp;|&nbsp;
+                收货(合计) <b>{{ sumField(row.items, 'receiptQty') }}</b> &nbsp;|&nbsp;
+                发货(良品/合计) <b>{{ sumField(row.items, 'shipmentQty') }}</b> &nbsp;|&nbsp;
+                金额(良品) <b>¥{{ sumField(row.items, 'goodsAmount') }}</b> &nbsp;|&nbsp;
+                金额(返工) <b style="color:#f56c6c">¥{{ sumField(row.items, 'reworkAmount') }}</b> &nbsp;|&nbsp;
+                金额(合计) <b>¥{{ sumField(row.items, 'shipmentAmount') }}</b>
               </div>
             </div>
           </template>
@@ -95,7 +110,7 @@
         <el-table-column label="发货数量" width="100" align="right">
           <template #default="{ row }">{{ fmtQty(row.shipmentQty) }}</template>
         </el-table-column>
-        <el-table-column label="良品金额" width="110" align="right">
+        <el-table-column label="应收金额" width="110" align="right">
           <template #default="{ row }">¥{{ fmtAmt(row.goodsAmount) }}</template>
         </el-table-column>
         <el-table-column label="操作" width="90" align="center" fixed="right">
@@ -169,7 +184,8 @@ const fmtPrice = (v) => (v == null ? '-' : Number(v).toFixed(4))
 const fmtAmt = (v) => (v == null ? '0.00' : Number(v).toFixed(2))
 const sumField = (items, field) => {
   const s = items.reduce((acc, it) => acc + (Number(it[field]) || 0), 0)
-  return (field === 'shipmentAmount' || field === 'goodsAmount') ? s.toFixed(2) : s.toLocaleString()
+  const amtFields = ['shipmentAmount', 'goodsAmount', 'reworkAmount']
+  return amtFields.includes(field) ? s.toFixed(2) : s.toLocaleString()
 }
 
 // ---- 列表 ----

@@ -491,7 +491,12 @@ CREATE TABLE `statement_item` (
   `deleted` tinyint NOT NULL DEFAULT '0',
   `create_time` datetime DEFAULT NULL,
   `update_time` datetime DEFAULT NULL,
-  `rework_qty` decimal(12,2) DEFAULT '0.00' COMMENT 'æœ¬æœˆè¿”å·¥æ”¶è´§æ•°é‡ï¼ˆå…è´¹ï¼Œå·²ä»Žè®¡è´¹ä¸­æ‰£é™¤ï¼‰',
+  `rework_qty` decimal(12,2) DEFAULT '0.00' COMMENT '本月收货（返工）数量',
+  `normal_receipt_qty` decimal(12,2) DEFAULT '0.00' COMMENT '本月收货（正常）数量',
+  `goods_ship_qty` decimal(12,2) DEFAULT '0.00' COMMENT '本月发货（良品）数量',
+  `rework_amount` decimal(12,2) DEFAULT '0.00' COMMENT '发货金额（返工），负数',
+  `prev_financial_balance` decimal(12,2) DEFAULT '0.00' COMMENT '上期结转金额（累计未抵扣负数，<=0）',
+  `prev_financial_origin` varchar(10) DEFAULT NULL COMMENT '上期结转来源月份（最初产生负数的月份）',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=84733 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='对账单明细';
 /*!40101 SET character_set_client = @saved_cs_client */;

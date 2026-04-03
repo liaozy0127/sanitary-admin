@@ -14,8 +14,10 @@ public interface StatementItemMapper extends BaseMapper<StatementItem> {
      * 查询对账单明细（关联物料、工艺表获取最新信息）
      */
     @Select("SELECT si.id, si.statement_id, si.statement_no, si.material_id, si.process_id, " +
-            "  si.prev_balance_qty, si.receipt_qty, si.rework_qty, si.shipment_qty, si.defective_qty, " +
-            "  si.curr_balance_qty, si.unit_price, si.goods_amount, si.shipment_amount, si.remark, " +
+            "  si.prev_balance_qty, si.receipt_qty, si.normal_receipt_qty, si.rework_qty, " +
+            "  si.shipment_qty, si.goods_ship_qty, si.defective_qty, " +
+            "  si.curr_balance_qty, si.unit_price, si.goods_amount, si.rework_amount, " +
+            "  si.prev_financial_balance, si.prev_financial_origin, si.shipment_amount, si.remark, " +
             "  COALESCE(m.material_code, si.material_code) AS material_code, " +
             "  COALESCE(m.material_name, si.material_name) AS material_name, " +
             "  m.spec AS spec, " +

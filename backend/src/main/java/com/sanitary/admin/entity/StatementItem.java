@@ -19,14 +19,19 @@ public class StatementItem {
     private Long processId;
     private String processName;
     private BigDecimal prevBalanceQty;
-    private BigDecimal receiptQty;
-    private BigDecimal reworkQty;     // 本月返工收货数量（免费，已从计费中扣除）
-    private BigDecimal shipmentQty;
-    private BigDecimal defectiveQty;  // 原件退回数量
+    private BigDecimal receiptQty;       // 本月收货（合计）
+    private BigDecimal normalReceiptQty; // 本月收货（正常）
+    private BigDecimal reworkQty;        // 本月收货（返工）
+    private BigDecimal shipmentQty;      // 本月发货（合计）
+    private BigDecimal goodsShipQty;     // 本月发货（良品）
+    private BigDecimal defectiveQty;     // 原件退回数量
     private BigDecimal currBalanceQty;
     private BigDecimal unitPrice;
-    private BigDecimal goodsAmount;   // 良品金额
-    private BigDecimal shipmentAmount;
+    private BigDecimal goodsAmount;          // 发货金额（良品）= goodsShipQty × unitPrice
+    private BigDecimal reworkAmount;         // 发货金额（返工）= -reworkQty × unitPrice（负数）
+    private BigDecimal prevFinancialBalance; // 上期结转金额（累计未抵扣负数，<=0 时结转，>0 清零）
+    private String prevFinancialOrigin;      // 上期结转来源月份（最初产生负数的月份，如 "2025-12"）
+    private BigDecimal shipmentAmount;       // 发货金额（合计）= goodsAmount + reworkAmount + prevFinancialBalance
     private String remark;
     @TableLogic
     private Integer deleted;
