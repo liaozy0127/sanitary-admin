@@ -19,11 +19,9 @@
 -- Dumping data for table `sys_user`
 --
 
-LOCK TABLES `sys_user` WRITE;
 /*!40000 ALTER TABLE `sys_user` DISABLE KEYS */;
 INSERT INTO `sys_user` VALUES (1,'admin','$2b$10$gVmswZWzA42HHQnh3CCE5.NFc7f7wpt8cLtBJNxX5fJ1P5ozNYAsK','admin@sanitary.com',NULL,'ADMIN',1,'2026-03-15 22:31:51','2026-03-15 22:31:51');
 /*!40000 ALTER TABLE `sys_user` ENABLE KEYS */;
-UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -34,4 +32,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-04-01 21:51:54
+-- Dump completed on 2026-04-03 11:59:27
