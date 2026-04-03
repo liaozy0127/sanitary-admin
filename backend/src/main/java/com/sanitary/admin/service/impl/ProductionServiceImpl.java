@@ -338,6 +338,8 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
         CellStyle s1 = ExcelExportUtil.dataStyle(wb, true);
         CellStyle n0 = ExcelExportUtil.numStyle(wb, false);
         CellStyle n1 = ExcelExportUtil.numStyle(wb, true);
+        CellStyle q0 = ExcelExportUtil.qtyStyle(wb, false);
+        CellStyle q1 = ExcelExportUtil.qtyStyle(wb, true);
 
         BigDecimal totalPlanned = BigDecimal.ZERO;
 
@@ -357,6 +359,7 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
                 boolean even = (detailCount % 2 == 0);
                 CellStyle s = even ? s0 : s1;
                 CellStyle ns = even ? n0 : n1;
+                CellStyle qs = even ? q0 : q1;
                 Row row = sheet.createRow(rowIdx++);
                 for (int i = 0; i < 4; i++) ExcelExportUtil.setCell(row, i, "", s);
                 ExcelExportUtil.setCell(row, 4, item.getMaterialCode(), s);
@@ -365,7 +368,7 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
                 ExcelExportUtil.setCell(row, 7, item.getProcessName(), s);
                 ExcelExportUtil.setCell(row, 8, item.getReceiptType(), s);
                 ExcelExportUtil.setCell(row, 9, item.getUnit(), s);
-                ExcelExportUtil.setCell(row, 10, item.getPlannedQty(), ns);
+                ExcelExportUtil.setCell(row, 10, item.getPlannedQty(), qs);
                 ExcelExportUtil.setCell(row, 11, item.getPlatingPrice(), ns);
                 ExcelExportUtil.setCell(row, 12, item.getProductionType(), s);
                 ExcelExportUtil.setCell(row, 13, item.getDetailRemark(), s);
@@ -375,11 +378,11 @@ public class ProductionServiceImpl extends ServiceImpl<ProductionMapper, Product
         }
 
         CellStyle sumS = ExcelExportUtil.summaryStyle(wb);
-        CellStyle sumN = ExcelExportUtil.summaryNumStyle(wb);
+        CellStyle sumQ = ExcelExportUtil.summaryQtyStyle(wb);
         Row sumRow = sheet.createRow(rowIdx);
         ExcelExportUtil.setCell(sumRow, 0, "合计", sumS);
         for (int i = 1; i <= 9; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
-        ExcelExportUtil.setCell(sumRow, 10, totalPlanned, sumN);
+        ExcelExportUtil.setCell(sumRow, 10, totalPlanned, sumQ);
         for (int i = 11; i < headers.length; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
 
         sheet.createFreezePane(0, 2);

@@ -42,14 +42,14 @@
         <el-table-column prop="quantity" label="库存总数" width="110" align="right">
           <template #default="{ row }">
             <span :style="{ color: Number(row.quantity) < 0 ? '#f56c6c' : Number(row.quantity) === 0 ? '#909399' : '#67c23a', fontWeight: 'bold' }">
-              {{ Number(row.quantity || 0).toFixed(2) }}
+              {{ Math.round(Number(row.quantity || 0)) }}
             </span>
           </template>
         </el-table-column>
         <el-table-column prop="reworkQty" label="其中返工" width="100" align="right">
           <template #default="{ row }">
             <span :style="{ color: Number(row.reworkQty) > 0 ? '#E6A23C' : '#909399', fontWeight: Number(row.reworkQty) > 0 ? 'bold' : 'normal' }">
-              {{ Number(row.reworkQty || 0).toFixed(2) }}
+              {{ Math.round(Number(row.reworkQty || 0)) }}
             </span>
           </template>
         </el-table-column>
@@ -100,15 +100,15 @@
         <el-table-column prop="changeQty" label="变动数量" width="100" align="right">
           <template #default="{ row }">
             <span :style="{ color: Number(row.changeQty) >= 0 ? '#67c23a' : '#f56c6c' }">
-              {{ Number(row.changeQty) >= 0 ? '+' : '' }}{{ Number(row.changeQty || 0).toFixed(2) }}
+              {{ Number(row.changeQty) >= 0 ? '+' : '' }}{{ Math.round(Number(row.changeQty || 0)) }}
             </span>
           </template>
         </el-table-column>
         <el-table-column prop="beforeQty" label="变动前" width="90" align="right">
-          <template #default="{ row }">{{ Number(row.beforeQty || 0).toFixed(2) }}</template>
+          <template #default="{ row }">{{ Math.round(Number(row.beforeQty || 0)) }}</template>
         </el-table-column>
         <el-table-column prop="afterQty" label="变动后" width="90" align="right">
-          <template #default="{ row }">{{ Number(row.afterQty || 0).toFixed(2) }}</template>
+          <template #default="{ row }">{{ Math.round(Number(row.afterQty || 0)) }}</template>
         </el-table-column>
         <el-table-column prop="orderNo" label="关联单号" width="160" />
         <el-table-column prop="createTime" label="时间" width="160" />

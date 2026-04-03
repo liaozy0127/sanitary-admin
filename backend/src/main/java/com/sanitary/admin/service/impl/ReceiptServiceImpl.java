@@ -595,6 +595,8 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
         org.apache.poi.ss.usermodel.CellStyle s1 = ExcelExportUtil.dataStyle(wb, true);
         org.apache.poi.ss.usermodel.CellStyle n0 = ExcelExportUtil.numStyle(wb, false);
         org.apache.poi.ss.usermodel.CellStyle n1 = ExcelExportUtil.numStyle(wb, true);
+        org.apache.poi.ss.usermodel.CellStyle q0 = ExcelExportUtil.qtyStyle(wb, false);
+        org.apache.poi.ss.usermodel.CellStyle q1 = ExcelExportUtil.qtyStyle(wb, true);
 
         // 合计累加器
         BigDecimal totalQty = BigDecimal.ZERO, totalShipped = BigDecimal.ZERO,
@@ -620,6 +622,7 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
                 boolean even = (detailCount % 2 == 0);
                 org.apache.poi.ss.usermodel.CellStyle s = even ? s0 : s1;
                 org.apache.poi.ss.usermodel.CellStyle ns = even ? n0 : n1;
+                org.apache.poi.ss.usermodel.CellStyle qs = even ? q0 : q1;
                 org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
                 for (int i = 0; i < 4; i++) ExcelExportUtil.setCell(row, i, "", s);
                 ExcelExportUtil.setCell(row, 4, item.getMaterialCode(), s);
@@ -627,12 +630,12 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
                 ExcelExportUtil.setCell(row, 6, item.getSpec(), s);
                 ExcelExportUtil.setCell(row, 7, item.getProcessName(), s);
                 ExcelExportUtil.setCell(row, 8, item.getReceiptSource(), s);
-                ExcelExportUtil.setCell(row, 9, item.getQuantity(), ns);
-                ExcelExportUtil.setCell(row, 10, item.getShippedQty(), ns);
-                ExcelExportUtil.setCell(row, 11, item.getUnshippedQty(), ns);
-                ExcelExportUtil.setCell(row, 12, item.getPlannedQty(), ns);
-                ExcelExportUtil.setCell(row, 13, item.getWareHousedQty(), ns);
-                ExcelExportUtil.setCell(row, 14, item.getUnwareHousedQty(), ns);
+                ExcelExportUtil.setCell(row, 9, item.getQuantity(), qs);
+                ExcelExportUtil.setCell(row, 10, item.getShippedQty(), qs);
+                ExcelExportUtil.setCell(row, 11, item.getUnshippedQty(), qs);
+                ExcelExportUtil.setCell(row, 12, item.getPlannedQty(), qs);
+                ExcelExportUtil.setCell(row, 13, item.getWareHousedQty(), qs);
+                ExcelExportUtil.setCell(row, 14, item.getUnwareHousedQty(), qs);
                 ExcelExportUtil.setCell(row, 15, item.getUnitPrice(), ns);
                 ExcelExportUtil.setCell(row, 16, item.getAmount(), ns);
                 ExcelExportUtil.setCell(row, 17, item.getCustomerOrderNo(), s);
@@ -652,15 +655,16 @@ public class ReceiptServiceImpl extends ServiceImpl<ReceiptMapper, Receipt> impl
         // 合计行
         org.apache.poi.ss.usermodel.CellStyle sumS = ExcelExportUtil.summaryStyle(wb);
         org.apache.poi.ss.usermodel.CellStyle sumN = ExcelExportUtil.summaryNumStyle(wb);
+        org.apache.poi.ss.usermodel.CellStyle sumQ = ExcelExportUtil.summaryQtyStyle(wb);
         org.apache.poi.ss.usermodel.Row sumRow = sheet.createRow(rowIdx);
         ExcelExportUtil.setCell(sumRow, 0, "合计", sumS);
         for (int i = 1; i <= 8; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
-        ExcelExportUtil.setCell(sumRow, 9, totalQty, sumN);
-        ExcelExportUtil.setCell(sumRow, 10, totalShipped, sumN);
-        ExcelExportUtil.setCell(sumRow, 11, totalUnshipped, sumN);
-        ExcelExportUtil.setCell(sumRow, 12, totalPlanned, sumN);
-        ExcelExportUtil.setCell(sumRow, 13, totalWarehoused, sumN);
-        ExcelExportUtil.setCell(sumRow, 14, totalUnwarehoused, sumN);
+        ExcelExportUtil.setCell(sumRow, 9, totalQty, sumQ);
+        ExcelExportUtil.setCell(sumRow, 10, totalShipped, sumQ);
+        ExcelExportUtil.setCell(sumRow, 11, totalUnshipped, sumQ);
+        ExcelExportUtil.setCell(sumRow, 12, totalPlanned, sumQ);
+        ExcelExportUtil.setCell(sumRow, 13, totalWarehoused, sumQ);
+        ExcelExportUtil.setCell(sumRow, 14, totalUnwarehoused, sumQ);
         ExcelExportUtil.setCell(sumRow, 15, BigDecimal.ZERO, sumN);
         ExcelExportUtil.setCell(sumRow, 16, totalAmount, sumN);
         ExcelExportUtil.setCell(sumRow, 17, "", sumS);

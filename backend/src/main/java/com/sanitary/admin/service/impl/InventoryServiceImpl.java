@@ -603,6 +603,8 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
         CellStyle s1 = ExcelExportUtil.dataStyle(wb, true);
         CellStyle n0 = ExcelExportUtil.numStyle(wb, false);
         CellStyle n1 = ExcelExportUtil.numStyle(wb, true);
+        CellStyle q0 = ExcelExportUtil.qtyStyle(wb, false);
+        CellStyle q1 = ExcelExportUtil.qtyStyle(wb, true);
         CellStyle d0 = ExcelExportUtil.dateStyle(wb, false);
         CellStyle d1 = ExcelExportUtil.dateStyle(wb, true);
 
@@ -612,6 +614,7 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
             boolean even = (rowIdx % 2 == 0);
             CellStyle s = even ? s1 : s0;
             CellStyle ns = even ? n1 : n0;
+            CellStyle qs = even ? q1 : q0;
             CellStyle ds = even ? d1 : d0;
             Row row = sheet.createRow(rowIdx++);
             ExcelExportUtil.setCell(row, 0, inv.getMaterialCode(), s);
@@ -619,18 +622,18 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
             ExcelExportUtil.setCell(row, 2, inv.getSpec(), s);
             ExcelExportUtil.setCell(row, 3, inv.getCustomerName(), s);
             ExcelExportUtil.setCell(row, 4, inv.getProcessName(), s);
-            ExcelExportUtil.setCell(row, 5, inv.getQuantity(), ns);
+            ExcelExportUtil.setCell(row, 5, inv.getQuantity(), qs);
             ExcelExportUtil.setCell(row, 6, ExcelExportUtil.fmtDateTime(inv.getLastReceiveTime()), ds);
             ExcelExportUtil.setCell(row, 7, ExcelExportUtil.fmtDateTime(inv.getLastShipTime()), ds);
             if (inv.getQuantity() != null) totalQty = totalQty.add(inv.getQuantity());
         }
 
         CellStyle sumS = ExcelExportUtil.summaryStyle(wb);
-        CellStyle sumN = ExcelExportUtil.summaryNumStyle(wb);
+        CellStyle sumQ = ExcelExportUtil.summaryQtyStyle(wb);
         Row sumRow = sheet.createRow(rowIdx);
         ExcelExportUtil.setCell(sumRow, 0, "合计", sumS);
         for (int i = 1; i <= 4; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
-        ExcelExportUtil.setCell(sumRow, 5, totalQty, sumN);
+        ExcelExportUtil.setCell(sumRow, 5, totalQty, sumQ);
         ExcelExportUtil.setCell(sumRow, 6, "", sumS);
         ExcelExportUtil.setCell(sumRow, 7, "", sumS);
 

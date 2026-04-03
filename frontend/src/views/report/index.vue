@@ -29,7 +29,7 @@
         <el-table-column type="index" label="#" width="50" align="center" />
         <el-table-column prop="customerName" label="客户名称" min-width="160" />
         <el-table-column prop="receiptQty" label="收货数量" width="120" align="right">
-          <template #default="{ row }">{{ Number(row.receiptQty || 0).toFixed(2) }}</template>
+          <template #default="{ row }">{{ Math.round(Number(row.receiptQty || 0)) }}</template>
         </el-table-column>
         <el-table-column prop="receiptAmount" label="收货金额" width="130" align="right">
           <template #default="{ row }">
@@ -37,7 +37,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="shipmentQty" label="发货数量" width="120" align="right">
-          <template #default="{ row }">{{ Number(row.shipmentQty || 0).toFixed(2) }}</template>
+          <template #default="{ row }">{{ Math.round(Number(row.shipmentQty || 0)) }}</template>
         </el-table-column>
         <el-table-column prop="shipmentAmount" label="发货金额" width="130" align="right">
           <template #default="{ row }">
@@ -80,11 +80,20 @@ const resetSearch = () => {
 
 const getSummaries = ({ columns, data }) => {
   const sums = []
+  const qtyProps = ['receiptQty', 'shipmentQty']
+  const amtProps = ['receiptAmount', 'shipmentAmount']
   columns.forEach((col, idx) => {
     if (idx === 0) { sums[idx] = '合计'; return }
     if (idx === 1) { sums[idx] = ''; return }
     const values = data.map(item => Number(item[col.property]) || 0)
-    sums[idx] = values.reduce((a, b) => a + b, 0).toFixed(2)
+    const total = values.reduce((a, b) => a + b, 0)
+    if (qtyProps.includes(col.property)) {
+      sums[idx] = Math.round(total)
+    } else if (amtProps.includes(col.property)) {
+      sums[idx] = total.toFixed(2)
+    } else {
+      sums[idx] = total.toFixed(2)
+    }
   })
   return sums
 }

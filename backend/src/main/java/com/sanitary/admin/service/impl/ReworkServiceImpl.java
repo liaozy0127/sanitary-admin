@@ -150,6 +150,8 @@ public class ReworkServiceImpl extends ServiceImpl<ReworkMapper, Rework> impleme
         CellStyle s1 = ExcelExportUtil.dataStyle(wb, true);
         CellStyle n0 = ExcelExportUtil.numStyle(wb, false);
         CellStyle n1 = ExcelExportUtil.numStyle(wb, true);
+        CellStyle q0 = ExcelExportUtil.qtyStyle(wb, false);
+        CellStyle q1 = ExcelExportUtil.qtyStyle(wb, true);
 
         BigDecimal totalQty = BigDecimal.ZERO, totalAmount = BigDecimal.ZERO;
 
@@ -170,13 +172,14 @@ public class ReworkServiceImpl extends ServiceImpl<ReworkMapper, Rework> impleme
                 boolean even = (detailCount % 2 == 0);
                 CellStyle cs = even ? s0 : s1;
                 CellStyle ns = even ? n0 : n1;
+                CellStyle qs = even ? q0 : q1;
                 Row row = sheet.createRow(rowIdx++);
                 for (int i = 0; i < 5; i++) ExcelExportUtil.setCell(row, i, "", cs);
                 ExcelExportUtil.setCell(row, 5, item.getMaterialCode(), cs);
                 ExcelExportUtil.setCell(row, 6, item.getMaterialName(), cs);
                 ExcelExportUtil.setCell(row, 7, item.getSpec(), cs);
                 ExcelExportUtil.setCell(row, 8, item.getProcessName(), cs);
-                ExcelExportUtil.setCell(row, 9, item.getQuantity(), ns);
+                ExcelExportUtil.setCell(row, 9, item.getQuantity(), qs);
                 ExcelExportUtil.setCell(row, 10, item.getUnitPrice(), ns);
                 ExcelExportUtil.setCell(row, 11, item.getAmount(), ns);
                 ExcelExportUtil.setCell(row, 12, item.getReworkReason(), cs);
@@ -189,10 +192,11 @@ public class ReworkServiceImpl extends ServiceImpl<ReworkMapper, Rework> impleme
 
         CellStyle sumS = ExcelExportUtil.summaryStyle(wb);
         CellStyle sumN = ExcelExportUtil.summaryNumStyle(wb);
+        CellStyle sumQ = ExcelExportUtil.summaryQtyStyle(wb);
         Row sumRow = sheet.createRow(rowIdx);
         ExcelExportUtil.setCell(sumRow, 0, "合计", sumS);
         for (int i = 1; i <= 8; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
-        ExcelExportUtil.setCell(sumRow, 9, totalQty, sumN);
+        ExcelExportUtil.setCell(sumRow, 9, totalQty, sumQ);
         ExcelExportUtil.setCell(sumRow, 10, "", sumS);
         ExcelExportUtil.setCell(sumRow, 11, totalAmount, sumN);
         ExcelExportUtil.setCell(sumRow, 12, "", sumS);

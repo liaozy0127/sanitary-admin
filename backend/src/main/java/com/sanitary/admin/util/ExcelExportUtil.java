@@ -85,6 +85,14 @@ public class ExcelExportUtil {
         return s;
     }
 
+    /** 整数数量样式（收发货数量、库存数量等） */
+    public static CellStyle qtyStyle(XSSFWorkbook wb, boolean even) {
+        CellStyle s = dataStyle(wb, even);
+        s.setAlignment(HorizontalAlignment.RIGHT);
+        s.setDataFormat(wb.createDataFormat().getFormat("0"));
+        return s;
+    }
+
     public static CellStyle dateStyle(XSSFWorkbook wb, boolean even) {
         CellStyle s = dataStyle(wb, even);
         s.setAlignment(HorizontalAlignment.CENTER);
@@ -107,6 +115,14 @@ public class ExcelExportUtil {
         CellStyle s = summaryStyle(wb);
         s.setAlignment(HorizontalAlignment.RIGHT);
         s.setDataFormat(wb.createDataFormat().getFormat("0.00"));
+        return s;
+    }
+
+    /** 合计行整数数量样式 */
+    public static CellStyle summaryQtyStyle(XSSFWorkbook wb) {
+        CellStyle s = summaryStyle(wb);
+        s.setAlignment(HorizontalAlignment.RIGHT);
+        s.setDataFormat(wb.createDataFormat().getFormat("0"));
         return s;
     }
 

@@ -794,12 +794,15 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         CellStyle s1 = ExcelExportUtil.dataStyle(wb, true);
         CellStyle n0 = ExcelExportUtil.numStyle(wb, false);
         CellStyle n1 = ExcelExportUtil.numStyle(wb, true);
+        CellStyle q0 = ExcelExportUtil.qtyStyle(wb, false);
+        CellStyle q1 = ExcelExportUtil.qtyStyle(wb, true);
 
         BigDecimal totalReceiptQty = BigDecimal.ZERO, totalNormalReceiptQty = BigDecimal.ZERO,
             totalReworkReceiptQty = BigDecimal.ZERO, totalGoodsShipQty = BigDecimal.ZERO,
             totalShipmentQty = BigDecimal.ZERO, totalGoodsAmount = BigDecimal.ZERO,
             totalReworkAmount = BigDecimal.ZERO,
-            totalTotalAmount = BigDecimal.ZERO;
+            totalTotalAmount = BigDecimal.ZERO,
+            totalReceivable = BigDecimal.ZERO;
 
         int rowIdx = 3;
         int detailCount = 0;
@@ -810,12 +813,14 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
             ExcelExportUtil.setCell(masterRow, 1, st.getStatementMonth(), masterS);
             ExcelExportUtil.setCell(masterRow, 2, st.getCustomerName(), masterS);
             for (int i = 3; i < headers.length; i++) ExcelExportUtil.setCell(masterRow, i, "", masterS);
+            if (st.getShipmentAmount() != null) totalReceivable = totalReceivable.add(st.getShipmentAmount());
 
             for (StatementItem item : items) {
                 if (detailCount >= 50000) break;
                 boolean even = (detailCount % 2 == 0);
                 CellStyle cs = even ? s0 : s1;
                 CellStyle ns = even ? n0 : n1;
+                CellStyle qs = even ? q0 : q1;
                 Row row = sheet.createRow(rowIdx++);
                 ExcelExportUtil.setCell(row, 0, "", cs);
                 ExcelExportUtil.setCell(row, 1, "", cs);
@@ -824,7 +829,7 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                 ExcelExportUtil.setCell(row, 4, item.getMaterialName(), cs);
                 ExcelExportUtil.setCell(row, 5, item.getSpec(), cs);
                 ExcelExportUtil.setCell(row, 6, item.getProcessName(), cs);
-                ExcelExportUtil.setCell(row, 7, item.getPrevBalanceQty(), ns);
+                ExcelExportUtil.setCell(row, 7, item.getPrevBalanceQty(), qs);
                 BigDecimal normalReceiptQty = item.getNormalReceiptQty() != null ? item.getNormalReceiptQty() : BigDecimal.ZERO;
                 BigDecimal reworkReceiptQty = item.getReworkQty() != null ? item.getReworkQty() : BigDecimal.ZERO;
                 BigDecimal receiptTotal = item.getReceiptQty() != null ? item.getReceiptQty() : BigDecimal.ZERO;
@@ -832,12 +837,12 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                 BigDecimal goodsAmtVal = item.getGoodsAmount() != null ? item.getGoodsAmount() : BigDecimal.ZERO;
                 BigDecimal reworkAmtVal = item.getReworkAmount() != null ? item.getReworkAmount() : BigDecimal.ZERO;
                 BigDecimal totalAmtVal = item.getShipmentAmount() != null ? item.getShipmentAmount() : BigDecimal.ZERO;
-                ExcelExportUtil.setCell(row, 8, normalReceiptQty, ns);
-                ExcelExportUtil.setCell(row, 9, reworkReceiptQty, ns);
-                ExcelExportUtil.setCell(row, 10, receiptTotal, ns);
-                ExcelExportUtil.setCell(row, 11, shipTotalQty, ns);  // 本月发货(良品) = 发货总数
-                ExcelExportUtil.setCell(row, 12, shipTotalQty, ns);  // 本月发货(合计) = 同上
-                ExcelExportUtil.setCell(row, 13, item.getCurrBalanceQty(), ns);
+                ExcelExportUtil.setCell(row, 8, normalReceiptQty, qs);
+                ExcelExportUtil.setCell(row, 9, reworkReceiptQty, qs);
+                ExcelExportUtil.setCell(row, 10, receiptTotal, qs);
+                ExcelExportUtil.setCell(row, 11, shipTotalQty, qs);  // 本月发货(良品) = 发货总数
+                ExcelExportUtil.setCell(row, 12, shipTotalQty, qs);  // 本月发货(合计) = 同上
+                ExcelExportUtil.setCell(row, 13, item.getCurrBalanceQty(), qs);
                 ExcelExportUtil.setCell(row, 14, item.getUnitPrice(), ns);
                 ExcelExportUtil.setCell(row, 15, goodsAmtVal, ns);
                 ExcelExportUtil.setCell(row, 16, reworkAmtVal, ns);
@@ -857,20 +862,28 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
 
         CellStyle sumS = ExcelExportUtil.summaryStyle(wb);
         CellStyle sumN = ExcelExportUtil.summaryNumStyle(wb);
+        CellStyle sumQ = ExcelExportUtil.summaryQtyStyle(wb);
         Row sumRow = sheet.createRow(rowIdx);
         ExcelExportUtil.setCell(sumRow, 0, "合计", sumS);
         for (int i = 1; i <= 7; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
-        ExcelExportUtil.setCell(sumRow, 8, totalNormalReceiptQty, sumN);
-        ExcelExportUtil.setCell(sumRow, 9, totalReworkReceiptQty, sumN);
-        ExcelExportUtil.setCell(sumRow, 10, totalReceiptQty, sumN);
-        ExcelExportUtil.setCell(sumRow, 11, totalGoodsShipQty, sumN);
-        ExcelExportUtil.setCell(sumRow, 12, totalShipmentQty, sumN);
+        ExcelExportUtil.setCell(sumRow, 8, totalNormalReceiptQty, sumQ);
+        ExcelExportUtil.setCell(sumRow, 9, totalReworkReceiptQty, sumQ);
+        ExcelExportUtil.setCell(sumRow, 10, totalReceiptQty, sumQ);
+        ExcelExportUtil.setCell(sumRow, 11, totalGoodsShipQty, sumQ);
+        ExcelExportUtil.setCell(sumRow, 12, totalShipmentQty, sumQ);
         ExcelExportUtil.setCell(sumRow, 13, "", sumS);
         ExcelExportUtil.setCell(sumRow, 14, "", sumS);
         ExcelExportUtil.setCell(sumRow, 15, totalGoodsAmount, sumN);
         ExcelExportUtil.setCell(sumRow, 16, totalReworkAmount, sumN);
         ExcelExportUtil.setCell(sumRow, 17, totalTotalAmount, sumN);
         ExcelExportUtil.setCell(sumRow, 18, "", sumS);
+
+        // 应收金额行（Statement 级别 shipmentAmount 之和，含结转扣减）
+        Row receivableRow = sheet.createRow(rowIdx + 1);
+        CellStyle receivableLabel = ExcelExportUtil.summaryStyle(wb);
+        for (int i = 0; i < headers.length; i++) ExcelExportUtil.setCell(receivableRow, i, "", receivableLabel);
+        ExcelExportUtil.setCell(receivableRow, 0, "应收金额", receivableLabel);
+        ExcelExportUtil.setCell(receivableRow, 17, totalReceivable, sumN);
 
         sheet.createFreezePane(0, 3);
         ExcelExportUtil.autoSize(sheet, headers.length);
