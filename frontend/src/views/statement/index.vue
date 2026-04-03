@@ -361,6 +361,9 @@ const handleExport = async () => {
   color: #333;
 }
 
+/* 展开明细表头固定 */
+:deep(.expand-area .el-table__header-wrapper) { position: sticky; top: 0; z-index: 10; background: #fff; }
+
 /* 操作列按钮并排 */
 :deep(.el-table .cell) { white-space: nowrap; }
 </style>

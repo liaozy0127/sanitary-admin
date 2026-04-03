@@ -805,6 +805,9 @@ const handleExport = async () => {
 .items-section { margin-top: 16px; }
 .items-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; }
 
+/* 展开明细表头固定 */
+:deep(.expand-area .el-table__header-wrapper) { position: sticky; top: 0; z-index: 10; background: #fff; }
+
 /* 操作列按钮并排 */
 :deep(.el-table .cell) { white-space: nowrap; }
 </style>
