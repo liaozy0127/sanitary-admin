@@ -773,14 +773,21 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         Sheet sheet = wb.createSheet("对账单");
         String[] headers = {"对账单号","对账月份","客户名称","产品编码","产品名称","规格型号","工艺要求",
             "上月结余",
-            "本月收货(正常)","本月收货(返工)","本月收货(合计)",
-            "本月发货(良品)","本月发货(合计)",
+            "正常","返工","合计",
+            "良品","合计",
             "本月结余",
             "单价",
-            "发货金额(良品)","发货金额(返工)","发货金额(合计)",
+            "良品","返工","合计",
             "备注"};
         ExcelExportUtil.writeTitleRow(sheet, wb, "对账单", headers.length);
-        ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
+        // 二级分组表头：行1=分组，行2=子列
+        // 独立列：0-7（对账单号~上月结余）、13（本月结余）、14（单价）、18（备注）
+        // 本月收货：8-10，本月发货：11-12，发货金额：15-17
+        ExcelExportUtil.writeTwoLevelHeaderRows(sheet, wb,
+            new int[]{0,1,2,3,4,5,6,7,13,14,18},
+            new int[][]{{8,9,10},{11,12},{15,16,17}},
+            new String[]{"本月收货","本月发货","发货金额"},
+            headers);
 
         CellStyle masterS = ExcelExportUtil.masterRowStyle(wb);
         CellStyle s0 = ExcelExportUtil.dataStyle(wb, false);
@@ -794,7 +801,7 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
             totalReworkAmount = BigDecimal.ZERO,
             totalTotalAmount = BigDecimal.ZERO;
 
-        int rowIdx = 2;
+        int rowIdx = 3;
         int detailCount = 0;
         for (Statement st : statements) {
             List<StatementItem> items = itemMap.getOrDefault(st.getId(), new ArrayList<>());
@@ -865,7 +872,7 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         ExcelExportUtil.setCell(sumRow, 17, totalTotalAmount, sumN);
         ExcelExportUtil.setCell(sumRow, 18, "", sumS);
 
-        sheet.createFreezePane(0, 2);
+        sheet.createFreezePane(0, 3);
         ExcelExportUtil.autoSize(sheet, headers.length);
         try {
             String today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));

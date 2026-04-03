@@ -176,6 +176,42 @@ public class ExcelExportUtil {
         }
     }
 
+    /**
+     * 写两行分组表头（行1=分组标题，行2=子列标题），适用于对账单等有嵌套列的场景。
+     * standalone[]  : 独立列的列索引（行1行2合并）
+     * groups[][]    : 每个分组的列索引范围（连续），groups[i][0]=起始列，groups[i][最后]=结束列
+     * groupLabels[] : 对应每个分组的标题
+     * leafLabels[]  : 所有列（0..colCount-1）在行2显示的子列标题，独立列可传空字符串
+     */
+    public static void writeTwoLevelHeaderRows(Sheet sheet, XSSFWorkbook wb,
+            int[] standalone, int[][] groups, String[] groupLabels, String[] leafLabels) {
+        CellStyle hs = headerStyle(wb);
+        Row groupRow = sheet.createRow(1);
+        Row leafRow  = sheet.createRow(2);
+        groupRow.setHeightInPoints(20);
+        leafRow.setHeightInPoints(20);
+
+        int colCount = leafLabels.length;
+        // 先把所有单元格都创建好并设置样式
+        for (int i = 0; i < colCount; i++) {
+            Cell gc = groupRow.createCell(i); gc.setCellStyle(hs); gc.setCellValue("");
+            Cell lc = leafRow.createCell(i);  lc.setCellStyle(hs); lc.setCellValue(leafLabels[i]);
+        }
+        // 独立列：行1行2合并，文字写在行1
+        for (int col : standalone) {
+            groupRow.getCell(col).setCellValue(leafLabels[col]);
+            leafRow.getCell(col).setCellValue("");
+            sheet.addMergedRegion(new CellRangeAddress(1, 2, col, col));
+        }
+        // 分组列：行1横向合并并写分组标题，行2写子列标题
+        for (int g = 0; g < groups.length; g++) {
+            int first = groups[g][0];
+            int last  = groups[g][groups[g].length - 1];
+            groupRow.getCell(first).setCellValue(groupLabels[g]);
+            if (first < last) sheet.addMergedRegion(new CellRangeAddress(1, 1, first, last));
+        }
+    }
+
     public static String fmtDate(LocalDate d) { return d == null ? "" : d.format(DATE_FMT); }
     public static String fmtDateTime(LocalDateTime dt) { return dt == null ? "" : dt.format(DT_FMT); }
     public static double bd(BigDecimal v) { return v == null ? 0 : v.doubleValue(); }

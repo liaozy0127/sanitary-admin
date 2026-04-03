@@ -47,20 +47,24 @@
                 <el-table-column prop="prevBalanceQty" label="上月结余" width="90" align="right">
                   <template #default="{ row: item }">{{ fmtQty(item.prevBalanceQty) }}</template>
                 </el-table-column>
-                <el-table-column label="本月收货(正常)" width="110" align="right">
-                  <template #default="{ row: item }">{{ fmtQty(item.normalReceiptQty) }}</template>
+                <el-table-column label="本月收货" align="center" header-align="center">
+                  <el-table-column label="正常" width="90" align="right">
+                    <template #default="{ row: item }">{{ fmtQty(item.normalReceiptQty) }}</template>
+                  </el-table-column>
+                  <el-table-column label="返工" width="90" align="right">
+                    <template #default="{ row: item }">{{ fmtQty(item.reworkQty) }}</template>
+                  </el-table-column>
+                  <el-table-column label="合计" width="90" align="right">
+                    <template #default="{ row: item }">{{ fmtQty(item.receiptQty) }}</template>
+                  </el-table-column>
                 </el-table-column>
-                <el-table-column label="本月收货(返工)" width="110" align="right">
-                  <template #default="{ row: item }">{{ fmtQty(item.reworkQty) }}</template>
-                </el-table-column>
-                <el-table-column prop="receiptQty" label="本月收货(合计)" width="110" align="right">
-                  <template #default="{ row: item }">{{ fmtQty(item.receiptQty) }}</template>
-                </el-table-column>
-                <el-table-column label="本月发货(良品)" width="110" align="right">
-                  <template #default="{ row: item }">{{ fmtQty(item.shipmentQty) }}</template>
-                </el-table-column>
-                <el-table-column prop="shipmentQty" label="本月发货(合计)" width="110" align="right">
-                  <template #default="{ row: item }">{{ fmtQty(item.shipmentQty) }}</template>
+                <el-table-column label="本月发货" align="center" header-align="center">
+                  <el-table-column label="良品" width="90" align="right">
+                    <template #default="{ row: item }">{{ fmtQty(item.shipmentQty) }}</template>
+                  </el-table-column>
+                  <el-table-column label="合计" width="90" align="right">
+                    <template #default="{ row: item }">{{ fmtQty(item.shipmentQty) }}</template>
+                  </el-table-column>
                 </el-table-column>
                 <el-table-column prop="currBalanceQty" label="本月结余" width="90" align="right">
                   <template #default="{ row: item }">{{ fmtQty(item.currBalanceQty) }}</template>
@@ -68,22 +72,24 @@
                 <el-table-column prop="unitPrice" label="单价" width="80" align="right">
                   <template #default="{ row: item }">{{ fmtPrice(item.unitPrice) }}</template>
                 </el-table-column>
-                <el-table-column label="发货金额(良品)" width="110" align="right">
-                  <template #default="{ row: item }">{{ fmtAmt(item.goodsAmount) }}</template>
-                </el-table-column>
-                <el-table-column label="发货金额(返工)" width="110" align="right">
-                  <template #default="{ row: item }">
-                    <span :style="{ color: (item.reworkAmount || 0) < 0 ? '#f56c6c' : '' }">
-                      {{ fmtAmt(item.reworkAmount) }}
-                    </span>
-                  </template>
-                </el-table-column>
-                <el-table-column label="发货金额(合计)" width="110" align="right">
-                  <template #default="{ row: item }">
-                    <span :style="{ color: (item.shipmentAmount || 0) < 0 ? '#f56c6c' : '' }">
-                      {{ fmtAmt(item.shipmentAmount) }}
-                    </span>
-                  </template>
+                <el-table-column label="发货金额" align="center" header-align="center">
+                  <el-table-column label="良品" width="100" align="right">
+                    <template #default="{ row: item }">{{ fmtAmt(item.goodsAmount) }}</template>
+                  </el-table-column>
+                  <el-table-column label="返工" width="100" align="right">
+                    <template #default="{ row: item }">
+                      <span :style="{ color: (item.reworkAmount || 0) < 0 ? '#f56c6c' : '' }">
+                        {{ fmtAmt(item.reworkAmount) }}
+                      </span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="合计" width="100" align="right">
+                    <template #default="{ row: item }">
+                      <span :style="{ color: (item.shipmentAmount || 0) < 0 ? '#f56c6c' : '' }">
+                        {{ fmtAmt(item.shipmentAmount) }}
+                      </span>
+                    </template>
+                  </el-table-column>
                 </el-table-column>
                 <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
               </el-table>
