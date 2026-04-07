@@ -609,8 +609,8 @@ const handlePrint = async (row) => {
   .info-cell { border: none !important; padding: 0.5mm 0 !important; background: white !important; font-weight: normal; }
   .info-flex { display: flex; justify-content: center; gap: 8mm; padding: 0 2mm; }
   .info-flex span { text-align: center; }
-  .foot-remark { background: white; font-size: 7.5pt; }
-  .sig-line { display: flex; justify-content: flex-start; font-size: 9pt; margin-top: 1.5mm; padding: 0 2mm; }
+  .foot-remark { background: white; font-size: 9pt; }
+  .sig-line { display: flex; justify-content: flex-start; font-size: 10pt; margin-top: 1.5mm; padding: 0 2mm; }
   .sig-line span { flex: 1; text-align: left; }
   .measure-wrap { position: absolute; top: -9999px; left: 0; width: ${PAGE_BODY_WIDTH_PX}px; visibility: hidden; }`
 

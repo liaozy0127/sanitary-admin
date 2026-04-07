@@ -544,7 +544,7 @@ const handlePrint = async (row) => {
   .meta-flex { display: flex; justify-content: space-around; }
   .meta-flex span { flex: 1; text-align: center; }
   .foot-remark { background: white; }
-  .sig-line { display: flex; justify-content: flex-start; font-size: 9pt; margin-top: 1.5mm; padding: 0 2mm; }
+  .sig-line { display: flex; justify-content: flex-start; font-size: 10pt; margin-top: 1.5mm; padding: 0 2mm; }
   .sig-line span { flex: 1; text-align: left; }
   .measure-wrap { position: absolute; top: -9999px; left: 0; width: ${PAGE_BODY_WIDTH_PX}px; visibility: hidden; }`
 
