@@ -584,25 +584,24 @@ const handlePrint = async (row) => {
     const totalGoodQty = items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)
     const totalDefectiveQty = items.reduce((sum, item) => sum + (parseFloat(item.defectiveQty) || 0), 0)
 
-    // 纸张: 241mm × 120mm，页边距 5mm，96dpi 下 1mm ≈ 3.7795px
-    // 可用高度: 110mm，page-body 宽度 = 241 - 5*2 - 2 - 10*2 = 209mm
+    // 纸张: 241mm × 140mm，页边距 5mm，96dpi 下 1mm ≈ 3.7795px
+    // 可用高度: 130mm，page-body 宽度 = 241 - 5*2 = 231mm
     const MM_TO_PX = 3.7795
-    const PAGE_HEIGHT_PX = Math.round(110 * MM_TO_PX)
-    const PAGE_BODY_WIDTH_PX = Math.round(209 * MM_TO_PX)
+    const PAGE_HEIGHT_PX = Math.round(130 * MM_TO_PX)
+    const PAGE_BODY_WIDTH_PX = Math.round(231 * MM_TO_PX)
 
     const remarkLines = deliveryRemark.split('\n').join('<br>')
 
     const CSS = `
-  @page { size: 241mm 120mm; margin: 5mm; }
+  @page { size: 241mm 140mm; margin: 5mm; }
   * { box-sizing: border-box; }
   body { font-family: SimSun, "宋体", serif; font-size: 9pt; margin: 0; }
-  .page { display: flex; align-items: stretch; gap: 2mm; page-break-after: always; }
+  .page { display: flex; align-items: stretch; page-break-after: always; }
   .page.last { page-break-after: auto; }
-  .stamp-side { flex: 0 0 10mm; }
   .page-body { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  .pt { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  .pt { width: 100%; border-collapse: collapse; font-size: 11pt; }
   .pt th, .pt td { border: 0.5pt solid #0066CC; padding: 1mm 1.5mm; word-break: break-all; }
-  .pt th { text-align: center; font-weight: bold; background: #f0f6ff; }
+  .pt th { text-align: center; font-weight: bold; background: #f0f6ff; white-space: nowrap; }
   .title-cell { border: none !important; text-align: center; font-size: 13pt; font-weight: bold; padding: 2mm 0 !important; background: white !important; }
   .meta-cell { border: none !important; padding: 1mm 0 !important; background: white !important; font-weight: normal; }
   .meta-flex { display: flex; justify-content: space-around; }
@@ -641,7 +640,7 @@ const handlePrint = async (row) => {
 
     // ── 第一步：测量每行实际渲染高度 ──
     const measureIframe = document.createElement('iframe')
-    measureIframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:241mm;height:120mm;border:none;'
+    measureIframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:241mm;height:140mm;border:none;'
     document.body.appendChild(measureIframe)
 
     const measureHtml = `<!DOCTYPE html><html><head><meta charset="utf-8">
@@ -722,7 +721,7 @@ const handlePrint = async (row) => {
 </body></html>`
 
     const overheadIframe = document.createElement('iframe')
-    overheadIframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:241mm;height:120mm;border:none;'
+    overheadIframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:241mm;height:140mm;border:none;'
     document.body.appendChild(overheadIframe)
 
     await new Promise(resolve => {
@@ -791,7 +790,6 @@ const handlePrint = async (row) => {
       const totalRow = isLast ? totalRowHtml : ''
 
       return `<div class="page${isLast ? ' last' : ''}">
-        <div class="stamp-side"></div>
         <div class="page-body">
         <table class="pt">
           ${colGroupHtml}
@@ -841,7 +839,6 @@ const handlePrint = async (row) => {
           <span>${sig1Label}</span>
         </div>
         </div>
-        <div class="stamp-side"></div>
       </div>`
     }
 
