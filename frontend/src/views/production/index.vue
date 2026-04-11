@@ -697,7 +697,7 @@ const handlePrint = async (row) => {
     }
 
     // ── 第三步：生成最终 HTML，空行补齐末页 ──
-    const emptyRow = `<tr>${'<td>&nbsp;</td>'.repeat(11)}</tr>`
+    const emptyRow = `<tr>${'<td>&nbsp;</td>'.repeat(10)}</tr>`
 
     const makePage = (chunk, isLast) => {
       const dataRows = chunk.map(item => makeDataRowHtml(item)).join('')
