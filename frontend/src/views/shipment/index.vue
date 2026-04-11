@@ -614,10 +614,10 @@ const handlePrint = async (row) => {
   .page.last { page-break-after: auto; }
   .stamp-side { flex: 0 0 10mm; }
   .page-body { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  .pt { width: 100%; border-collapse: collapse; font-size: 11pt; }
+  .pt { width: 100%; border-collapse: collapse; font-size: 12pt; }
   .pt th, .pt td { border: 0.5pt solid #0066CC; padding: 1mm 1.5mm; word-break: break-all; }
   .pt th { text-align: center; font-weight: bold; background: #f0f6ff; white-space: nowrap; }
-  .title-cell { border: none !important; text-align: center; font-size: 13pt; font-weight: bold; padding: 2mm 0 !important; background: white !important; }
+  .title-cell { border: none !important; text-align: center; font-size: 16pt; font-weight: bold; padding: 2mm 0 !important; background: white !important; }
   .meta-cell { border: none !important; padding: 1mm 0 !important; background: white !important; font-weight: normal; }
   .meta-flex { display: flex; justify-content: space-around; }
   .meta-flex span { flex: 1; text-align: center; }
