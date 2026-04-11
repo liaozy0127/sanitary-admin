@@ -551,10 +551,10 @@ const handlePrint = async (row) => {
   .page.last { page-break-after: auto; }
   .stamp-side { flex: 0 0 10mm; }
   .page-body { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  .pt { width: 100%; border-collapse: collapse; font-size: 11pt; }
+  .pt { width: 100%; border-collapse: collapse; font-size: 12pt; }
   .pt th, .pt td { border: 0.5pt solid #0066CC; padding: 1mm 1.5mm; word-break: break-all; }
   .pt th { text-align: center; font-weight: bold; background: #f0f6ff; white-space: nowrap; }
-  .title-cell { border: none !important; text-align: center; font-size: 13pt; font-weight: bold; padding: 2mm 0 !important; background: white !important; }
+  .title-cell { border: none !important; text-align: center; font-size: 16pt; font-weight: bold; padding: 2mm 0 !important; background: white !important; }
   .meta-cell { border: none !important; padding: 1mm 0 !important; background: white !important; font-weight: normal; }
   .meta-flex { display: flex; justify-content: space-around; }
   .meta-flex span { flex: 1; text-align: center; }
@@ -565,7 +565,6 @@ const handlePrint = async (row) => {
 
     // 构造数据行 HTML（供测量和最终渲染共用）
     const makeDataRowHtml = (item) => `<tr>
-      <td>${detail.customerName || ''}</td>
       <td>${item.materialName || ''}</td>
       <td>${item.spec || ''}</td>
       <td>${item.processName || ''}</td>
@@ -576,13 +575,13 @@ const handlePrint = async (row) => {
     </tr>`
 
     const totalRowHtml = `<tr>
-      <td colspan="4" style="text-align:right;font-weight:bold;">合计</td>
+      <td colspan="3" style="text-align:right;font-weight:bold;">合计</td>
       <td style="text-align:right;font-weight:bold;">${totalQty || ''}</td>
       <td colspan="6"></td>
     </tr>`
 
     // 固定列宽定义（供测量表使用，与实际渲染保持一致）
-    const colWidths = ['9%','20%','10%','15%','7%','6%','6%','6%','6%','6%','9%']
+    const colWidths = ['29%','14%','11%','7%','6%','6%','6%','6%','6%','9%']
 
     // ── 第一步：创建测量用 iframe，渲染所有行后测量实际高度 ──
     const measureIframe = document.createElement('iframe')
@@ -600,7 +599,7 @@ const handlePrint = async (row) => {
     <tbody id="mbody">
       ${items.map((item, i) => `<tr id="mr${i}">${makeDataRowHtml(item).replace(/^<tr>/, '').replace(/<\/tr>$/, '')}</tr>`).join('')}
       <tr id="mr_total">${totalRowHtml.replace(/^<tr>/, '').replace(/<\/tr>$/, '')}</tr>
-      <tr id="mr_empty"><td>&nbsp;</td>${'<td>&nbsp;</td>'.repeat(10)}</tr>
+      <tr id="mr_empty"><td>&nbsp;</td>${'<td>&nbsp;</td>'.repeat(9)}</tr>
     </tbody>
   </table>
 </div>
@@ -623,8 +622,8 @@ const handlePrint = async (row) => {
 <div class="measure-wrap" id="owrap">
   <table class="pt" style="width:100%">
     <thead>
-      <tr><th colspan="11" class="title-cell" id="oh_title">${docTitle}</th></tr>
-      <tr><td colspan="11" class="meta-cell" id="oh_meta">
+      <tr><th colspan="10" class="title-cell" id="oh_title">${docTitle}</th></tr>
+      <tr><td colspan="10" class="meta-cell" id="oh_meta">
         <div class="meta-flex">
           <span>排产日期：${detail.productionDate || ''}</span>
           <span>单号：${detail.productionNo || ''}</span>
@@ -633,15 +632,15 @@ const handlePrint = async (row) => {
         </div>
       </td></tr>
       <tr id="oh_hdr1">
-        <th rowspan="2">客户</th><th rowspan="2">品名</th><th rowspan="2">规格</th>
+        <th rowspan="2">品名</th><th rowspan="2">规格</th>
         <th rowspan="2">工艺</th><th rowspan="2">数量</th><th rowspan="2">类型</th>
         <th colspan="4">完成情况</th><th rowspan="2">备注</th>
       </tr>
       <tr id="oh_hdr2"><th>1良品</th><th>2良品</th><th>3良品</th><th>不良</th></tr>
     </thead>
-    <tbody><tr id="oh_empty"><td>&nbsp;</td>${'<td>&nbsp;</td>'.repeat(10)}</tr></tbody>
+    <tbody><tr id="oh_empty"><td>&nbsp;</td>${'<td>&nbsp;</td>'.repeat(9)}</tr></tbody>
     <tfoot>
-      <tr><td colspan="11" class="foot-remark" id="oh_remark">备注：${remark}</td></tr>
+      <tr><td colspan="10" class="foot-remark" id="oh_remark">备注：${remark}</td></tr>
     </tfoot>
   </table>
   <div class="sig-line" id="oh_sig">
@@ -730,8 +729,8 @@ const handlePrint = async (row) => {
         <table class="pt">
           ${colGroupHtml}
           <thead>
-            <tr><th colspan="11" class="title-cell">${docTitle}</th></tr>
-            <tr><td colspan="11" class="meta-cell">
+            <tr><th colspan="10" class="title-cell">${docTitle}</th></tr>
+            <tr><td colspan="10" class="meta-cell">
               <div class="meta-flex">
                 <span>排产日期：${detail.productionDate || ''}</span>
                 <span>单号：${detail.productionNo || ''}</span>
@@ -740,7 +739,7 @@ const handlePrint = async (row) => {
               </div>
             </td></tr>
             <tr>
-              <th rowspan="2">客户</th><th rowspan="2">品名</th><th rowspan="2">规格</th>
+              <th rowspan="2">品名</th><th rowspan="2">规格</th>
               <th rowspan="2">工艺</th><th rowspan="2">数量</th><th rowspan="2">类型</th>
               <th colspan="4">完成情况</th><th rowspan="2">备注</th>
             </tr>
@@ -748,7 +747,7 @@ const handlePrint = async (row) => {
           </thead>
           <tbody>${dataRows}${padRows}${totalRow}</tbody>
           <tfoot>
-            <tr><td colspan="11" class="foot-remark">备注：${remark}</td></tr>
+            <tr><td colspan="10" class="foot-remark">备注：${remark}</td></tr>
           </tfoot>
         </table>
         <div class="sig-line">
