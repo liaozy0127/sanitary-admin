@@ -49,26 +49,6 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
         // 将 null 的 processId 统一处理为 0L，确保唯一约束正常工作
         Long effectiveProcessId = processId != null ? processId : 0L;
 
-        // 如果是发货（changeType == 2），需要先检查库存是否足够
-        if (changeType == 2) { // 发货
-            LambdaQueryWrapper<Inventory> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.eq(Inventory::getMaterialId, materialId)
-                    .eq(Inventory::getCustomerId, customerId)
-                    .eq(Inventory::getProcessId, effectiveProcessId);
-
-            Inventory inventory = this.getOne(queryWrapper, false);
-            if (inventory != null) {
-                BigDecimal currentQty = inventory.getQuantity() != null ? inventory.getQuantity() : BigDecimal.ZERO;
-                BigDecimal shipQty = changeQty.abs(); // changeQty 是负数，取绝对值
-                if (currentQty.compareTo(shipQty) < 0) {
-                    throw new RuntimeException("库存不足，当前库存：" + currentQty + "，发货数量：" + shipQty);
-                }
-            } else {
-                // 如果库存记录不存在，而又要发货，则不允许
-                throw new RuntimeException("库存不足，当前库存：0，发货数量：" + changeQty.abs());
-            }
-        }
-
         // 首先尝试原子更新现有库存记录
         int rowsAffected = this.baseMapper.incrementQuantity(materialId, customerId, effectiveProcessId, changeQty);
 
@@ -588,7 +568,7 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
                 .or().like(Inventory::getMaterialCode, keyword));
         }
         if (customerId != null) wrapper.eq(Inventory::getCustomerId, customerId);
-        wrapper.gt(Inventory::getQuantity, 0)
+        wrapper.ne(Inventory::getQuantity, 0)
                .orderByDesc(Inventory::getUpdateTime).orderByDesc(Inventory::getId)
                .last("LIMIT 50000");
         List<Inventory> list = this.list(wrapper);

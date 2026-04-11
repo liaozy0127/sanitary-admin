@@ -505,7 +505,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
         XSSFWorkbook wb = new XSSFWorkbook();
         Sheet sheet = wb.createSheet("发货单");
         String[] headers = {"发货单号","发货日期","客户名称","制单人","备注","物料编码","物料名称","型号规格","工艺名称",
-            "良品数量","废品数量","单价","金额","明细备注"};
+            "良品数量","原件退回","单价","金额","明细备注"};
         ExcelExportUtil.writeTitleRow(sheet, wb, "发货单", headers.length);
         ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
 

@@ -21,7 +21,7 @@ public class ShipmentItem {
     private Long processId;
     private String processName;
     private BigDecimal quantity;       // 良品数量（实际发货数量）
-    private BigDecimal defectiveQty;   // 废品数量
+    private BigDecimal defectiveQty;   // 原件退回数量
     private BigDecimal unitPrice;
     private BigDecimal amount;
     private String detailRemark;

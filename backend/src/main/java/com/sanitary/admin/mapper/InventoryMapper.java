@@ -38,7 +38,7 @@ public interface InventoryMapper extends BaseMapper<Inventory> {
             "LEFT JOIN material m ON m.id = i.material_id " +
             "LEFT JOIN customer c ON c.id = i.customer_id " +
             "LEFT JOIN process p ON p.id = i.process_id " +
-            "WHERE i.quantity &gt; 0 " +
+            "WHERE i.quantity != 0 " +
             "<if test='customerId != null'> AND i.customer_id = #{customerId} </if>" +
             "<if test='keyword != null and keyword != \"\"'> " +
             "  AND (COALESCE(m.material_code, i.material_code) LIKE CONCAT('%', #{keyword}, '%') " +
