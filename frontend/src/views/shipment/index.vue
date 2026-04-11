@@ -599,10 +599,10 @@ const handlePrint = async (row) => {
     const totalDefectiveQty = items.reduce((sum, item) => sum + (parseFloat(item.defectiveQty) || 0), 0)
 
     // 纸张: 241mm × 140mm，页边距 5mm，96dpi 下 1mm ≈ 3.7795px
-    // 可用高度: 130mm，page-body 宽度 = 241 - 5*2 = 231mm
+    // 可用高度: 130mm，page-body 宽度 = 241 - 5*2(margin) - 10*2(孔戳) = 211mm
     const MM_TO_PX = 3.7795
     const PAGE_HEIGHT_PX = Math.round(130 * MM_TO_PX)
-    const PAGE_BODY_WIDTH_PX = Math.round(231 * MM_TO_PX)
+    const PAGE_BODY_WIDTH_PX = Math.round(211 * MM_TO_PX)
 
     const remarkLines = deliveryRemark.split('\n').join('<br>')
 
@@ -612,6 +612,7 @@ const handlePrint = async (row) => {
   body { font-family: SimSun, "宋体", serif; font-size: 9pt; margin: 0; }
   .page { display: flex; align-items: stretch; page-break-after: always; }
   .page.last { page-break-after: auto; }
+  .stamp-side { flex: 0 0 10mm; }
   .page-body { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   .pt { width: 100%; border-collapse: collapse; font-size: 11pt; }
   .pt th, .pt td { border: 0.5pt solid #0066CC; padding: 1mm 1.5mm; word-break: break-all; }
@@ -804,6 +805,7 @@ const handlePrint = async (row) => {
       const totalRow = isLast ? totalRowHtml : ''
 
       return `<div class="page${isLast ? ' last' : ''}">
+        <div class="stamp-side"></div>
         <div class="page-body">
         <table class="pt">
           ${colGroupHtml}
@@ -853,6 +855,7 @@ const handlePrint = async (row) => {
           <span>${sig1Label}</span>
         </div>
         </div>
+        <div class="stamp-side"></div>
       </div>`
     }
 
