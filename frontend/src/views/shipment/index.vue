@@ -134,8 +134,9 @@
           <el-table-column label="工艺" width="120">
             <template #default="{ row, $index }">
               <el-select v-model="row.processId" placeholder="工艺" filterable clearable size="small"
-                style="width:100%" @change="(id) => onItemProcessChange(id, $index)">
-                <el-option v-for="p in processList" :key="p.id" :label="p.name" :value="p.id" />
+                style="width:100%" @change="(id) => onItemProcessChange(id, $index)"
+                :filter-method="filterProcess">
+                <el-option v-for="p in filteredProcessList" :key="p.id" :label="p.name" :value="p.id" />
               </el-select>
             </template>
           </el-table-column>
@@ -214,6 +215,18 @@ const editId = ref(null)
 const customerList = ref([])
 const materialList = ref([])
 const processList = ref([])
+const filteredProcessList = ref([])
+const filterProcess = (query) => {
+  if (!query) {
+    filteredProcessList.value = processList.value
+  } else {
+    const q = query.toLowerCase()
+    filteredProcessList.value = processList.value.filter(p =>
+      (p.name && p.name.toLowerCase().includes(q)) ||
+      (p.code && p.code.toLowerCase().includes(q))
+    )
+  }
+}
 const defaultMatOptions = ref([])  // 当前客户默认前100条物料
 
 const expandedRowIds = ref(new Set())
@@ -264,6 +277,7 @@ const loadCustomers = async () => {
 const loadProcesses = async () => {
   const res = await request.get('/processes/all')
   processList.value = Array.isArray(res) ? res : (res.data || [])
+  filteredProcessList.value = processList.value
 }
 
 const loadMaterials = async (customerId) => {
