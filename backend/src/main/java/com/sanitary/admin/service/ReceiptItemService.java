@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.sanitary.admin.entity.ReceiptItem;
 
 import java.util.List;
+import java.util.Map;
 
 public interface ReceiptItemService extends IService<ReceiptItem> {
     List<ReceiptItem> listByReceiptId(Long receiptId);
@@ -14,4 +15,6 @@ public interface ReceiptItemService extends IService<ReceiptItem> {
     ReceiptItem getLatestProcessByMaterial(Long customerId, Long materialId);
     /** 查询该客户+物料+工艺最新收货单里的单价，没有则返回 null */
     ReceiptItem getLatestPrice(Long customerId, Long materialId, Long processId);
+    /** 按客户ID查询收货明细（按收货日期倒序），用于排产单快速填充 */
+    List<Map<String, Object>> listByCustomerId(Long customerId);
 }

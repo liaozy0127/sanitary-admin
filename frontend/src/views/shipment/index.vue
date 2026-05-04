@@ -39,13 +39,17 @@
         <el-table-column type="expand">
           <template #default="{ row }">
             <div class="expand-area">
-              <el-table :data="row.items || []" border size="small" style="width: 100%">
+              <el-table :data="row.items || []" border size="small" style="width: 100%" show-summary :summary-method="(p) => getShipmentSummary(p, row.customerId)">
                 <el-table-column prop="materialName" label="产品名称" min-width="150" show-overflow-tooltip />
                 <el-table-column prop="spec" label="型号规格" width="120" />
                 <el-table-column prop="processName" label="工艺" width="100" />
                 <el-table-column prop="quantity" label="良品数量" width="90" align="right" />
                 <el-table-column prop="defectiveQty" label="原件退回" width="90" align="right" />
-                <el-table-column prop="unitPrice" label="单价" width="80" align="right" />
+                <el-table-column prop="unitPrice" label="单价" width="80" align="right">
+                  <template #default="{ row: item }">
+                    {{ item.unitPrice ? Number(item.unitPrice).toFixed(2) : '0.00' }}
+                  </template>
+                </el-table-column>
                 <el-table-column prop="amount" label="金额" width="90" align="right">
                   <template #default="{ row: item }">
                     {{ item.amount ? Number(item.amount).toFixed(2) : '0.00' }}
@@ -424,6 +428,33 @@ const calcItemAmount = (item) => {
   item.amount = (qty * price).toFixed(2)
 }
 
+// 判断客户是否为现金客户
+const isCashCustomer = (customerId) => {
+  const c = customerList.value.find(c => c.id === customerId)
+  return c && c.customerType === '现金'
+}
+
+// 发货展开明细合计行
+const getShipmentSummary = ({ columns, data }, customerId) => {
+  const sums = []
+  columns.forEach((col, index) => {
+    if (index === 0) {
+      sums[index] = '合计'
+      return
+    }
+    if (col.property === 'quantity') {
+      sums[index] = data.reduce((s, it) => s + (Number(it.quantity) || 0), 0)
+    } else if (col.property === 'defectiveQty') {
+      sums[index] = data.reduce((s, it) => s + (Number(it.defectiveQty) || 0), 0)
+    } else if (col.property === 'amount') {
+      sums[index] = data.reduce((s, it) => s + (Number(it.amount) || 0), 0).toFixed(2)
+    } else {
+      sums[index] = ''
+    }
+  })
+  return sums
+}
+
 // 查询该行的当前库存（选物料/工艺后调用）
 const loadItemInventory = async (row) => {
   if (!row.materialId || !formData.customerId) {
@@ -585,6 +616,10 @@ const handlePrint = async (row) => {
     const config = configRes.data || configRes
     const items = detail.items || []
 
+    // 判断客户类型
+    const isCash = isCashCustomer(detail.customerId)
+    const colCount = isCash ? 10 : 9  // 月结客户去掉"单价"列
+
     const docTitle = config.printTitleDelivery || '致恒（致越）金属表面加工厂送货单'
     const delSig1 = config.printDeliverySig1Label || '制单人'
     const sig1Label = config.printDeliverySig3Label || '收货单位'
@@ -629,29 +664,48 @@ const handlePrint = async (row) => {
   .sig-line span { flex: 1; text-align: left; }
   .measure-wrap { position: absolute; top: -9999px; left: 0; width: ${PAGE_BODY_WIDTH_PX}px; visibility: hidden; }`
 
-    const colWidths = ['5%','29%','13%','5%','11%','6%','8%','7%','8%','8%']
+    const colWidthsCash = ['5%','29%','13%','5%','11%','6%','8%','7%','8%','8%']
+    const colWidthsMonthly = ['5%','30%','14%','5%','12%','6%','10%','10%','8%']
+    const colWidths = isCash ? colWidthsCash : colWidthsMonthly
     const colGroupHtml = `<colgroup>${colWidths.map(w => `<col style="width:${w}">`).join('')}</colgroup>`
 
-    const makeDataRowHtml = (item, seqNo) => `<tr>
-      <td style="text-align:center">${seqNo}</td>
-      <td>${item.materialName || ''}</td>
-      <td>${item.spec || ''}</td>
-      <td style="text-align:center">${item.unit || '个'}</td>
-      <td>${item.processName || ''}</td>
-      <td style="text-align:center">${item.productionType || '正常'}</td>
-      <td style="text-align:right">${item.quantity != null ? item.quantity : ''}</td>
-      <td style="text-align:right">${item.unitPrice != null ? item.unitPrice : ''}</td>
-      <td style="text-align:right">${item.defectiveQty != null ? item.defectiveQty : ''}</td>
-      <td>${item.detailRemark || ''}</td>
-    </tr>`
+    // 表头行 HTML（不含 <tr> 包裹）
+    const headerCellsHtml = isCash
+      ? `<th style="width:5%">序号</th><th style="width:29%">品名</th><th style="width:13%">规格</th><th style="width:5%">单位</th><th style="width:11%">工艺要求</th><th style="width:6%">类型</th><th style="width:8%">良品数量</th><th style="width:7%">单价</th><th style="width:8%">原件退回</th><th style="width:8%">备注</th>`
+      : `<th style="width:5%">序号</th><th style="width:30%">品名</th><th style="width:14%">规格</th><th style="width:5%">单位</th><th style="width:12%">工艺要求</th><th style="width:6%">类型</th><th style="width:10%">良品数量</th><th style="width:10%">原件退回</th><th style="width:8%">备注</th>`
 
-    const totalRowHtml = `<tr>
-      <td colspan="6" style="text-align:right;font-weight:bold;">合计</td>
-      <td style="text-align:right;font-weight:bold;">${totalGoodQty || ''}</td>
-      <td></td>
-      <td style="text-align:right;font-weight:bold;">${totalDefectiveQty || ''}</td>
-      <td></td>
-    </tr>`
+    const makeDataRowHtml = (item, seqNo) => {
+      if (isCash) {
+        return `<tr>
+          <td style="text-align:center">${seqNo}</td>
+          <td>${item.materialName || ''}</td>
+          <td>${item.spec || ''}</td>
+          <td style="text-align:center">${item.unit || '个'}</td>
+          <td>${item.processName || ''}</td>
+          <td style="text-align:center">${item.productionType || '正常'}</td>
+          <td style="text-align:right">${item.quantity != null ? item.quantity : ''}</td>
+          <td style="text-align:right">${item.unitPrice != null ? item.unitPrice : ''}</td>
+          <td style="text-align:right">${item.defectiveQty != null ? item.defectiveQty : ''}</td>
+          <td>${item.detailRemark || ''}</td>
+        </tr>`
+      } else {
+        return `<tr>
+          <td style="text-align:center">${seqNo}</td>
+          <td>${item.materialName || ''}</td>
+          <td>${item.spec || ''}</td>
+          <td style="text-align:center">${item.unit || '个'}</td>
+          <td>${item.processName || ''}</td>
+          <td style="text-align:center">${item.productionType || '正常'}</td>
+          <td style="text-align:right">${item.quantity != null ? item.quantity : ''}</td>
+          <td style="text-align:right">${item.defectiveQty != null ? item.defectiveQty : ''}</td>
+          <td>${item.detailRemark || ''}</td>
+        </tr>`
+      }
+    }
+
+    const totalRowHtml = isCash
+      ? `<tr><td colspan="6" style="text-align:right;font-weight:bold;">合计</td><td style="text-align:right;font-weight:bold;">${totalGoodQty || ''}</td><td></td><td style="text-align:right;font-weight:bold;">${totalDefectiveQty || ''}</td><td></td></tr>`
+      : `<tr><td colspan="6" style="text-align:right;font-weight:bold;">合计</td><td style="text-align:right;font-weight:bold;">${totalGoodQty || ''}</td><td style="text-align:right;font-weight:bold;">${totalDefectiveQty || ''}</td><td></td></tr>`
 
     // ── 第一步：测量每行实际渲染高度 ──
     const measureIframe = document.createElement('iframe')
@@ -669,7 +723,7 @@ const handlePrint = async (row) => {
         return `<tr id="mr${i}">${inner}</tr>`
       }).join('')}
       <tr id="mr_total">${totalRowHtml.replace(/^<tr>/, '').replace(/<\/tr>$/, '')}</tr>
-      <tr id="mr_empty"><td>&nbsp;</td>${'<td>&nbsp;</td>'.repeat(9)}</tr>
+      <tr id="mr_empty"><td>&nbsp;</td>${'<td>&nbsp;</td>'.repeat(colCount - 1)}</tr>
     </tbody>
   </table>
 </div>
@@ -692,40 +746,29 @@ const handlePrint = async (row) => {
   <table class="pt" style="width:100%">
     ${colGroupHtml}
     <thead>
-      <tr><th colspan="10" class="title-cell" id="oh_title">${docTitle}</th></tr>
-      <tr><td colspan="10" class="info-cell" id="oh_info1">
+      <tr><th colspan="${colCount}" class="title-cell" id="oh_title">${docTitle}</th></tr>
+      <tr><td colspan="${colCount}" class="info-cell" id="oh_info1">
         <div class="info-flex">
           <span>电话/传真：${companyPhone}</span>
           <span>${contact1}</span>
           <span>${contact2}</span>
         </div>
       </td></tr>
-      <tr><td colspan="10" class="info-cell" id="oh_info2">
+      <tr><td colspan="${colCount}" class="info-cell" id="oh_info2">
         <div class="info-flex"><span>地址：${companyAddress}</span></div>
       </td></tr>
-      <tr><td colspan="10" class="meta-cell" id="oh_meta">
+      <tr><td colspan="${colCount}" class="meta-cell" id="oh_meta">
         <div class="meta-flex">
           <span>客户：${detail.customerName || ''}</span>
           <span>发货日期：${detail.shipmentDate || ''}</span>
           <span>单号：${detail.shipmentNo || ''}</span>
         </div>
       </td></tr>
-      <tr id="oh_hdr">
-        <th style="width:5%">序号</th>
-        <th style="width:29%">品名</th>
-        <th style="width:13%">规格</th>
-        <th style="width:5%">单位</th>
-        <th style="width:11%">工艺要求</th>
-        <th style="width:6%">类型</th>
-        <th style="width:8%">良品数量</th>
-        <th style="width:7%">单价</th>
-        <th style="width:8%">原件退回</th>
-        <th style="width:8%">备注</th>
-      </tr>
+      <tr id="oh_hdr">${headerCellsHtml}</tr>
     </thead>
-    <tbody><tr><td>&nbsp;</td>${'<td>&nbsp;</td>'.repeat(9)}</tr></tbody>
+    <tbody><tr><td>&nbsp;</td>${'<td>&nbsp;</td>'.repeat(colCount - 1)}</tr></tbody>
     <tfoot>
-      <tr><td colspan="10" class="foot-remark" id="oh_remark">${remarkLines}</td></tr>
+      <tr><td colspan="${colCount}" class="foot-remark" id="oh_remark">${remarkLines}</td></tr>
     </tfoot>
   </table>
   <div class="sig-line" id="oh_sig">
@@ -781,7 +824,7 @@ const handlePrint = async (row) => {
     }
 
     // ── 第三步：生成最终 HTML ──
-    const emptyRow = `<tr>${'<td>&nbsp;</td>'.repeat(10)}</tr>`
+    const emptyRow = `<tr>${'<td>&nbsp;</td>'.repeat(colCount)}</tr>`
 
     let globalSeq = 0
     const makePage = (chunk, isLast) => {
@@ -809,42 +852,31 @@ const handlePrint = async (row) => {
         <table class="pt">
           ${colGroupHtml}
           <thead>
-            <tr><th colspan="10" class="title-cell">${docTitle}</th></tr>
-            <tr><td colspan="10" class="info-cell">
+            <tr><th colspan="${colCount}" class="title-cell">${docTitle}</th></tr>
+            <tr><td colspan="${colCount}" class="info-cell">
               <div class="info-flex">
                 <span>电话/传真：${companyPhone}</span>
                 <span>${contact1}</span>
                 <span>${contact2}</span>
               </div>
             </td></tr>
-            <tr><td colspan="10" class="info-cell">
+            <tr><td colspan="${colCount}" class="info-cell">
               <div class="info-flex">
                 <span>地址：${companyAddress}</span>
               </div>
             </td></tr>
-            <tr><td colspan="10" class="meta-cell">
+            <tr><td colspan="${colCount}" class="meta-cell">
               <div class="meta-flex">
                 <span>客户：${detail.customerName || ''}</span>
                 <span>发货日期：${detail.shipmentDate || ''}</span>
                 <span>单号：${detail.shipmentNo || ''}</span>
               </div>
             </td></tr>
-            <tr>
-              <th style="width:5%">序号</th>
-              <th style="width:29%">品名</th>
-              <th style="width:13%">规格</th>
-              <th style="width:5%">单位</th>
-              <th style="width:11%">工艺要求</th>
-              <th style="width:6%">类型</th>
-              <th style="width:8%">良品数量</th>
-              <th style="width:7%">单价</th>
-              <th style="width:8%">原件退回</th>
-              <th style="width:8%">备注</th>
-            </tr>
+            <tr>${headerCellsHtml}</tr>
           </thead>
           <tbody>${dataRows}${padRows}${totalRow}</tbody>
           <tfoot>
-            <tr><td colspan="10" class="foot-remark">${remarkLines}</td></tr>
+            <tr><td colspan="${colCount}" class="foot-remark">${remarkLines}</td></tr>
           </tfoot>
         </table>
         <div class="sig-line">

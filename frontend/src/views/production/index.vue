@@ -99,7 +99,10 @@
       <div class="items-section">
         <div class="items-header">
           <span>排产明细</span>
-          <el-button type="primary" size="small" :icon="Plus" @click="addItem">添加明细</el-button>
+          <div>
+            <el-button type="warning" size="small" @click="openReceiptSelectDialog" :disabled="!formData.customerId">从收货单填充</el-button>
+            <el-button type="primary" size="small" :icon="Plus" @click="addItem">添加明细</el-button>
+          </div>
         </div>
         <el-table :data="formData.items" border size="small" style="width: 100%" max-height="400">
           <el-table-column label="产品名称" min-width="160">
@@ -172,6 +175,71 @@
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="submitLoading" @click="handleSubmit">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 收货单选择弹窗 -->
+    <el-dialog v-model="receiptSelectVisible" title="选择收货单明细" width="1100px" @close="resetReceiptSelect">
+      <!-- 搜索区域 -->
+      <el-form inline style="margin-bottom:12px">
+        <el-form-item label="关键词">
+          <el-input v-model="receiptSearchKeyword" placeholder="单号/物料名称/编码/工艺" clearable style="width:200px" @keyup.enter="doReceiptSearch" />
+        </el-form-item>
+        <el-form-item label="日期">
+          <el-date-picker v-model="receiptSearchDateRange" type="daterange" range-separator="-"
+            start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" style="width:240px" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="doReceiptSearch">搜索</el-button>
+          <el-button @click="resetReceiptSearch">重置</el-button>
+        </el-form-item>
+      </el-form>
+
+      <!-- 主表：收货单列表（展开查看明细） -->
+      <el-table :data="filteredReceiptSelectList" border size="small" style="width: 100%"
+        max-height="500" row-key="receiptId"
+        @expand-change="onReceiptExpandChange">
+        <el-table-column type="expand">
+          <template #default="{ row }">
+            <div class="expand-area">
+              <div style="margin-bottom:6px">
+                <el-checkbox v-model="row._allChecked" @change="(val) => toggleAllItems(row, val)" :indeterminate="row._indeterminate">全选本单明细</el-checkbox>
+              </div>
+              <el-table :data="row.items || []" border size="small" style="width: 100%"
+                :row-class-name="itemRowHighlight">
+                <el-table-column width="45" align="center">
+                  <template #default="{ row: item }">
+                    <el-checkbox :model-value="isItemSelected(row, item)" @change="(val) => toggleItem(row, item, val)" />
+                  </template>
+                </el-table-column>
+                <el-table-column prop="materialName" label="产品名称" min-width="150" show-overflow-tooltip />
+                <el-table-column prop="spec" label="型号规格" width="120" />
+                <el-table-column prop="processName" label="工艺" width="100" />
+                <el-table-column prop="receiptSource" label="收货来源" width="90" />
+                <el-table-column prop="quantity" label="收货数量" width="90" align="right" />
+                <el-table-column prop="unshippedQty" label="未发数量" width="90" align="right" />
+                <el-table-column prop="unitPrice" label="单价" width="80" align="right" />
+                <el-table-column prop="detailRemark" label="备注" min-width="100" show-overflow-tooltip />
+              </el-table>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column type="index" label="#" width="50" align="center" />
+        <el-table-column prop="receiptDate" label="收货日期" width="110" />
+        <el-table-column prop="receiptNo" label="收货单号" width="160" />
+        <el-table-column label="明细/已选" width="100" align="center">
+          <template #default="{ row }">
+            {{ (row.items || []).length }} / {{ (row._selectedIds || []).length }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
+      </el-table>
+
+      <template #footer>
+        <el-button @click="receiptSelectVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="selectedReceiptItems.length === 0" @click="confirmReceiptSelect">
+          确认填充（已选 {{ selectedReceiptItems.length }} 条）
+        </el-button>
       </template>
     </el-dialog>
 
@@ -805,6 +873,166 @@ const handleExport = async () => {
   } finally {
     exporting.value = false
   }
+}
+
+// ---- 收货单选择功能 ----
+const receiptSelectVisible = ref(false)
+const receiptSelectList = ref([])  // 分组后的原始数据
+const filteredReceiptSelectList = ref([])  // 过滤后的数据
+const selectedReceiptItems = ref([])  // 选中的明细项（扁平列表）
+const receiptSearchKeyword = ref('')
+const receiptSearchDateRange = ref([])
+
+const resetReceiptSelect = () => {
+  receiptSelectList.value = []
+  filteredReceiptSelectList.value = []
+  receiptSearchKeyword.value = ''
+  receiptSearchDateRange.value = []
+  selectedReceiptItems.value = []
+}
+
+// 给每个 group 初始化 _selectedIds 数组
+const initGroupState = (list) => {
+  list.forEach(g => {
+    if (!g._selectedIds) g._selectedIds = []
+  })
+  return list
+}
+
+const openReceiptSelectDialog = async () => {
+  if (!formData.customerId) {
+    ElMessage.warning('请先选择客户')
+    return
+  }
+  receiptSelectVisible.value = true
+  resetReceiptSelect()
+  try {
+    const res = await request.get('/receipt-items/by-customer', { params: { customerId: formData.customerId } })
+    const list = Array.isArray(res) ? res : (res.data || [])
+    initGroupState(list)
+    receiptSelectList.value = list
+    filteredReceiptSelectList.value = list
+  } catch (e) {
+    receiptSelectList.value = []
+    filteredReceiptSelectList.value = []
+  }
+}
+
+const doReceiptSearch = () => {
+  const q = (receiptSearchKeyword.value || '').toLowerCase().trim()
+  const startD = receiptSearchDateRange.value?.[0]
+  const endD = receiptSearchDateRange.value?.[1]
+  filteredReceiptSelectList.value = receiptSelectList.value.filter(group => {
+    // 日期过滤
+    if (startD && group.receiptDate && group.receiptDate < startD) return false
+    if (endD && group.receiptDate && group.receiptDate > endD) return false
+    // 关键词过滤
+    if (!q) return true
+    const matchNo = (group.receiptNo && group.receiptNo.toLowerCase().includes(q))
+    const matchRemark = (group.remark && group.remark.toLowerCase().includes(q))
+    const matchItem = (group.items || []).some(item =>
+      (item.materialName && item.materialName.toLowerCase().includes(q)) ||
+      (item.materialCode && item.materialCode.toLowerCase().includes(q)) ||
+      (item.processName && item.processName.toLowerCase().includes(q))
+    )
+    return matchNo || matchRemark || matchItem
+  })
+}
+
+const resetReceiptSearch = () => {
+  receiptSearchKeyword.value = ''
+  receiptSearchDateRange.value = []
+  filteredReceiptSelectList.value = receiptSelectList.value
+}
+
+// 展开行
+const receiptExpandedRows = ref(new Set())
+const onReceiptExpandChange = (row, expandedRows) => {
+  if (expandedRows.some(r => r.receiptId === row.receiptId)) {
+    receiptExpandedRows.value.add(row.receiptId)
+  } else {
+    receiptExpandedRows.value.delete(row.receiptId)
+  }
+}
+
+// 判断子明细是否选中
+const isItemSelected = (group, item) => {
+  return (group._selectedIds || []).includes(item.id)
+}
+
+// 切换单个子明细
+const toggleItem = (group, item, checked) => {
+  if (!group._selectedIds) group._selectedIds = []
+  if (checked) {
+    if (!group._selectedIds.includes(item.id)) {
+      group._selectedIds.push(item.id)
+    }
+  } else {
+    group._selectedIds = group._selectedIds.filter(id => id !== item.id)
+  }
+  // 更新全选状态
+  const total = (group.items || []).length
+  group._allChecked = group._selectedIds.length === total
+  group._indeterminate = group._selectedIds.length > 0 && group._selectedIds.length < total
+  rebuildSelectedItems()
+}
+
+// 全选/取消全选某个收货单下所有明细
+const toggleAllItems = (group, checked) => {
+  if (checked) {
+    group._selectedIds = (group.items || []).map(i => i.id)
+  } else {
+    group._selectedIds = []
+  }
+  group._indeterminate = false
+  rebuildSelectedItems()
+}
+
+// 子表行高亮
+const itemRowHighlight = ({ row: item, row: _row }) => {
+  // 需要找到父 group，但这里拿不到；通过响应式追踪判断
+  return ''
+}
+
+// 重建选中项
+const rebuildSelectedItems = () => {
+  const items = []
+  receiptSelectList.value.forEach(group => {
+    const selIds = group._selectedIds || []
+    if (selIds.length > 0) {
+      ;(group.items || []).forEach(item => {
+        if (selIds.includes(item.id)) {
+          items.push({ ...item, _receiptDate: group.receiptDate, _receiptNo: group.receiptNo })
+        }
+      })
+    }
+  })
+  selectedReceiptItems.value = items
+}
+
+const confirmReceiptSelect = () => {
+  if (selectedReceiptItems.value.length === 0) return
+  selectedReceiptItems.value.forEach(item => {
+    const newRow = {
+      materialId: item.materialId || null,
+      materialName: item.materialName || '',
+      materialCode: item.materialCode || '',
+      spec: item.spec || '',
+      processId: item.processId || null,
+      processName: item.processName || '',
+      receiptType: item.receiptSource || '正常',
+      unit: '个',
+      _matOptions: item.materialId ? [{ id: item.materialId, name: item.materialName, code: item.materialCode, spec: item.spec }] : [...defaultMatOptions.value],
+      _matLoading: false,
+      plannedQty: Number(item.unshippedQty) || Number(item.quantity) || 0,
+      platingPrice: Number(item.unitPrice) || 0,
+      productionType: '自制',
+      detailRemark: item.detailRemark || ''
+    }
+    formData.items.push(newRow)
+  })
+  receiptSelectVisible.value = false
+  ElMessage.success(`已填充 ${selectedReceiptItems.value.length} 条收货单数据到排产明细`)
 }
 </script>
 

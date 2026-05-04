@@ -504,10 +504,20 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
 
         XSSFWorkbook wb = new XSSFWorkbook();
         Sheet sheet = wb.createSheet("发货单");
-        String[] headers = {"发货单号","发货日期","客户名称","制单人","备注","物料编码","物料名称","型号规格","工艺名称",
+        String[] headers = {"发货单号","发货日期","客户名称","客户类型","制单人","备注","物料编码","物料名称","型号规格","工艺名称",
             "良品数量","原件退回","单价","金额","明细备注"};
         ExcelExportUtil.writeTitleRow(sheet, wb, "发货单", headers.length);
         ExcelExportUtil.writeHeaderRow(sheet, wb, headers);
+
+        // 查询所有相关客户的类型
+        java.util.Set<Long> customerIds = shipments.stream().map(Shipment::getCustomerId).collect(java.util.stream.Collectors.toSet());
+        java.util.Map<Long, String> customerTypeMap = new java.util.HashMap<>();
+        if (!customerIds.isEmpty()) {
+            List<Customer> customers = customerMapper.selectBatchIds(customerIds);
+            for (Customer c : customers) {
+                customerTypeMap.put(c.getId(), c.getCustomerType());
+            }
+        }
 
         CellStyle masterS = ExcelExportUtil.masterRowStyle(wb);
         CellStyle masterDateS = ExcelExportUtil.masterRowDateStyle(wb);
@@ -524,13 +534,16 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
         int detailCount = 0;
         for (Shipment s : shipments) {
             List<ShipmentItem> items = itemMap.getOrDefault(s.getId(), new ArrayList<>());
+            String customerType = customerTypeMap.getOrDefault(s.getCustomerId(), "");
+            boolean isCash = "现金".equals(customerType);
             Row masterRow = sheet.createRow(rowIdx++);
             ExcelExportUtil.setCell(masterRow, 0, s.getShipmentNo(), masterS);
             ExcelExportUtil.setCell(masterRow, 1, ExcelExportUtil.fmtDate(s.getShipmentDate()), masterDateS);
             ExcelExportUtil.setCell(masterRow, 2, s.getCustomerName(), masterS);
-            ExcelExportUtil.setCell(masterRow, 3, s.getOperator(), masterS);
-            ExcelExportUtil.setCell(masterRow, 4, s.getRemark(), masterS);
-            for (int i = 5; i < headers.length; i++) ExcelExportUtil.setCell(masterRow, i, "", masterS);
+            ExcelExportUtil.setCell(masterRow, 3, customerType, masterS);
+            ExcelExportUtil.setCell(masterRow, 4, s.getOperator(), masterS);
+            ExcelExportUtil.setCell(masterRow, 5, s.getRemark(), masterS);
+            for (int i = 6; i < headers.length; i++) ExcelExportUtil.setCell(masterRow, i, "", masterS);
 
             for (ShipmentItem item : items) {
                 if (detailCount >= 50000) break;
@@ -539,16 +552,16 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
                 CellStyle ns = even ? n0 : n1;
                 CellStyle qs = even ? q0 : q1;
                 Row row = sheet.createRow(rowIdx++);
-                for (int i = 0; i < 5; i++) ExcelExportUtil.setCell(row, i, "", cs);
-                ExcelExportUtil.setCell(row, 5, item.getMaterialCode(), cs);
-                ExcelExportUtil.setCell(row, 6, item.getMaterialName(), cs);
-                ExcelExportUtil.setCell(row, 7, item.getSpec(), cs);
-                ExcelExportUtil.setCell(row, 8, item.getProcessName(), cs);
-                ExcelExportUtil.setCell(row, 9, item.getQuantity(), qs);
-                ExcelExportUtil.setCell(row, 10, item.getDefectiveQty(), qs);
-                ExcelExportUtil.setCell(row, 11, item.getUnitPrice(), ns);
-                ExcelExportUtil.setCell(row, 12, item.getAmount(), ns);
-                ExcelExportUtil.setCell(row, 13, item.getDetailRemark(), cs);
+                for (int i = 0; i < 6; i++) ExcelExportUtil.setCell(row, i, "", cs);
+                ExcelExportUtil.setCell(row, 6, item.getMaterialCode(), cs);
+                ExcelExportUtil.setCell(row, 7, item.getMaterialName(), cs);
+                ExcelExportUtil.setCell(row, 8, item.getSpec(), cs);
+                ExcelExportUtil.setCell(row, 9, item.getProcessName(), cs);
+                ExcelExportUtil.setCell(row, 10, item.getQuantity(), qs);
+                ExcelExportUtil.setCell(row, 11, item.getDefectiveQty(), qs);
+                ExcelExportUtil.setCell(row, 12, item.getUnitPrice(), ns);
+                ExcelExportUtil.setCell(row, 13, item.getAmount(), ns);
+                ExcelExportUtil.setCell(row, 14, item.getDetailRemark(), cs);
                 if (item.getQuantity() != null) totalQty = totalQty.add(item.getQuantity());
                 if (item.getDefectiveQty() != null) totalDefQty = totalDefQty.add(item.getDefectiveQty());
                 if (item.getAmount() != null) totalAmount = totalAmount.add(item.getAmount());
@@ -561,12 +574,12 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
         CellStyle sumQ = ExcelExportUtil.summaryQtyStyle(wb);
         Row sumRow = sheet.createRow(rowIdx);
         ExcelExportUtil.setCell(sumRow, 0, "合计", sumS);
-        for (int i = 1; i <= 8; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
-        ExcelExportUtil.setCell(sumRow, 9, totalQty, sumQ);
-        ExcelExportUtil.setCell(sumRow, 10, totalDefQty, sumQ);
-        ExcelExportUtil.setCell(sumRow, 11, "", sumS);
-        ExcelExportUtil.setCell(sumRow, 12, totalAmount, sumN);
-        ExcelExportUtil.setCell(sumRow, 13, "", sumS);
+        for (int i = 1; i <= 9; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 10, totalQty, sumQ);
+        ExcelExportUtil.setCell(sumRow, 11, totalDefQty, sumQ);
+        ExcelExportUtil.setCell(sumRow, 12, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 13, totalAmount, sumN);
+        ExcelExportUtil.setCell(sumRow, 14, "", sumS);
 
         sheet.createFreezePane(0, 2);
         ExcelExportUtil.autoSize(sheet, headers.length);

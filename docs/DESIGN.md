@@ -1218,4 +1218,26 @@ body {
 
 ---
 
-*文档版本：v1.7 | 最后更新：2026-03-26*
+*文档版本：v1.8 | 最后更新：2026-05-04*
+
+---
+
+## 二十一、功能变更记录
+
+### 21.1 对账单导出增加"原件退回"列（2026-05-04）
+
+- **后端** `StatementServiceImpl.exportExcel`：发货分组从2列（良品/合计）改为3列（良品/原件退回/合计），良品 = shipmentQty - defectiveQty
+- **前端** `statement/index.vue`：展开明细表格发货分组增加"原件退回"列，使用 `goodsShipQty` 显示良品发货数量
+- 导出列索引调整：独立列 0-7,14,15,19；收货分组 8-10；发货分组 11-13；金额分组 16-18
+
+### 21.2 发货单按客户类型区分展示（2026-05-04）
+
+- **后端** `CustomerServiceImpl.listAll/listAllByType`：返回数据增加 `customerType` 字段
+- **后端** `ShipmentServiceImpl.exportExcel`：新增"客户类型"列，动态列根据客户类型区分（现金显示单价，月结显示不良品数量）
+- **前端** `shipment/index.vue`：展开明细表格"单价"列改为动态列（现金客户显示单价，月结客户显示不良品数量），增加合计行
+
+### 21.3 排产单新增支持收货单快速填充（2026-05-04）
+
+- **后端** `ReceiptItemService.listByCustomerId`：新增方法，按客户ID查询收货明细（JOIN收货单获取日期，按收货日期倒序，LIMIT 500）
+- **后端** `ReceiptItemController`：新增 `GET /api/receipt-items/by-customer?customerId=xxx` 端点
+- **前端** `production/index.vue`：新增"从收货单填充"按钮和选择弹窗，支持搜索过滤，选中后自动填充排产明细（物料、工艺、数量、单价等）

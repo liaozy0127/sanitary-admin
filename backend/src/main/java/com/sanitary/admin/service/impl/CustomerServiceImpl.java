@@ -49,13 +49,14 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     public List<Map<String, Object>> listAll() {
         return list(new LambdaQueryWrapper<Customer>()
                 .eq(Customer::getStatus, 1)
-                .select(Customer::getId, Customer::getCustomerName)
+                .select(Customer::getId, Customer::getCustomerName, Customer::getCustomerType)
                 .orderByAsc(Customer::getCustomerCode))
                 .stream()
                 .map(c -> {
                     Map<String, Object> m = new HashMap<>();
                     m.put("id", c.getId());
                     m.put("name", c.getCustomerName());
+                    m.put("customerType", c.getCustomerType());
                     return m;
                 })
                 .collect(Collectors.toList());
@@ -66,13 +67,14 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         return list(new LambdaQueryWrapper<Customer>()
                 .eq(Customer::getStatus, 1)
                 .eq(StringUtils.hasText(customerType), Customer::getCustomerType, customerType)
-                .select(Customer::getId, Customer::getCustomerName)
+                .select(Customer::getId, Customer::getCustomerName, Customer::getCustomerType)
                 .orderByAsc(Customer::getCustomerCode))
                 .stream()
                 .map(c -> {
                     Map<String, Object> m = new HashMap<>();
                     m.put("id", c.getId());
                     m.put("name", c.getCustomerName());
+                    m.put("customerType", c.getCustomerType());
                     return m;
                 })
                 .collect(Collectors.toList());

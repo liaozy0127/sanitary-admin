@@ -60,7 +60,10 @@
                 </el-table-column>
                 <el-table-column label="本月发货" align="center" header-align="center">
                   <el-table-column label="良品" width="90" align="right">
-                    <template #default="{ row: item }">{{ fmtQty(item.shipmentQty) }}</template>
+                    <template #default="{ row: item }">{{ fmtQty(Number(item.shipmentQty || 0) - Number(item.defectiveQty || 0)) }}</template>
+                  </el-table-column>
+                  <el-table-column label="原件退回" width="90" align="right">
+                    <template #default="{ row: item }">{{ fmtQty(item.defectiveQty) }}</template>
                   </el-table-column>
                   <el-table-column label="合计" width="90" align="right">
                     <template #default="{ row: item }">{{ fmtQty(item.shipmentQty) }}</template>
@@ -97,7 +100,9 @@
                 合计：收货(正常) <b>{{ sumField(row.items, 'normalReceiptQty') }}</b> &nbsp;|&nbsp;
                 收货(返工) <b>{{ sumField(row.items, 'reworkQty') }}</b> &nbsp;|&nbsp;
                 收货(合计) <b>{{ sumField(row.items, 'receiptQty') }}</b> &nbsp;|&nbsp;
-                发货(良品/合计) <b>{{ sumField(row.items, 'shipmentQty') }}</b> &nbsp;|&nbsp;
+                发货(良品) <b>{{ row.items.reduce((s,it) => s + (Number(it.shipmentQty||0) - Number(it.defectiveQty||0)), 0) }}</b> &nbsp;|&nbsp;
+                发货(退回) <b>{{ sumField(row.items, 'defectiveQty') }}</b> &nbsp;|&nbsp;
+                发货(合计) <b>{{ sumField(row.items, 'shipmentQty') }}</b> &nbsp;|&nbsp;
                 金额(良品) <b>¥{{ sumField(row.items, 'goodsAmount') }}</b> &nbsp;|&nbsp;
                 金额(返工) <b style="color:#f56c6c">¥{{ sumField(row.items, 'reworkAmount') }}</b> &nbsp;|&nbsp;
                 金额(合计) <b>¥{{ sumField(row.items, 'shipmentAmount') }}</b>

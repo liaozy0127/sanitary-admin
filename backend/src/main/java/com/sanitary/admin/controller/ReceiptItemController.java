@@ -35,4 +35,12 @@ public class ReceiptItemController {
         }
         return result;
     }
+
+    /**
+     * 按客户ID查询收货明细（按收货日期倒序），用于排产单快速填充
+     */
+    @GetMapping("/by-customer")
+    public List<Map<String, Object>> getByCustomerId(@RequestParam Long customerId) {
+        return receiptItemService.listByCustomerId(customerId);
+    }
 }

@@ -499,15 +499,17 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
             }
             item.setPrevBalanceQty(prevBal);
             item.setCurrBalanceQty(currBal);
-            // 发货金额（良品）= 发货总数量 × 单价
+            // 发货金额（良品）= (发货总数量 - 原件退回) × 单价
             BigDecimal shipQty = item.getShipmentQty() != null ? item.getShipmentQty() : BigDecimal.ZERO;
-            BigDecimal goodsAmount = shipQty.multiply(item.getUnitPrice()).setScale(2, java.math.RoundingMode.HALF_UP);
+            BigDecimal defQty = item.getDefectiveQty() != null ? item.getDefectiveQty() : BigDecimal.ZERO;
+            BigDecimal goodsQty = shipQty.subtract(defQty);
+            BigDecimal goodsAmount = goodsQty.multiply(item.getUnitPrice()).setScale(2, java.math.RoundingMode.HALF_UP);
             // 发货金额（返工）= -本月收货（返工）× 单价（负数，表示抵扣）
             BigDecimal reworkQty = item.getReworkQty() != null ? item.getReworkQty() : BigDecimal.ZERO;
             BigDecimal reworkAmount = reworkQty.multiply(item.getUnitPrice()).negate().setScale(2, java.math.RoundingMode.HALF_UP);
             // 发货金额（合计）= 良品金额 + 返工金额
             BigDecimal totalAmount = goodsAmount.add(reworkAmount);
-            item.setGoodsShipQty(shipQty);
+            item.setGoodsShipQty(goodsQty);
             item.setGoodsAmount(goodsAmount);
             item.setReworkAmount(reworkAmount);
             item.setPrevFinancialBalance(BigDecimal.ZERO);
@@ -774,18 +776,18 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         String[] headers = {"对账单号","对账月份","客户名称","产品编码","产品名称","规格型号","工艺要求",
             "上月结余",
             "正常","返工","合计",
-            "良品","合计",
+            "良品","原件退回","合计",
             "本月结余",
             "单价",
             "良品","返工","合计",
             "备注"};
         ExcelExportUtil.writeTitleRow(sheet, wb, "对账单", headers.length);
         // 二级分组表头：行1=分组，行2=子列
-        // 独立列：0-7（对账单号~上月结余）、13（本月结余）、14（单价）、18（备注）
-        // 本月收货：8-10，本月发货：11-12，发货金额：15-17
+        // 独立列：0-7（对账单号~上月结余）、14（本月结余）、15（单价）、19（备注）
+        // 本月收货：8-10，本月发货：11-13，发货金额：16-18
         ExcelExportUtil.writeTwoLevelHeaderRows(sheet, wb,
-            new int[]{0,1,2,3,4,5,6,7,13,14,18},
-            new int[][]{{8,9,10},{11,12},{15,16,17}},
+            new int[]{0,1,2,3,4,5,6,7,14,15,19},
+            new int[][]{{8,9,10},{11,12,13},{16,17,18}},
             new String[]{"本月收货","本月发货","发货金额"},
             headers);
 
@@ -799,6 +801,7 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
 
         BigDecimal totalReceiptQty = BigDecimal.ZERO, totalNormalReceiptQty = BigDecimal.ZERO,
             totalReworkReceiptQty = BigDecimal.ZERO, totalGoodsShipQty = BigDecimal.ZERO,
+            totalDefectiveQty = BigDecimal.ZERO,
             totalShipmentQty = BigDecimal.ZERO, totalGoodsAmount = BigDecimal.ZERO,
             totalReworkAmount = BigDecimal.ZERO,
             totalTotalAmount = BigDecimal.ZERO,
@@ -834,24 +837,28 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
                 BigDecimal reworkReceiptQty = item.getReworkQty() != null ? item.getReworkQty() : BigDecimal.ZERO;
                 BigDecimal receiptTotal = item.getReceiptQty() != null ? item.getReceiptQty() : BigDecimal.ZERO;
                 BigDecimal shipTotalQty = item.getShipmentQty() != null ? item.getShipmentQty() : BigDecimal.ZERO;
+                BigDecimal defQty = item.getDefectiveQty() != null ? item.getDefectiveQty() : BigDecimal.ZERO;
+                BigDecimal goodsShipQty = shipTotalQty.subtract(defQty);  // 良品 = 发货合计 - 原件退回
                 BigDecimal goodsAmtVal = item.getGoodsAmount() != null ? item.getGoodsAmount() : BigDecimal.ZERO;
                 BigDecimal reworkAmtVal = item.getReworkAmount() != null ? item.getReworkAmount() : BigDecimal.ZERO;
                 BigDecimal totalAmtVal = item.getShipmentAmount() != null ? item.getShipmentAmount() : BigDecimal.ZERO;
                 ExcelExportUtil.setCell(row, 8, normalReceiptQty, qs);
                 ExcelExportUtil.setCell(row, 9, reworkReceiptQty, qs);
                 ExcelExportUtil.setCell(row, 10, receiptTotal, qs);
-                ExcelExportUtil.setCell(row, 11, shipTotalQty, qs);  // 本月发货(良品) = 发货总数
-                ExcelExportUtil.setCell(row, 12, shipTotalQty, qs);  // 本月发货(合计) = 同上
-                ExcelExportUtil.setCell(row, 13, item.getCurrBalanceQty(), qs);
-                ExcelExportUtil.setCell(row, 14, item.getUnitPrice(), ns);
-                ExcelExportUtil.setCell(row, 15, goodsAmtVal, ns);
-                ExcelExportUtil.setCell(row, 16, reworkAmtVal, ns);
-                ExcelExportUtil.setCell(row, 17, totalAmtVal, ns);       // 发货金额(合计)
-                ExcelExportUtil.setCell(row, 18, item.getRemark(), cs);
+                ExcelExportUtil.setCell(row, 11, goodsShipQty, qs);       // 本月发货(良品) = 发货合计 - 原件退回
+                ExcelExportUtil.setCell(row, 12, defQty, qs);             // 本月发货(原件退回)
+                ExcelExportUtil.setCell(row, 13, shipTotalQty, qs);       // 本月发货(合计)
+                ExcelExportUtil.setCell(row, 14, item.getCurrBalanceQty(), qs);
+                ExcelExportUtil.setCell(row, 15, item.getUnitPrice(), ns);
+                ExcelExportUtil.setCell(row, 16, goodsAmtVal, ns);
+                ExcelExportUtil.setCell(row, 17, reworkAmtVal, ns);
+                ExcelExportUtil.setCell(row, 18, totalAmtVal, ns);        // 发货金额(合计)
+                ExcelExportUtil.setCell(row, 19, item.getRemark(), cs);
                 totalReceiptQty = totalReceiptQty.add(receiptTotal);
                 totalNormalReceiptQty = totalNormalReceiptQty.add(normalReceiptQty);
                 totalReworkReceiptQty = totalReworkReceiptQty.add(reworkReceiptQty);
-                totalGoodsShipQty = totalGoodsShipQty.add(shipTotalQty);
+                totalGoodsShipQty = totalGoodsShipQty.add(goodsShipQty);
+                totalDefectiveQty = totalDefectiveQty.add(defQty);
                 totalShipmentQty = totalShipmentQty.add(shipTotalQty);
                 totalGoodsAmount = totalGoodsAmount.add(goodsAmtVal);
                 totalReworkAmount = totalReworkAmount.add(reworkAmtVal);
@@ -870,20 +877,21 @@ public class StatementServiceImpl extends ServiceImpl<StatementMapper, Statement
         ExcelExportUtil.setCell(sumRow, 9, totalReworkReceiptQty, sumQ);
         ExcelExportUtil.setCell(sumRow, 10, totalReceiptQty, sumQ);
         ExcelExportUtil.setCell(sumRow, 11, totalGoodsShipQty, sumQ);
-        ExcelExportUtil.setCell(sumRow, 12, totalShipmentQty, sumQ);
-        ExcelExportUtil.setCell(sumRow, 13, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 12, totalDefectiveQty, sumQ);
+        ExcelExportUtil.setCell(sumRow, 13, totalShipmentQty, sumQ);
         ExcelExportUtil.setCell(sumRow, 14, "", sumS);
-        ExcelExportUtil.setCell(sumRow, 15, totalGoodsAmount, sumN);
-        ExcelExportUtil.setCell(sumRow, 16, totalReworkAmount, sumN);
-        ExcelExportUtil.setCell(sumRow, 17, totalTotalAmount, sumN);
-        ExcelExportUtil.setCell(sumRow, 18, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 15, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 16, totalGoodsAmount, sumN);
+        ExcelExportUtil.setCell(sumRow, 17, totalReworkAmount, sumN);
+        ExcelExportUtil.setCell(sumRow, 18, totalTotalAmount, sumN);
+        ExcelExportUtil.setCell(sumRow, 19, "", sumS);
 
         // 应收金额行（Statement 级别 shipmentAmount 之和，含结转扣减）
         Row receivableRow = sheet.createRow(rowIdx + 1);
         CellStyle receivableLabel = ExcelExportUtil.summaryStyle(wb);
         for (int i = 0; i < headers.length; i++) ExcelExportUtil.setCell(receivableRow, i, "", receivableLabel);
         ExcelExportUtil.setCell(receivableRow, 0, "应收金额", receivableLabel);
-        ExcelExportUtil.setCell(receivableRow, 17, totalReceivable, sumN);
+        ExcelExportUtil.setCell(receivableRow, 18, totalReceivable, sumN);
 
         sheet.createFreezePane(0, 3);
         ExcelExportUtil.autoSize(sheet, headers.length);
