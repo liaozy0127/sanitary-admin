@@ -668,14 +668,14 @@ const handlePrint = async (row) => {
   .sig-line span { flex: 1; text-align: left; }
   .measure-wrap { position: absolute; top: -9999px; left: 0; width: ${PAGE_BODY_WIDTH_PX}px; visibility: hidden; }`
 
-    const colWidthsCash = ['5%','29%','13%','5%','11%','6%','8%','7%','8%','8%']
+    const colWidthsCash = ['5%','27%','13%','5%','11%','6%','8%','10%','8%','7%']
     const colWidthsMonthly = ['5%','30%','14%','5%','12%','6%','10%','10%','8%']
     const colWidths = isCash ? colWidthsCash : colWidthsMonthly
     const colGroupHtml = `<colgroup>${colWidths.map(w => `<col style="width:${w}">`).join('')}</colgroup>`
 
     // 表头行 HTML（不含 <tr> 包裹）
     const headerCellsHtml = isCash
-      ? `<th style="width:5%">序号</th><th style="width:29%">品名</th><th style="width:13%">规格</th><th style="width:5%">单位</th><th style="width:11%">工艺要求</th><th style="width:6%">类型</th><th style="width:8%">良品数量</th><th style="width:7%">单价</th><th style="width:8%">原件退回</th><th style="width:8%">备注</th>`
+      ? `<th style="width:5%">序号</th><th style="width:27%">品名</th><th style="width:13%">规格</th><th style="width:5%">单位</th><th style="width:11%">工艺要求</th><th style="width:6%">类型</th><th style="width:8%">良品数量</th><th style="width:10%">单价</th><th style="width:8%">原件退回</th><th style="width:7%">备注</th>`
       : `<th style="width:5%">序号</th><th style="width:30%">品名</th><th style="width:14%">规格</th><th style="width:5%">单位</th><th style="width:12%">工艺要求</th><th style="width:6%">类型</th><th style="width:10%">良品数量</th><th style="width:10%">原件退回</th><th style="width:8%">备注</th>`
 
     const makeDataRowHtml = (item, seqNo) => {
