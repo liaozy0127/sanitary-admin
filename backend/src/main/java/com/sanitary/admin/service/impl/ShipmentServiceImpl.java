@@ -577,7 +577,7 @@ public class ShipmentServiceImpl extends ServiceImpl<ShipmentMapper, Shipment> i
         for (int i = 1; i <= 9; i++) ExcelExportUtil.setCell(sumRow, i, "", sumS);
         ExcelExportUtil.setCell(sumRow, 10, totalQty, sumQ);
         ExcelExportUtil.setCell(sumRow, 11, totalDefQty, sumQ);
-        ExcelExportUtil.setCell(sumRow, 12, "", sumS);
+        ExcelExportUtil.setCell(sumRow, 12, totalAmount, sumN);
         ExcelExportUtil.setCell(sumRow, 13, totalAmount, sumN);
         ExcelExportUtil.setCell(sumRow, 14, "", sumS);
 

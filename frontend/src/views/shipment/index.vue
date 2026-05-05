@@ -45,7 +45,7 @@
                 <el-table-column prop="processName" label="工艺" width="100" />
                 <el-table-column prop="quantity" label="良品数量" width="90" align="right" />
                 <el-table-column prop="defectiveQty" label="原件退回" width="90" align="right" />
-                <el-table-column prop="unitPrice" label="单价" width="80" align="right">
+                <el-table-column property="unitPrice" label="单价" width="80" align="right">
                   <template #default="{ row: item }">
                     {{ item.unitPrice ? Number(item.unitPrice).toFixed(2) : '0.00' }}
                   </template>
@@ -436,6 +436,7 @@ const isCashCustomer = (customerId) => {
 
 // 发货展开明细合计行
 const getShipmentSummary = ({ columns, data }, customerId) => {
+  const totalAmount = data.reduce((s, it) => s + (Number(it.amount) || 0), 0)
   const sums = []
   columns.forEach((col, index) => {
     if (index === 0) {
@@ -446,8 +447,10 @@ const getShipmentSummary = ({ columns, data }, customerId) => {
       sums[index] = data.reduce((s, it) => s + (Number(it.quantity) || 0), 0)
     } else if (col.property === 'defectiveQty') {
       sums[index] = data.reduce((s, it) => s + (Number(it.defectiveQty) || 0), 0)
+    } else if (col.property === 'unitPrice') {
+      sums[index] = totalAmount.toFixed(2)
     } else if (col.property === 'amount') {
-      sums[index] = data.reduce((s, it) => s + (Number(it.amount) || 0), 0).toFixed(2)
+      sums[index] = totalAmount.toFixed(2)
     } else {
       sums[index] = ''
     }
@@ -632,6 +635,7 @@ const handlePrint = async (row) => {
 
     const totalGoodQty = items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)
     const totalDefectiveQty = items.reduce((sum, item) => sum + (parseFloat(item.defectiveQty) || 0), 0)
+    const totalAmount = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0).toFixed(2)
 
     // 纸张: 241mm × 140mm，页边距 5mm，96dpi 下 1mm ≈ 3.7795px
     // 可用高度: 130mm，page-body 宽度 = 241 - 5*2(margin) - 10*2(孔戳) = 211mm
@@ -704,7 +708,7 @@ const handlePrint = async (row) => {
     }
 
     const totalRowHtml = isCash
-      ? `<tr><td colspan="6" style="text-align:right;font-weight:bold;">合计</td><td style="text-align:right;font-weight:bold;">${totalGoodQty || ''}</td><td></td><td style="text-align:right;font-weight:bold;">${totalDefectiveQty || ''}</td><td></td></tr>`
+      ? `<tr><td colspan="6" style="text-align:right;font-weight:bold;">合计</td><td style="text-align:right;font-weight:bold;">${totalGoodQty || ''}</td><td style="text-align:right;font-weight:bold;">${totalAmount}</td><td style="text-align:right;font-weight:bold;">${totalDefectiveQty || ''}</td><td></td></tr>`
       : `<tr><td colspan="6" style="text-align:right;font-weight:bold;">合计</td><td style="text-align:right;font-weight:bold;">${totalGoodQty || ''}</td><td style="text-align:right;font-weight:bold;">${totalDefectiveQty || ''}</td><td></td></tr>`
 
     // ── 第一步：测量每行实际渲染高度 ──
